@@ -52,6 +52,7 @@ const FAELLE = {
   'zwo': 2, 'null': 0, 'elf': 11, 'zwölf': 12, 'einundzwanzig': 21, 'neunundneunzig': 99,
   'dreißig': 30, '42': 42, 'das ist 8': 8, 'drei plus vier ist sieben': 7, 'Fünfzehn.': 15,
   'achtundfünfzig': 58, 'eins': 1, 'sechzig': 60, 'hallo': null, '': null,
+  'nein': 9, 'Neu': 9, 'nine': 9, 'Nein.': 9, 'neun': 9, 'sex': 6, 'frei': 3,
 };
 for (const [t, z] of Object.entries(FAELLE)) {
   pruefe(`Zahlwort "${t}"`, () => assert.strictEqual(Zahlwort.parse(t), z));

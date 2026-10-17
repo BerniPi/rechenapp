@@ -12,7 +12,22 @@ const Zahlwort = (() => {
     sechzig: 60, siebzig: 70, achtzig: 80, neunzig: 90, hundert: 100, einhundert: 100,
   };
   // Häufige Verhörer der Spracherkennung
-  const AEHNLICH = { frei: 3, sex: 6, sechse: 6, achte: 8, elfe: 11, zwölfe: 12, eis: 1, ains: 1, hundertt: 100 };
+  // Die Antwort ist immer eine Zahl – darum dürfen ähnlich klingende Wörter als Zahl gelten.
+  const AEHNLICH = {
+    eis: 1, ains: 1, eines: 1,
+    zwai: 2, zwo: 2,
+    frei: 3, drai: 3, trei: 3,
+    fier: 4, vir: 4, fia: 4,
+    fünfe: 5, fünft: 5, fünfte: 5, fuenfe: 5,
+    sex: 6, sechse: 6, sechst: 6, zechs: 6, sechsen: 6,
+    siebn: 7, siebene: 7, sieb: 7,
+    achte: 8, ach: 8, nacht: 8,
+    nein: 9, neu: 9, neune: 9, noin: 9, nain: 9, neum: 9, nine: 9,
+    zehen: 10, zehne: 10,
+    elfe: 11, elfen: 11,
+    zwölfe: 12, zwölf: 12,
+    hundertt: 100, hunderd: 100,
+  };
 
   function wort(w) {
     if (w in EINER) return EINER[w];

@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar.
 // Bei jeder Änderung an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'rechenheld-2';
+const VERSION = 'rechenheld-3';
 const DATEIEN = [
   './', 'index.html', 'manifest.json', 'css/style.css',
   'js/speicher.js', 'js/aufgaben.js', 'js/ton.js', 'js/sprache.js', 'js/app.js',
