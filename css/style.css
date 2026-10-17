@@ -131,7 +131,6 @@ button {
   color: #fff;
   border-color: #2f58d9;
 }
-.gruppe.aus { opacity: .35; pointer-events: none; }
 
 .rekord-info { text-align: center; color: var(--leise); min-height: 1.4em; margin: 14px 0 4px; font-weight: 700; }
 

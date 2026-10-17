@@ -37,7 +37,6 @@
         b.classList.toggle('an', an);
       });
     });
-    $('#gruppe-einsetzen').classList.toggle('aus', s.modus === 'sprache');
     rekordInfo();
     sprachHinweis();
   }
@@ -77,7 +76,7 @@
   });
 
   function rekordSchluessel(s) {
-    const ein = s.modus === 'schrift' && s.einsetzen ? 'E' : '';
+    const ein = s.einsetzen ? 'E' : '';
     return `${s.modus}|${s.art}|${[...s.ops].sort().join('')}|${s.raum}|${ein}`;
   }
   function rekordText(r, art) {
@@ -118,8 +117,6 @@
       if (!Sprache.kannHoeren) {
         alert('Dieser Browser kann leider keine Sprache erkennen. Bitte Chrome verwenden – jetzt geht es mit Schreiben weiter.');
         s.modus = 'schrift';
-      } else {
-        s.einsetzen = false;
       }
     }
     // Sprechen: erst Sprachmodell laden und Mikrofon öffnen, dann startet die Uhr.
@@ -228,10 +225,15 @@
   }
 
   function aufgabeZeigen() {
+    const luecke = `<span class="luecke" id="luecke">${R.eingabe}</span>`;
+    // Im Sprechmodus wird die Aufgabe nur vorgelesen, nicht angezeigt.
+    if (R.s.modus === 'sprache') {
+      $('#aufgabe').innerHTML = R.tastatur ? `👂 = ${luecke}` : '👂';
+      return;
+    }
     const t = Aufgaben.teile(R.auf);
-    const zahl = (n) => (n === null ? `<span class="luecke" id="luecke">${R.eingabe}</span>` : n);
-    const c = R.s.modus === 'sprache' && !R.tastatur && t.c === null ? '<span class="luecke">?</span>' : zahl(t.c);
-    $('#aufgabe').innerHTML = `${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${c}`;
+    const zahl = (n) => (n === null ? luecke : n);
+    $('#aufgabe').innerHTML = `${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${zahl(t.c)}`;
   }
 
   function ziffer(z) {
@@ -305,10 +307,7 @@
           R.tastatur = true;
           $('#tastatur').classList.remove('versteckt');
           $('#sprach-knoepfe').classList.add('versteckt');
-          if (R.auf.luecke === 'c') {
-            $('#aufgabe').querySelector('.luecke').id = 'luecke';
-            $('#aufgabe').querySelector('.luecke').textContent = '';
-          }
+          aufgabeZeigen();
         }
       },
       onZahl: (zahl, ok) => {

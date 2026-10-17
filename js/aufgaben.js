@@ -92,8 +92,12 @@ const Aufgaben = (() => {
   }
 
   // Satz zum Vorlesen (nur Ergebnis-gesucht-Aufgaben im Sprechmodus).
+  // Vorlese-Satz: "7 minus 5" bzw. bei Einsetzaufgaben "Wie viel plus 4 ergibt 5?"
   function alsSatz(auf) {
-    return `${auf.a} ${WORT[auf.op]} ${auf.b}`;
+    if (auf.luecke === 'c') return `${auf.a} ${WORT[auf.op]} ${auf.b}`;
+    const a = auf.luecke === 'a' ? 'Wie viel' : auf.a;
+    const b = auf.luecke === 'b' ? 'wie viel' : auf.b;
+    return `${a} ${WORT[auf.op]} ${b} ergibt ${auf.c}?`;
   }
 
   return { erzeuger, neu, teile, alsText, alsSatz, ZEICHEN };
