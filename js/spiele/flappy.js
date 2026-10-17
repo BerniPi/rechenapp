@@ -1,7 +1,7 @@
-// Flappy Vogel: Tippen zum Fliegen, durch die Röhren steuern.
+// Flattervogel: Tippen zum Fliegen, durch die Röhren steuern.
 Spiele.registrieren({
   id: 'flappy',
-  name: 'Flappy Vogel',
+  name: 'Flattervogel',
   emoji: '🐤',
   beschr: 'Tippen und durch die Röhren fliegen',
 

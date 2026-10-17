@@ -1,4 +1,4 @@
-// Unblock: das rote Auto durch Verschieben der anderen Blöcke zum Ausgang bringen.
+// Ausparken: das rote Auto durch Verschieben der anderen Blöcke zum Ausgang bringen.
 // Levels werden zufällig (aber pro Levelnummer immer gleich) erzeugt und mit einer
 // Breitensuche so gewählt, dass die kürzeste Lösung mit dem Level wächst.
 const Unblock = (() => {
@@ -143,7 +143,7 @@ const Unblock = (() => {
 if (typeof module !== 'undefined') module.exports = Unblock;
 else Spiele.registrieren({
   id: 'unblock',
-  name: 'Unblock',
+  name: 'Ausparken',
   emoji: '🚗',
   beschr: 'Schieb die Blöcke, hol das rote Auto raus',
 

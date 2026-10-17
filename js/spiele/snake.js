@@ -1,8 +1,8 @@
-// Snake: Äpfel fressen, nicht gegen Wand oder sich selbst fahren.
+// Apfelschlange: Äpfel fressen, nicht gegen Wand oder sich selbst fahren.
 // Steuerung: Wischen, Pfeil-Knöpfe oder Pfeiltasten.
 Spiele.registrieren({
   id: 'snake',
-  name: 'Snake',
+  name: 'Apfelschlange',
   emoji: '🐍',
   beschr: 'Friss Äpfel und werde lang',
 

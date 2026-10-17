@@ -6,7 +6,7 @@ Rechen-Trainer für die Volksschule als Web-App (PWA) – ohne Build-Schritt, re
 - **Sprechen**: Aufgabe wird vorgelesen, das Kind sagt das Ergebnis. Erkennung wahlweise mit **Vosk** (offline im Browser, nur Zahlwörter 0–100 erlaubt – Standard) oder der Google-Erkennung von Chrome (braucht Internet). Umschalten im Eltern-Bereich. Mikrofon braucht HTTPS.
 - **Spielarten**: 10 Aufgaben auf Zeit, Zeit-Challenge 1 Minute oder 5 Minuten.
 - Rechenarten + − · : (mischbar), Zahlenraum 10/20/50/100, Einsetzaufgaben (nur Schreiben).
-- 1–5 Sterne pro Runde → Sterne sind Währung für Minispiele: Flappy Vogel, Snake, Farbblöcke, Tierturm, Schrauben, Unblock.
+- 1–5 Sterne pro Runde → Sterne sind Währung für Minispiele: Flattervogel, Apfelschlange, Farbblöcke, Tierturm, Schrauben, Ausparken.
 - **Eltern-Bereich**: Zahnrad oben links **lange drücken** – Sterne-Schwellen, Spielpreis (mind. 10 ⭐ für genau eine Runde), Verlauf.
 
 ## Lokal starten
@@ -23,7 +23,7 @@ Dann http://localhost:8765 öffnen.
 node tools/test.js
 ```
 
-Prüft Aufgaben-Generator (keine negativen Ergebnisse, keine Reste, eindeutige Lücken), Zahlwort-Erkennung und die Level-Generatoren von Schrauben und Unblock.
+Prüft Aufgaben-Generator (keine negativen Ergebnisse, keine Reste, eindeutige Lücken), Zahlwort-Erkennung und die Level-Generatoren von Schrauben und Ausparken.
 
 ## Aufs Tablet bringen
 

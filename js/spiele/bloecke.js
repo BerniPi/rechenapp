@@ -1,4 +1,4 @@
-// Farbblöcke (Tetris): Reihen füllen, damit sie verschwinden.
+// Farbblöcke: Reihen füllen, damit sie verschwinden.
 Spiele.registrieren({
   id: 'bloecke',
   name: 'Farbblöcke',
