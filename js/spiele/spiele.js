@@ -2,12 +2,20 @@
 // Jedes Spiel: { id, name, emoji, beschr, zeitlimit?, start(flaeche, hilfe) -> { stop(), zusammenfassung?() } }
 //   zeitlimit: Sekunden – die Runde endet nach dieser Zeit oder vorher durch vorbei()
 //   flaeche: leeres <div>, das den ganzen Spielbereich füllt
-//   hilfe:   { ton, stand(), speichern(), vorbei() } – stand() ist ein Objekt, das gespeichert bleibt;
+//   hilfe:   { ton, stand(), speichern(), vorbei(), pause(an) } – stand() ist ein Objekt, das gespeichert bleibt;
 //            vorbei() meldet das Ende der (einzigen) Runde: verloren oder Level geschafft
+//            (Level-Spiele rufen es nicht – dort geht es bis zum Zeitlimit Level für Level weiter)
+//            pause(true/false) hält die Uhr des Zeitlimits an bzw. lässt sie weiterlaufen
 const Spiele = {
   liste: [],
   registrieren(def) { this.liste.push(def); },
 };
+
+// Abschluss-Text für Level-Spiele: geschafft = Level in dieser Runde, level = nächstes Level
+function levelBilanz(geschafft, level) {
+  if (!geschafft) return `Nicht ganz geschafft – nächstes Mal geht's bei Level ${level} weiter, wo du aufgehört hast.`;
+  return `${geschafft === 1 ? `Level ${level - 1}` : `${geschafft} Level`} geschafft! Nächstes Mal geht's bei Level ${level} weiter.`;
+}
 
 // Kleines Hilfsmittel für Canvas-Spiele: Canvas in Gerätepixeln, passt sich der Größe an.
 function spielCanvas(flaeche) {

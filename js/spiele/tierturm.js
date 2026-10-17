@@ -5,7 +5,7 @@ Spiele.registrieren({
   name: 'Tierturm',
   emoji: '🦒',
   beschr: 'Staple die Tiere so hoch du kannst',
-  zeitlimit: 180,
+  zeitlimit: 60,
 
   start(flaeche, hilfe) {
     const TIERE = [

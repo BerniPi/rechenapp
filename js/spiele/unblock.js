@@ -146,6 +146,7 @@ else Spiele.registrieren({
   name: 'Ausparken',
   emoji: '🚗',
   beschr: 'Schieb die Blöcke, hol das rote Auto raus',
+  zeitlimit: 60, // so viele Level wie in der Zeit gehen
 
   start(flaeche, hilfe) {
     const N = Unblock.N;
@@ -153,6 +154,7 @@ else Spiele.registrieren({
     const stand = hilfe.stand();
     stand.level = stand.level || 1;
     let geschafft = 0;
+    let aus = false;
     let lv, pos, zuege, startPos, fertig;
 
     flaeche.innerHTML = `
@@ -168,20 +170,43 @@ else Spiele.registrieren({
     const titel = flaeche.querySelector('.ub-titel');
     const info = flaeche.querySelector('.ub-info');
 
+    // Angefangenes Level liegt samt Teilen in stand.offen – das Bauen hängt von der Rechenzeit ab
+    // und ergäbe sonst womöglich ein anderes Level. Schwere Level gehen so über mehrere Runden.
     function laden() {
       titel.textContent = `Level ${stand.level}`;
+      const offen = stand.offen;
+      if (offen && offen.level === stand.level) {
+        lv = { teile: offen.teile, d: offen.d };
+        startPos = offen.start;
+        pos = offen.pos.slice();
+        zuege = offen.zuege;
+        fertig = false;
+        zeichnen();
+        return;
+      }
       info.textContent = 'Level wird gebaut …';
+      hilfe.pause(true); // Bauen kostet keine Spielzeit
       setTimeout(() => {
+        if (aus) return;
         lv = Unblock.level(stand.level);
         startPos = lv.pos.slice();
+        stand.offen = { level: stand.level, teile: lv.teile, d: lv.d, start: startPos };
         neuStart();
+        hilfe.pause(false);
       }, 30);
+    }
+
+    function merken() {
+      stand.offen.pos = pos.slice();
+      stand.offen.zuege = zuege;
+      hilfe.speichern();
     }
 
     function neuStart() {
       pos = startPos.slice();
       zuege = 0;
       fertig = false;
+      merken();
       zeichnen();
     }
 
@@ -242,7 +267,7 @@ else Spiele.registrieren({
             zuege++;
             hilfe.ton.note(440, 0, 0.05, 'triangle', 0.12);
             infoText();
-            if (Unblock.geloest(pos)) gewonnen(el);
+            if (Unblock.geloest(pos)) gewonnen(el); else merken();
           }
         };
         el.addEventListener('pointermove', bewegen);
@@ -258,15 +283,19 @@ else Spiele.registrieren({
       setzen(el, 0, N + 1);
       hilfe.ton.jubel();
       const perfekt = zuege <= lv.d;
+      hilfe.pause(true);
       stand.level++;
+      delete stand.offen;
       hilfe.speichern();
       setTimeout(() => {
+        if (aus) return;
         const box = document.createElement('div');
         box.className = 'r-sieg';
         box.innerHTML = `<div class="overlay-box"><h2>${perfekt ? 'Perfekt! 🌟' : 'Geschafft! 🎉'}</h2>
           <p>Level ${stand.level - 1} in ${zuege} Zügen${perfekt ? ' – besser geht\'s nicht!' : ` (am besten ${lv.d})`}</p></div>`;
         flaeche.appendChild(box);
-        hilfe.vorbei();
+        // Bis die Zeit um ist, gleich das nächste Level
+        setTimeout(() => { if (!aus) { box.remove(); laden(); } }, 1300);
       }, 500);
     }
 
@@ -274,9 +303,8 @@ else Spiele.registrieren({
 
     laden();
     return {
-      stop() {},
-      zusammenfassung: () => (geschafft ? `Level ${stand.level - 1} geschafft! Nächstes Mal geht's bei Level ${stand.level} weiter.`
-        : `Nicht ganz geschafft – nächstes Mal wieder Level ${stand.level}.`),
+      stop() { aus = true; },
+      zusammenfassung: () => levelBilanz(geschafft, stand.level),
     };
   },
 });

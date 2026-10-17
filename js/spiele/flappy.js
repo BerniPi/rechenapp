@@ -4,7 +4,7 @@ Spiele.registrieren({
   name: 'Flattervogel',
   emoji: '🐤',
   beschr: 'Tippen und durch die Röhren fliegen',
-  zeitlimit: 180,
+  zeitlimit: 60,
 
   start(flaeche, hilfe) {
     const leinwand = spielCanvas(flaeche);

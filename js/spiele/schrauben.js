@@ -94,12 +94,15 @@ else Spiele.registrieren({
   name: 'Schrauben',
   emoji: '🔩',
   beschr: 'Sortiere die Schrauben nach Farben',
+  zeitlimit: 60, // so viele Level wie in der Zeit gehen
 
   start(flaeche, hilfe) {
     const FARBEN = ['#ef4b4b', '#4f7cff', '#22b867', '#ffc531', '#9b5cff', '#ff8a1f', '#ff6fb5', '#2ec4d6'];
     const stand = hilfe.stand();
     stand.level = stand.level || 1;
     let geschafft = 0;
+    let aus = false;
+    let sieg = false; // Sieg-Hinweis ist zu sehen
     let stangen, verlauf, gewaehlt;
 
     flaeche.innerHTML = `
@@ -114,8 +117,10 @@ else Spiele.registrieren({
     const titel = flaeche.querySelector('.sch-titel');
     const feld = flaeche.querySelector('.sch-stangen');
 
+    // Angefangenes Level weiterspielen – sonst wären schwere Level im Zeitlimit nie zu schaffen
     function laden() {
-      stangen = Schrauben.level(stand.level);
+      const offen = stand.offen;
+      stangen = offen && offen.level === stand.level ? offen.stangen : Schrauben.level(stand.level);
       verlauf = [];
       gewaehlt = null;
       zeichnen();
@@ -140,7 +145,13 @@ else Spiele.registrieren({
       });
     }
 
+    function merken() {
+      stand.offen = { level: stand.level, stangen };
+      hilfe.speichern();
+    }
+
     function tippen(i) {
+      if (sieg) return;
       if (gewaehlt === null) {
         if (stangen[i].length && !Schrauben.komplett(stangen[i])) { gewaehlt = i; hilfe.ton.klick(); }
       } else if (gewaehlt === i) {
@@ -151,6 +162,7 @@ else Spiele.registrieren({
         gewaehlt = null;
         if (Schrauben.komplett(stangen[i])) hilfe.ton.richtig(); else hilfe.ton.note(520, 0, 0.06, 'triangle', 0.15);
         if (Schrauben.geloest(stangen)) { zeichnen(); return gewonnen(); }
+        merken();
       } else if (stangen[i].length && !Schrauben.komplett(stangen[i])) {
         gewaehlt = i; // andere Stange auswählen
         hilfe.ton.klick();
@@ -163,26 +175,44 @@ else Spiele.registrieren({
 
     function gewonnen() {
       geschafft++;
+      sieg = true;
+      hilfe.pause(true);
       hilfe.ton.jubel();
       stand.level++;
+      delete stand.offen;
       hilfe.speichern();
       const box = document.createElement('div');
       box.className = 'r-sieg';
       box.innerHTML = `<div class="overlay-box"><h2>Super! 🎉</h2><p>Level ${stand.level - 1} geschafft!</p></div>`;
       flaeche.appendChild(box);
-      hilfe.vorbei();
+      // Bis die Zeit um ist, gleich das nächste Level
+      setTimeout(() => {
+        if (aus) return;
+        box.remove();
+        sieg = false;
+        laden();
+        hilfe.pause(false);
+      }, 1300);
     }
 
     flaeche.querySelector('[data-a="zurueck"]').addEventListener('click', () => {
-      if (verlauf.length) { stangen = verlauf.pop(); gewaehlt = null; zeichnen(); }
+      if (sieg || !verlauf.length) return;
+      stangen = verlauf.pop();
+      gewaehlt = null;
+      merken();
+      zeichnen();
     });
-    flaeche.querySelector('[data-a="neu"]').addEventListener('click', laden);
+    flaeche.querySelector('[data-a="neu"]').addEventListener('click', () => {
+      if (sieg) return;
+      delete stand.offen;
+      hilfe.speichern();
+      laden();
+    });
 
     laden();
     return {
-      stop() {},
-      zusammenfassung: () => (geschafft ? `Level ${stand.level - 1} geschafft! Nächstes Mal geht's bei Level ${stand.level} weiter.`
-        : `Nicht ganz geschafft – nächstes Mal wieder Level ${stand.level}.`),
+      stop() { aus = true; },
+      zusammenfassung: () => levelBilanz(geschafft, stand.level),
     };
   },
 });

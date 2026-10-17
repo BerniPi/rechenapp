@@ -5,7 +5,7 @@ Spiele.registrieren({
   name: 'Apfelschlange',
   emoji: '🐍',
   beschr: 'Friss Äpfel und werde lang',
-  zeitlimit: 180,
+  zeitlimit: 60,
 
   start(flaeche, hilfe) {
     const stand = hilfe.stand();

@@ -4,7 +4,7 @@ Spiele.registrieren({
   name: 'Farbblöcke',
   emoji: '🧱',
   beschr: 'Fülle ganze Reihen mit Blöcken',
-  zeitlimit: 180,
+  zeitlimit: 60,
 
   start(flaeche, hilfe) {
     const B = 10;

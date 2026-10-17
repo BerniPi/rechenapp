@@ -682,7 +682,7 @@
     $('#spiel-name').textContent = `${def.emoji} ${def.name}`;
     const flaeche = $('#spiel-flaeche');
     flaeche.innerHTML = '';
-    const runde = { def, instanz: null, timer: null, uhr: null, zeitUm: false };
+    const runde = { def, instanz: null, timer: null, uhr: null, zeitUm: false, pause: false };
     S = runde;
     spielUhr(runde);
     wachHalten(true);
@@ -690,6 +690,8 @@
       ton: Ton,
       stand: () => (d.spielstand[def.id] = d.spielstand[def.id] || {}),
       speichern: () => Speicher.speichern(),
+      // Uhr anhalten, z. B. während ein Level gebaut wird oder der Sieg-Hinweis zu sehen ist
+      pause: (an) => { runde.pause = !!an; },
       // Das Spiel meldet: Runde zu Ende (verloren oder Level geschafft).
       // Kurz warten, damit man den Absturz bzw. das gelöste Level noch sieht.
       vorbei: () => {
@@ -700,8 +702,8 @@
     requestAnimationFrame(() => { if (S === runde) runde.instanz = def.start(flaeche, hilfe); });
   }
 
-  // Zeitlimit: zählt nur, solange die App sichtbar ist. Endet die Runde vorher
-  // (verloren / Level geschafft), bleibt die Uhr stehen.
+  // Zeitlimit: zählt nur, solange die App sichtbar ist und das Spiel nicht pausiert.
+  // Endet die Runde vorher (verloren), bleibt die Uhr stehen.
   function spielUhr(runde) {
     const uhr = $('#spiel-uhr');
     uhr.textContent = '';
@@ -717,7 +719,7 @@
     zeigen();
     runde.uhr = setInterval(() => {
       const jetzt = performance.now();
-      if (document.visibilityState === 'visible' && !runde.timer) rest -= (jetzt - zuletzt) / 1000;
+      if (document.visibilityState === 'visible' && !runde.timer && !runde.pause) rest -= (jetzt - zuletzt) / 1000;
       zuletzt = jetzt;
       if (S !== runde) { clearInterval(runde.uhr); return; }
       if (rest <= 0) {
