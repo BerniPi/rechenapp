@@ -134,6 +134,7 @@
   <div class="spiel-leiste">
     <button id="spiel-ende" class="rund klein" title="Beenden">✖</button>
     <div id="spiel-name"></div>
+    <div id="spiel-uhr" class="spiel-uhr"></div>
   </div>
   <div id="spiel-flaeche" class="spiel-flaeche"></div>
   <div id="spiel-vorbei" class="overlay versteckt">
@@ -178,7 +179,12 @@
     <p id="mikro-test" class="mikro-test"></p>
 
     <h2>Minispiele</h2>
-    <label>Preis pro Spielrunde (Sterne, mind. 10) <input type="number" min="10" max="50" data-eltern="preis"></label>
+    <label>Preis pro Spielrunde (Sterne, normal 10) <input type="number" min="1" max="50" data-eltern="preis"></label>
+
+    <h2>Sterne ans Tempo anpassen</h2>
+    <label>Sterne am eigenen Tempo messen <input type="checkbox" id="anpassen"></label>
+    <p class="hinweis">Nach 3 Runden einer Aufgabenart zählt der eigene Schnitt: gleich schnell = 3 ⭐, deutlich schneller = 5 ⭐. Besser werden hebt den Schnitt schnell, schlechter werden senkt ihn nur langsam. Die Werte unten bleiben als Rahmen und gelten für die ersten 3 Runden.</p>
+    <button id="tempo-loeschen" class="knopf klein">Schnitt neu messen</button>
 
     <h2>Sterne bei „10 Aufgaben" (Sekunden pro Aufgabe)</h2>
     <p class="hinweis">Jede falsche Antwort zählt als +<span data-zeige="strafe"></span> s. Ab 3 Fehlern gibt es je 3 Fehler einen Stern weniger, unter 5 richtigen gar keinen.</p>

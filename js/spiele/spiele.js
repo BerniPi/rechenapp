@@ -1,5 +1,6 @@
 // Register der Minispiele.
-// Jedes Spiel: { id, name, emoji, beschr, start(flaeche, hilfe) -> { stop(), zusammenfassung?() } }
+// Jedes Spiel: { id, name, emoji, beschr, zeitlimit?, start(flaeche, hilfe) -> { stop(), zusammenfassung?() } }
+//   zeitlimit: Sekunden – die Runde endet nach dieser Zeit oder vorher durch vorbei()
 //   flaeche: leeres <div>, das den ganzen Spielbereich füllt
 //   hilfe:   { ton, stand(), speichern(), vorbei() } – stand() ist ein Objekt, das gespeichert bleibt;
 //            vorbei() meldet das Ende der (einzigen) Runde: verloren oder Level geschafft

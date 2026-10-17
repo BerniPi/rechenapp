@@ -284,6 +284,8 @@ button {
   font-size: 22px; font-weight: 900;
 }
 #spiel-name { text-align: center; }
+.spiel-uhr { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.spiel-uhr.knapp { color: var(--rot, #e5484d); }
 .spiel-flaeche { flex: 1; position: relative; overflow: hidden; touch-action: none; }
 .spiel-flaeche canvas { display: block; width: 100%; height: 100%; }
 
@@ -315,6 +317,7 @@ button {
 .eltern-inhalt h2 { margin: 18px 0 2px; font-size: 20px; color: var(--blau); }
 .eltern-inhalt label { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 700; background: var(--karte); padding: 10px 14px; border-radius: 12px; }
 .eltern-inhalt input { width: 90px; font: inherit; font-size: 20px; padding: 6px 8px; border-radius: 8px; border: 2px solid var(--grau); text-align: center; }
+.eltern-inhalt input[type="checkbox"] { width: 28px; height: 28px; flex: none; accent-color: var(--blau, #3b6fe0); }
 .eltern-inhalt .zeile { display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 24px; }
 .hinweis { color: var(--leise); margin: 0; font-size: 15px; }
 .schwellen { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }

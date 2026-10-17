@@ -4,6 +4,7 @@ Spiele.registrieren({
   name: 'Farbblöcke',
   emoji: '🧱',
   beschr: 'Fülle ganze Reihen mit Blöcken',
+  zeitlimit: 180,
 
   start(flaeche, hilfe) {
     const B = 10;
@@ -265,6 +266,8 @@ Spiele.registrieren({
     return {
       stop() { lauf = false; lw.weg(); document.removeEventListener('keydown', taste); },
       zusammenfassung() {
+        // Bei Zeit-um wurde der Rekord noch nicht gespeichert
+        if (punkte > stand.best) { stand.best = punkte; hilfe.speichern(); }
         return `${punkte} Punkte. Rekord: ${stand.best}`;
       },
     };

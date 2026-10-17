@@ -5,6 +5,7 @@ Spiele.registrieren({
   name: 'Apfelschlange',
   emoji: '🐍',
   beschr: 'Friss Äpfel und werde lang',
+  zeitlimit: 180,
 
   start(flaeche, hilfe) {
     const stand = hilfe.stand();
@@ -189,6 +190,8 @@ Spiele.registrieren({
     return {
       stop() { lauf = false; lw.weg(); document.removeEventListener('keydown', taste); },
       zusammenfassung() {
+        // Bei Zeit-um wurde der Rekord noch nicht gespeichert
+        if (punkte > stand.best) { stand.best = punkte; hilfe.speichern(); }
         return `Deine Schlange: ${punkte} Äpfel. Rekord: ${stand.best}`;
       },
     };

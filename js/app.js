@@ -362,27 +362,76 @@
   }
 
   // --- Auswertung ---
-  function sterneBerechnen() {
-    if (R.s.art === 'zehn') {
-      if (R.richtig < 5) return 0;
-      const eff = (R.zeit / 1000 + R.falsch * e.strafe) / 10;
-      const th = e.zehn;
-      let st = eff <= th[0] ? 5 : eff <= th[1] ? 4 : eff <= th[2] ? 3 : eff <= th[3] ? 2 : 1;
-      st -= Math.floor(R.falsch / 3);
-      return Math.max(1, st);
-    }
+  // Leistung der Runde: Sekunden pro Aufgabe (zehn, kleiner = besser) bzw. netto richtige pro Minute.
+  // null = Runde zählt nicht (zu wenig richtig / netto nichts).
+  function leistung() {
+    if (R.s.art === 'zehn') return R.richtig < 5 ? null : (R.zeit / 1000 + R.falsch * e.strafe) / 10;
     const netto = (R.richtig - R.falsch) / (R.dauer / 60);
-    if (netto <= 0) return 0;
-    const f = R.s.modus === 'sprache' ? 0.6 : 1;
-    const th = e.minute.map((x) => x * f);
-    return netto >= th[0] ? 5 : netto >= th[1] ? 4 : netto >= th[2] ? 3 : netto >= th[3] ? 2 : 1;
+    return netto > 0 ? netto : null;
+  }
+
+  // Persönlicher Schnitt, begrenzt durch die festen Schwellen, damit absichtlich
+  // langsames Spielen die Latte nicht beliebig senkt.
+  function tempoRahmen(s) {
+    if (s.art === 'zehn') return [e.zehn[0] * 0.75, e.zehn[3] * 1.5];
+    const f = s.modus === 'sprache' ? 0.6 : 1;
+    return [e.minute[3] * f * 0.6, e.minute[0] * f * 1.25];
+  }
+
+  function tempoAktualisieren(s, wert) {
+    const key = rekordSchluessel(s);
+    const t = d.tempo[key] || { wert, n: 0 };
+    if (t.n < 3) {
+      t.wert = (t.wert * t.n + wert) / (t.n + 1);
+    } else {
+      // Besser werden zählt schnell, schlechter werden nur langsam.
+      const besser = s.art === 'zehn' ? wert < t.wert : wert > t.wert;
+      t.wert += (wert - t.wert) * (besser ? 0.5 : 0.1);
+    }
+    const [lo, hi] = tempoRahmen(s);
+    t.wert = Math.min(hi, Math.max(lo, t.wert));
+    t.n += 1;
+    d.tempo[key] = t;
+  }
+
+  function sterneBerechnen(wert) {
+    if (wert === null) return 0;
+    const s = R.s;
+    const t = d.tempo[rekordSchluessel(s)];
+    let st;
+    if (e.anpassen && t && t.n >= 3) {
+      // Verhältnis > 1 heißt: besser als der eigene Schnitt
+      const v = s.art === 'zehn' ? t.wert / wert : wert / t.wert;
+      st = v >= 1.2 ? 5 : v >= 1.08 ? 4 : v >= 0.92 ? 3 : v >= 0.8 ? 2 : 1;
+    } else if (s.art === 'zehn') {
+      const th = e.zehn;
+      st = wert <= th[0] ? 5 : wert <= th[1] ? 4 : wert <= th[2] ? 3 : wert <= th[3] ? 2 : 1;
+    } else {
+      const f = s.modus === 'sprache' ? 0.6 : 1;
+      const th = e.minute.map((x) => x * f);
+      st = wert >= th[0] ? 5 : wert >= th[1] ? 4 : wert >= th[2] ? 3 : wert >= th[3] ? 2 : 1;
+    }
+    if (s.art === 'zehn') st = Math.max(1, st - Math.floor(R.falsch / 3));
+    return st;
+  }
+
+  function tempoText(s) {
+    const t = d.tempo[rekordSchluessel(s)];
+    if (!e.anpassen || !t) return '';
+    if (t.n < 3) return `<br>📈 Noch ${3 - t.n} Runde${t.n === 2 ? '' : 'n'}, dann zählt dein eigenes Tempo`;
+    const w = s.art === 'zehn'
+      ? `${t.wert.toFixed(1).replace('.', ',')} s pro Aufgabe`
+      : `${t.wert.toFixed(1).replace('.', ',')} pro Minute`;
+    return `<br>📈 Dein Schnitt: ${w}`;
   }
 
   function rundeEnde() {
     if (!R || !R.aktiv) return;
     rundeAufraeumen();
     const s = R.s;
-    const st = sterneBerechnen();
+    const wert = leistung();
+    const st = sterneBerechnen(wert);
+    if (wert !== null) tempoAktualisieren(s, wert);
     const faktor = s.art === 'm5' ? 2 : 1;
     const gewinn = st * faktor;
     d.sterne += gewinn;
@@ -391,15 +440,15 @@
     const key = rekordSchluessel(s);
     const alt = d.rekorde[key];
     let neuerRekord = false;
-    let wert;
+    let rekWert;
     if (s.art === 'zehn') {
-      wert = Math.round(R.zeit / 1000 + R.falsch * e.strafe);
-      if (R.richtig >= 5 && (!alt || wert < alt.wert)) neuerRekord = true;
+      rekWert = Math.round(R.zeit / 1000 + R.falsch * e.strafe);
+      if (R.richtig >= 5 && (!alt || rekWert < alt.wert)) neuerRekord = true;
     } else {
-      wert = R.richtig - R.falsch;
-      if (wert > 0 && (!alt || wert > alt.wert)) neuerRekord = true;
+      rekWert = R.richtig - R.falsch;
+      if (rekWert > 0 && (!alt || rekWert > alt.wert)) neuerRekord = true;
     }
-    if (neuerRekord) d.rekorde[key] = { wert, datum: Date.now() };
+    if (neuerRekord) d.rekorde[key] = { wert: rekWert, datum: Date.now() };
 
     d.verlauf.unshift({
       t: Date.now(), modus: s.modus, art: s.art, ops: s.ops.join(''), raum: s.raum,
@@ -421,7 +470,7 @@
     }
     const zeitText = s.art === 'zehn' ? `⏱️ ${fmt(R.zeit / 1000)}` : `⏱️ ${ART_NAME[s.art]}`;
     $('#erg-text').innerHTML = `${zeitText} &nbsp; ✅ ${R.richtig} richtig &nbsp; ❌ ${R.falsch} falsch`
-      + `<br>+${gewinn} ⭐ &nbsp;→&nbsp; Konto: ${d.sterne} ⭐`;
+      + `<br>+${gewinn} ⭐ &nbsp;→&nbsp; Konto: ${d.sterne} ⭐` + tempoText(s);
     const rek = $('#erg-rekord');
     rek.textContent = neuerRekord ? (alt ? '🏆 Neuer Rekord!' : '🏆 Erster Rekord!') : rekordText(d.rekorde[key], s.art);
     if (neuerRekord) setTimeout(() => Ton.jubel(), 450 + st * 320 + 200);
@@ -451,7 +500,8 @@
       const k = document.createElement('button');
       k.className = 'spiel-karte' + (d.sterne < e.preis ? ' zu-teuer' : '');
       k.innerHTML = `<div class="emoji">${def.emoji}</div><div class="name">${def.name}</div>`
-        + `<div class="beschr">${def.beschr}</div><div class="preis">${e.preis} ⭐</div>`;
+        + `<div class="beschr">${def.beschr}</div>`
+        + `<div class="preis">${e.preis} ⭐${def.zeitlimit ? ` · ⏱️ ${Math.round(def.zeitlimit / 60)} Min` : ''}</div>`;
       k.addEventListener('click', () => {
         if (d.sterne < e.preis) {
           Ton.falsch();
@@ -476,8 +526,9 @@
     $('#spiel-name').textContent = `${def.emoji} ${def.name}`;
     const flaeche = $('#spiel-flaeche');
     flaeche.innerHTML = '';
-    const runde = { def, instanz: null, timer: null };
+    const runde = { def, instanz: null, timer: null, uhr: null, zeitUm: false };
     S = runde;
+    spielUhr(runde);
     wachHalten(true);
     const hilfe = {
       ton: Ton,
@@ -493,9 +544,42 @@
     requestAnimationFrame(() => { if (S === runde) runde.instanz = def.start(flaeche, hilfe); });
   }
 
+  // Zeitlimit: zählt nur, solange die App sichtbar ist. Endet die Runde vorher
+  // (verloren / Level geschafft), bleibt die Uhr stehen.
+  function spielUhr(runde) {
+    const uhr = $('#spiel-uhr');
+    uhr.textContent = '';
+    uhr.classList.remove('knapp');
+    const limit = runde.def.zeitlimit;
+    if (!limit) return;
+    let rest = limit;
+    let zuletzt = performance.now();
+    const zeigen = () => {
+      uhr.textContent = `⏱️ ${fmt(Math.ceil(rest))}`;
+      uhr.classList.toggle('knapp', rest <= 15);
+    };
+    zeigen();
+    runde.uhr = setInterval(() => {
+      const jetzt = performance.now();
+      if (document.visibilityState === 'visible' && !runde.timer) rest -= (jetzt - zuletzt) / 1000;
+      zuletzt = jetzt;
+      if (S !== runde) { clearInterval(runde.uhr); return; }
+      if (rest <= 0) {
+        rest = 0;
+        zeigen();
+        runde.zeitUm = true;
+        spielVorbei(true);
+        return;
+      }
+      zeigen();
+    }, 250);
+  }
+
   function spielVorbei(fertig) {
     if (!S) return;
     clearTimeout(S.timer);
+    clearInterval(S.uhr);
+    const zeitUm = S.zeitUm;
     let text = '';
     try {
       if (S.instanz && S.instanz.zusammenfassung) text = S.instanz.zusammenfassung();
@@ -504,7 +588,7 @@
     S = null;
     wachHalten(false);
     if (fertig) {
-      $('#spiel-vorbei-text').textContent = text || '';
+      $('#spiel-vorbei-text').textContent = (zeitUm ? '⏰ Zeit um! ' : '') + (text || '');
       $('#spiel-vorbei').classList.remove('versteckt');
       Ton.jubel();
     } else {
@@ -530,6 +614,7 @@
     $$('[data-zeige]').forEach((el) => { el.textContent = e[el.dataset.zeige]; });
     verlaufZeigen();
     $('#erkennung').value = e.erkennung;
+    $('#anpassen').checked = e.anpassen;
     stimmeInfo();
     zeige('eltern');
   }
@@ -547,6 +632,16 @@
     e.erkennung = $('#erkennung').value;
     Speicher.speichern();
     Sprache.setzeMotor(e.erkennung);
+  });
+
+  $('#anpassen').addEventListener('change', () => {
+    e.anpassen = $('#anpassen').checked;
+    Speicher.speichern();
+  });
+  $('#tempo-loeschen').addEventListener('click', () => {
+    if (!confirm('Den persönlichen Schnitt löschen? Er wird dann in den nächsten 3 Runden neu gemessen.')) return;
+    d.tempo = {};
+    Speicher.speichern();
   });
 
   $('#test-stimme').addEventListener('click', () => Sprache.vorlesen('Sieben plus drei'));

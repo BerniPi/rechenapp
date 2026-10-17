@@ -4,6 +4,7 @@ Spiele.registrieren({
   name: 'Flattervogel',
   emoji: '🐤',
   beschr: 'Tippen und durch die Röhren fliegen',
+  zeitlimit: 180,
 
   start(flaeche, hilfe) {
     const leinwand = spielCanvas(flaeche);
@@ -165,6 +166,8 @@ Spiele.registrieren({
         document.removeEventListener('keydown', taste);
       },
       zusammenfassung() {
+        // Bei Zeit-um wurde der Rekord noch nicht gespeichert
+        if (punkte > stand.best) { stand.best = punkte; hilfe.speichern(); }
         return `${punkte} Punkte. Rekord: ${stand.best}`;
       },
     };

@@ -5,6 +5,7 @@ Spiele.registrieren({
   name: 'Tierturm',
   emoji: '🦒',
   beschr: 'Staple die Tiere so hoch du kannst',
+  zeitlimit: 180,
 
   start(flaeche, hilfe) {
     const TIERE = [
@@ -196,6 +197,8 @@ Spiele.registrieren({
     return {
       stop() { lauf = false; lw.weg(); document.removeEventListener('keydown', taste); },
       zusammenfassung() {
+        // Bei Zeit-um wurde der Rekord noch nicht gespeichert
+        if (punkte() > stand.best) { stand.best = punkte(); hilfe.speichern(); }
         return `Dein Turm: ${punkte()} Tiere. Rekord: ${stand.best}`;
       },
     };
