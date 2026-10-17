@@ -243,8 +243,9 @@
     R.eingabe = neu;
     const l = $('#luecke');
     if (l) l.textContent = neu;
-    if (!ziel.startsWith(neu)) bewerte(false, Number(neu));
-    else if (neu === ziel) bewerte(true, Number(neu));
+    // Erst bewerten, wenn so viele Ziffern getippt sind, wie die Lösung Stellen hat –
+    // sonst landet die zweite Ziffer einer falschen Eingabe in der nächsten Aufgabe.
+    if (neu.length >= ziel.length) bewerte(neu === ziel, Number(neu));
   }
 
   function bewerte(ok, gegeben) {
