@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Rechenheld Admin</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<section id="login" class="login versteckt">
+  <form id="login-form" class="karte">
+    <h1>Rechenheld Admin</h1>
+    <label>Passwort <input id="passwort" type="password" autocomplete="current-password" required></label>
+    <button class="knopf">Anmelden</button>
+    <p id="login-fehler" class="fehler"></p>
+  </form>
+</section>
+
+<main id="haupt" class="versteckt">
+  <header class="kopf">
+    <h1>Rechenheld Admin</h1>
+    <nav class="tabs">
+      <button data-tab="spieler" class="an">Spieler</button>
+      <button data-tab="gruppen">Gruppen</button>
+      <button data-tab="codes">Codes</button>
+      <button data-tab="rekorde">Bestenliste</button>
+    </nav>
+    <button id="abmelden" class="knopf leise">Abmelden</button>
+  </header>
+
+  <!-- Spieler + Aktivität -->
+  <section data-bereich="spieler">
+    <div class="filter"><label>Gruppe <select id="spieler-filter" class="gruppen-filter"></select></label></div>
+    <div class="tabelle-box">
+      <table id="spieler-tabelle">
+        <thead><tr>
+          <th>Spieler</th><th>Gruppe</th><th>Code-Notiz</th><th class="zahl">Runden</th><th class="zahl">7 Tage</th><th class="zahl">Heute</th>
+          <th class="zahl">Minispiele</th><th class="zahl">Richtig</th><th>Zuletzt</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p id="spieler-leer" class="leise versteckt">Noch niemand verbunden. Erzeuge unter „Codes" einen Code für jedes Kind.</p>
+
+    <div id="detail" class="karte versteckt">
+      <div class="detail-kopf">
+        <h2 id="detail-titel"></h2>
+        <div class="knoepfe">
+          <label class="inline">Gruppe <select id="d-gruppe"></select></label>
+          <button id="d-umbenennen" class="knopf leise">Umbenennen</button>
+          <button id="d-sperren" class="knopf leise"></button>
+          <button id="d-rekorde" class="knopf leise">Rekorde löschen</button>
+          <button id="d-loeschen" class="knopf rot">Spieler löschen</button>
+          <button id="d-zu" class="knopf leise" aria-label="Schließen">✕</button>
+        </div>
+      </div>
+      <h3>Runden pro Tag (30 Tage)</h3>
+      <div id="tage" class="tage"></div>
+      <p class="legende"><span class="punkt rechnen"></span> Rechenrunden <span class="punkt spiel"></span> Minispiele</p>
+      <h3>Letzte 50 Runden</h3>
+      <div class="tabelle-box">
+        <table id="runden-tabelle">
+          <thead><tr><th>Wann</th><th>Art</th><th>Rechnungen</th><th class="zahl">Richtig</th><th class="zahl">Falsch</th><th class="zahl">Zeit</th><th class="zahl">Sterne</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Codes -->
+  <section data-bereich="codes" class="versteckt">
+    <form id="codes-form" class="karte reihe">
+      <label>Anzahl <input id="anzahl" type="number" min="1" max="20" value="1" required></label>
+      <label>Gruppe <select id="code-gruppe"></select></label>
+      <label class="breit">Notiz (z. B. für wen) <input id="notiz" type="text" maxlength="60" placeholder="für Lena"></label>
+      <button class="knopf">Codes erzeugen</button>
+    </form>
+    <div id="neue-codes" class="karte neu versteckt">
+      <p><strong>Neue Codes</strong> – nur jetzt sichtbar, gleich weitergeben:</p>
+      <pre id="neue-codes-liste"></pre>
+      <button id="kopieren" class="knopf leise">Kopieren</button>
+    </div>
+    <div class="tabelle-box">
+      <table id="codes-tabelle">
+        <thead><tr><th>Code</th><th>Gruppe</th><th>Notiz</th><th>Erstellt</th><th>Status</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Gruppen -->
+  <section data-bereich="gruppen" class="versteckt">
+    <form id="gruppe-form" class="karte reihe">
+      <label class="breit">Neue Gruppe (z. B. 1a) <input id="gruppe-name" type="text" maxlength="20" required></label>
+      <button class="knopf">Anlegen</button>
+    </form>
+    <div class="tabelle-box">
+      <table id="gruppen-tabelle">
+        <thead><tr><th>Gruppe</th><th class="zahl">Spieler</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="leise">Beim Erzeugen eines Codes wählst du die Gruppe – das Kind landet beim Einlösen automatisch darin. Jede Gruppe hat in der App ihre eigene Bestenliste.</p>
+  </section>
+
+  <!-- Bestenliste -->
+  <section data-bereich="rekorde" class="versteckt">
+    <div class="filter"><label>Gruppe <select id="rekorde-filter" class="gruppen-filter"></select></label></div>
+    <div id="rekorde-liste"></div>
+  </section>
+</main>
+
+<p id="meldung" class="meldung" role="status"></p>
+<script src="admin.js"></script>
+</body>
+</html>

@@ -535,3 +535,15 @@ button {
 .bestenliste li.ich { background: #dfe7ff; }
 .bestenliste li .platz { text-align: center; }
 .bestenliste li .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Online-Bestenliste */
+.online-box { display: flex; flex-direction: column; gap: 10px; }
+.eltern-inhalt input.text { width: 100%; max-width: 300px; text-align: left; }
+.online-status { margin: 0; font-weight: 800; background: var(--karte); padding: 10px 14px; border-radius: 12px; }
+.online-meldung:empty { display: none; }
+.online-mehr summary { cursor: pointer; color: var(--leise); font-weight: 700; padding: 4px 0; }
+.online-mehr label { margin-top: 6px; }
+.listen-tabs { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
+.listen-tabs button { background: var(--karte); border-radius: 99px; padding: 6px 14px; font-weight: 800; font-size: 16px; box-shadow: var(--schatten); }
+.listen-tabs button.an { background: var(--blau); color: #fff; }
+.listen-info { text-align: center; color: var(--leise); font-size: 14px; margin: 6px 0 0; }

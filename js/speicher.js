@@ -14,6 +14,7 @@ const Speicher = {
       verlauf: [],
       spielstand: {},
       tempo: {},                 // persönlicher Schnitt je Aufgabenart: { wert, n }
+      online: null,              // Online-Bestenliste, siehe js/online.js
       eltern: {
         anpassen: true,          // Sterne am eigenen Tempo messen
         zehn: [4, 6, 9, 14],     // Sekunden pro Aufgabe für 5/4/3/2 Sterne
@@ -111,11 +112,25 @@ const Speicher = {
 
   speichern() {
     if (!this.data || !this.benutzer.aktiv) return;
-    try { localStorage.setItem(this.key(this.benutzer.aktiv), JSON.stringify(this.data)); } catch (e) { /* privat/voll */ }
+    this.speichernFuer(this.benutzer.aktiv, this.data);
+  },
+
+  // Daten eines beliebigen Spielers (der aktive aus dem Speicher, sonst frisch gelesen)
+  datenVon(id) {
+    if (id === this.benutzer.aktiv && this.data) return this.data;
+    if (!this.benutzer.liste.some((u) => u.id === id)) return null;
+    try { return JSON.parse(localStorage.getItem(this.key(id))); } catch (e) { return null; }
+  },
+
+  speichernFuer(id, data) {
+    try { localStorage.setItem(this.key(id), JSON.stringify(data)); } catch (e) { /* privat/voll */ }
   },
 
   zuruecksetzen() {
+    // Die Online-Verbindung bleibt – sonst wäre der Einladungs-Code verloren.
+    const online = this.data && this.data.online;
     this.data = this.standard();
+    if (online) this.data.online = { ...online, warte: { rekorde: {}, runden: [] } };
     this.speichern();
   },
 };

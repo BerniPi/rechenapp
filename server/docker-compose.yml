@@ -1,0 +1,18 @@
+services:
+  rechenheld:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    container_name: rechenheld
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Vienna
+    volumes:
+      - rechenheld-daten:/daten
+    # Nur lokal offen – der Reverse-Proxy leitet https://deine-domain → 127.0.0.1:8080
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  rechenheld-daten:

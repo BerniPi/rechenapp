@@ -1,10 +1,10 @@
 // Service Worker: hält die App offline verfügbar.
 // Bei jeder Änderung an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'rechenheld-13';
+const VERSION = 'rechenheld-14';
 const GROSS = 'rechenheld-gross-1'; // Sprachmodell + Vosk-Bibliothek, bleibt über Updates erhalten
 const DATEIEN = [
   './', 'index.html', 'manifest.json', 'css/style.css',
-  'js/speicher.js', 'js/aufgaben.js', 'js/ton.js', 'js/vosk-erkennung.js', 'js/sprache.js', 'js/app.js',
+  'js/speicher.js', 'js/online.js', 'js/aufgaben.js', 'js/ton.js', 'js/vosk-erkennung.js', 'js/sprache.js', 'js/app.js',
   'js/spiele/spiele.js', 'js/spiele/flappy.js', 'js/spiele/snake.js', 'js/spiele/bloecke.js',
   'js/spiele/tierturm.js', 'js/spiele/schrauben.js', 'js/spiele/unblock.js',
   'icons/icon-192.png', 'icons/icon-512.png',
@@ -25,6 +25,9 @@ self.addEventListener('activate', (ev) => {
 // Erst Netz (damit Updates sofort ankommen), sonst Cache.
 self.addEventListener('fetch', (ev) => {
   if (ev.request.method !== 'GET') return;
+  // Bestenliste (API) und fremde Server nie aus dem Cache
+  const url = new URL(ev.request.url);
+  if (url.origin !== location.origin || url.pathname.includes('/api/')) return;
   // Große Dateien ändern sich nie: erst Cache, nur beim ersten Mal aus dem Netz.
   if (/\/(models|vendor)\//.test(new URL(ev.request.url).pathname)) {
     ev.respondWith(

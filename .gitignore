@@ -1,1 +1,3 @@
 .claude/
+server/daten/
+server/.env

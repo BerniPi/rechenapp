@@ -518,19 +518,28 @@
       rekWert = R.richtig - R.falsch;
       if (key && rekWert > 0 && (!alt || rekWert > alt.wert)) neuerRekord = true;
     }
-    if (neuerRekord) d.rekorde[key] = { wert: rekWert, datum: Date.now() };
+    if (neuerRekord) {
+      d.rekorde[key] = { wert: rekWert, datum: Date.now() };
+      Online.merkeRekord(d, key, rekWert, d.rekorde[key].datum);
+    }
     const geraeteRekord = neuerRekord && Speicher.benutzer.liste.length > 1 && (!geraeteBest
       || (istAufgaben(s) ? rekWert < geraeteBest.wert : rekWert > geraeteBest.wert));
 
-    d.verlauf.unshift({
+    const eintrag = {
       t: Date.now(), modus: s.modus, art: s.art, anzahl: s.anzahl, minuten: s.minuten,
       ops: s.ops.join(''), raum: s.raum,
       einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch,
       zeit: Math.round((istAufgaben(s) ? R.zeit / 1000 : R.dauer)), sterne: gewinn,
-    });
+    };
+    d.verlauf.unshift(eintrag);
     d.verlauf = d.verlauf.slice(0, 300);
+    Online.merkeRunde(d, {
+      typ: 'rechnen', t: eintrag.t, modus: s.modus, art: s.art, laenge: istAufgaben(s) ? s.anzahl : s.minuten,
+      ops: eintrag.ops, raum: s.raum, einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch, zeit: eintrag.zeit, sterne: gewinn,
+    });
     Speicher.speichern();
     sterneAnzeigen();
+    const gesendet = Online.senden(Speicher.benutzer.aktiv);
 
     // Anzeige
     $('#erg-titel').textContent = st >= 4 ? 'Super gemacht! 🎉' : st >= 2 ? 'Gut gemacht! 👍' : st === 1 ? 'Geschafft! 💪' : 'Probier es nochmal! 💪';
@@ -548,7 +557,7 @@
     rek.textContent = geraeteRekord ? '👑 Neuer Geräte-Rekord!'
       : neuerRekord ? (alt ? '🏆 Neuer Rekord!' : '🏆 Erster Rekord!')
         : key ? rekordText(d.rekorde[key], s) : '';
-    bestenlisteZeigen(s);
+    bestenlisteZeigen(s, gesendet);
     if (neuerRekord) setTimeout(() => Ton.jubel(), 450 + st * 320 + 200);
 
     const fehler = R.liste.filter((x) => !x.ok);
@@ -565,30 +574,73 @@
   $('#erg-menue').addEventListener('click', () => { chipsAnzeigen(); zeige('start'); });
   $('#erg-spiele').addEventListener('click', spieleOeffnen);
 
-  // Bestenliste aller Spieler auf diesem Gerät (nur wenn es mehrere gibt)
-  function bestenlisteZeigen(s) {
+  // Bestenliste: 🏠 alle Spieler auf diesem Gerät, 👥 eigene Gruppe und 🌍 Welt (wenn online verbunden)
+  let welche = null;
+  function bestenlisteZeigen(s, gesendet = Promise.resolve()) {
     const box = $('#erg-bestenliste');
     box.innerHTML = '';
-    const liste = bestenliste(s);
-    if (Speicher.benutzer.liste.length < 2 || !liste.length) return;
+    const key = rekordSchluessel(s);
+    const geraet = bestenliste(s);
+    const hatWelt = !!(key && d.online && d.online.status === 'ok');
+    // Reiter: 🏠 Gerät (ab 2 Spielern), 👥 eigene Gruppe/Klasse, 🌍 Welt
+    const reiter = [];
+    if (Speicher.benutzer.liste.length > 1 && geraet.length > 0) reiter.push(['geraet', '🏠 Hier']);
+    if (hatWelt && d.online.gruppe) reiter.push(['gruppe', `👥 ${d.online.gruppe}`]);
+    if (hatWelt) reiter.push(['welt', '🌍 Welt']);
+    if (!reiter.length) return;
+    // Standard: zuerst die eigene Gruppe, sonst Welt, sonst Gerät
+    if (!reiter.some(([w]) => w === welche)) welche = ['gruppe', 'welt', 'geraet'].find((w) => reiter.some(([x]) => x === w));
+
     const h = document.createElement('h3');
     h.textContent = `Bestenliste · ${laengeText(s)}`;
+    box.appendChild(h);
+    if (reiter.length > 1) {
+      const tabs = document.createElement('div');
+      tabs.className = 'listen-tabs';
+      reiter.forEach(([w, text]) => {
+        const b = document.createElement('button');
+        b.textContent = text;
+        b.classList.toggle('an', welche === w);
+        b.addEventListener('click', () => { Ton.klick(); welche = w; bestenlisteZeigen(s); });
+        tabs.appendChild(b);
+      });
+      box.appendChild(tabs);
+    }
     const ol = document.createElement('ol');
-    liste.slice(0, 5).forEach((x, i) => {
+    box.appendChild(ol);
+    const eintrag = (platz, u, name, wert, ich) => {
       const li = document.createElement('li');
-      if (x.benutzer.id === Speicher.benutzer.aktiv) li.className = 'ich';
-      const platz = document.createElement('span');
-      platz.className = 'platz';
-      platz.textContent = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
-      const name = document.createElement('span');
-      name.className = 'name';
-      name.textContent = x.benutzer.name;
-      const wert = document.createElement('span');
-      wert.textContent = rekordWert(x.wert, s);
-      li.append(platz, avatar(x.benutzer, 'klein'), name, wert);
+      if (ich) li.className = 'ich';
+      const p = document.createElement('span');
+      p.className = 'platz';
+      p.textContent = ['🥇', '🥈', '🥉'][platz - 1] || `${platz}.`;
+      const n = document.createElement('span');
+      n.className = 'name';
+      n.textContent = name;
+      const w = document.createElement('span');
+      w.textContent = rekordWert(wert, s);
+      li.append(p, avatar(u, 'klein'), n, w);
       ol.appendChild(li);
+    };
+
+    if (welche === 'geraet') {
+      geraet.slice(0, 5).forEach((x, i) => eintrag(i + 1, x.benutzer, x.benutzer.name, x.wert, x.benutzer.id === Speicher.benutzer.aktiv));
+      return;
+    }
+    const info = document.createElement('p');
+    info.className = 'listen-info';
+    const zeichen = welche === 'gruppe' ? '👥' : '🌍';
+    info.textContent = `${zeichen} wird geladen …`;
+    box.appendChild(info);
+    const daten = d;
+    gesendet.then(() => Online.liste(daten, key, welche)).then((j) => {
+      if (daten !== d || !box.contains(ol)) return; // inzwischen woanders
+      if (!j) { info.textContent = `${zeichen} Gerade keine Verbindung zur Bestenliste.`; return; }
+      const u = (x) => ({ bild: { art: 'emoji', wert: x.emoji } });
+      j.top.slice(0, 5).forEach((x) => eintrag(x.platz, u(x), x.name, x.wert, x.ich));
+      if (j.ich && j.ich.platz > 5) eintrag(j.ich.platz, u(j.ich), j.ich.name, j.ich.wert, true);
+      info.textContent = j.gesamt ? `${j.gesamt} ${j.gesamt === 1 ? 'Kind' : 'Kinder'} in dieser Liste` : 'Noch niemand in dieser Liste – sei der Erste!';
     });
-    box.append(h, ol);
   }
 
   // ---------- Spiele ----------
@@ -611,7 +663,9 @@
           return;
         }
         d.sterne -= e.preis;
+        Online.merkeRunde(d, { typ: 'spiel', t: Date.now(), spiel: def.id });
         Speicher.speichern();
+        Online.senden(Speicher.benutzer.aktiv);
         sterneAnzeigen();
         spielStarten(def);
       });
@@ -715,6 +769,7 @@
     $$('[data-schwelle]').forEach((inp) => { inp.value = e[inp.dataset.schwelle][Number(inp.dataset.i)]; });
     $$('[data-zeige]').forEach((el) => { el.textContent = e[el.dataset.zeige]; });
     verlaufZeigen();
+    onlineZeigen();
     $('#erkennung').value = e.erkennung;
     $('#anpassen').checked = e.anpassen;
     stimmeInfo();
@@ -807,6 +862,121 @@
     $('#verlauf').innerHTML = `<table><tr><th>Wann</th><th>Art</th><th>Rechnungen</th><th>Ergebnis</th><th>Zeit</th><th>Sterne</th></tr>${zeilen}</table>`;
   }
 
+  // ---------- Online-Bestenliste (Eltern-Bereich) ----------
+  function onlineZeigen() {
+    const box = $('#online-box');
+    box.innerHTML = '';
+    const u = Speicher.aktiverBenutzer();
+    const o = d.online;
+    const neu = (tag, text, klasse) => {
+      const el = document.createElement(tag);
+      if (text) el.textContent = text;
+      if (klasse) el.className = klasse;
+      return el;
+    };
+    const feld = (titel, wert, platzhalter) => {
+      const l = neu('label', titel);
+      const i = neu('input', null, 'text');
+      i.type = 'text';
+      i.value = wert || '';
+      i.placeholder = platzhalter || '';
+      i.autocomplete = 'off';
+      l.appendChild(i);
+      box.appendChild(l);
+      return i;
+    };
+    // Bildauswahl wie bei „Neuer Spieler" – nur Emojis, keine Fotos
+    const bildWahl = (start) => {
+      let gewaehlt = start;
+      const g = neu('div', null, 'bilder');
+      BILDER.forEach((b) => {
+        const k = neu('button', b);
+        k.classList.toggle('an', b === gewaehlt);
+        k.addEventListener('click', () => {
+          Ton.klick();
+          gewaehlt = b;
+          g.querySelectorAll('button').forEach((x) => x.classList.toggle('an', x === k));
+        });
+        g.appendChild(k);
+      });
+      box.appendChild(g);
+      return () => gewaehlt;
+    };
+    const meldung = neu('p', '', 'hinweis online-meldung');
+    const knopfZeile = () => { const z = neu('div', null, 'zeile'); box.appendChild(z); return z; };
+    const knopf = (zeile, text, klasse, fn) => {
+      const k = neu('button', text, `knopf klein ${klasse || ''}`);
+      k.addEventListener('click', async () => {
+        k.disabled = true;
+        meldung.textContent = '';
+        try { await fn(); } catch (err) { meldung.textContent = `❌ ${err.message}`; }
+        k.disabled = false;
+      });
+      zeile.appendChild(k);
+      return k;
+    };
+
+    if (!o) {
+      box.appendChild(neu('p', `Mit einem Code nimmt ${u.name} an der Bestenliste der Klasse/Gruppe und der Welt teil. Online sichtbar sind nur Spitzname und Bild – nie ein Foto. Jeder Code gilt nur einmal.`, 'hinweis'));
+      const code = feld('Code', '', 'RH-XXXX-XXXX');
+      code.autocapitalize = 'characters';
+      const name = feld('Spitzname', u.name);
+      name.maxLength = 16;
+      box.appendChild(neu('p', 'Bild für die Bestenliste:', 'hinweis'));
+      const eigenes = u.bild && u.bild.art === 'emoji' && BILDER.includes(u.bild.wert) ? u.bild.wert : BILDER[0];
+      const bild = bildWahl(eigenes);
+      const mehr = neu('details', null, 'online-mehr');
+      mehr.appendChild(neu('summary', 'Server-Adresse'));
+      box.appendChild(mehr);
+      const server = feld('Adresse (leer = dieselbe wie die App)', '', 'https://rechnen.example.at');
+      mehr.appendChild(server.parentElement);
+      knopf(knopfZeile(), '🌍 Verbinden', 'gruen', async () => {
+        if (!code.value.trim()) throw new Error('Bitte den Code eingeben.');
+        const verbindung = await Online.einloesen(server.value.trim(), code.value, name.value.trim(), bild());
+        d.online = verbindung;
+        // bisherige Rekorde gleich mitnehmen
+        Object.entries(d.rekorde).forEach(([key, r]) => Online.merkeRekord(d, key, r.wert, r.datum));
+        Speicher.speichern();
+        await Online.senden(Speicher.benutzer.aktiv);
+        onlineZeigen();
+      });
+      box.appendChild(meldung);
+      return;
+    }
+
+    const status = o.status === 'gesperrt' ? '⛔ Dieser Spieler wurde gesperrt.'
+      : o.status === 'ungueltig' ? '⚠️ Die Verbindung gilt nicht mehr. Bitte trennen und einen neuen Code eingeben.'
+        : `✅ Verbunden als ${o.emoji} ${o.name}${o.gruppe ? ` · Gruppe ${o.gruppe}` : ''}`;
+    box.appendChild(neu('p', status, 'online-status'));
+    const n = Online.wartet(d);
+    if (n) box.appendChild(neu('p', `📤 ${n} ${n === 1 ? 'Eintrag wartet' : 'Einträge warten'} auf Übertragung (passiert automatisch, sobald Internet da ist).`, 'hinweis'));
+
+    if (o.status === 'ok') {
+      const name = feld('Spitzname', o.name);
+      name.maxLength = 16;
+      const bild = bildWahl(o.emoji);
+      knopf(knopfZeile(), 'Spitzname/Bild speichern', '', async () => {
+        await Online.aendern(d, name.value.trim(), bild());
+        Speicher.speichern();
+        onlineZeigen();
+      });
+    }
+    const z = knopfZeile();
+    if (o.status === 'ok') {
+      knopf(z, '📤 Jetzt senden', 'blau', async () => {
+        await Online.senden(Speicher.benutzer.aktiv);
+        onlineZeigen();
+      });
+    }
+    knopf(z, 'Trennen', 'grau', async () => {
+      if (!confirm('Online-Verbindung trennen? Zum Wiederverbinden braucht es einen neuen Code.')) return;
+      d.online = null;
+      Speicher.speichern();
+      onlineZeigen();
+    });
+    box.appendChild(meldung);
+  }
+
   // ---------- Spieler ----------
   const BILDER = ['🚗', '✈️', '🐴', '🦄', '🚀', '🚒', '🚜', '🐶', '🐱', '🦁', '🐼', '🦊', '🐸', '🦖', '🐬', '🦋', '⚽', '🌈'];
 
@@ -873,7 +1043,10 @@
     sterneAnzeigen();
     tonAnzeigen();
     zeige('start');
+    // Liegengebliebenes nachschicken und Gruppe/Sperre auffrischen
+    Online.senden(id);
   }
+  window.addEventListener('online', () => { if (d) Online.senden(Speicher.benutzer.aktiv); });
 
   function tonAnzeigen() {
     Ton.an = d.settings.ton !== false;
