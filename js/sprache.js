@@ -57,6 +57,109 @@ const Zahlwort = (() => {
   return { parse };
 })();
 
+// Mitgelieferte Stimme "Jonas" (de-AT) aus Wortschnipseln in audio/jonas/
+// (erzeugt mit tools/stimme.py). Kennt nur die Sätze aus Aufgaben.alsSatz.
+const Jonas = (() => {
+  const ORDNER = 'audio/jonas/';
+  const LUECKE = 0.03; // Sekunden zwischen zwei Wörtern
+  const AC = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
+  const roh = new Map(); // Name -> Promise<ArrayBuffer>
+  let laufend = [];
+
+  // "Wie viel plus 4 ergibt 9?" -> ['wieviel-anfang', 'plus', 'z4', 'ergibt', 'f9'], unbekannt -> null
+  function zerlegen(text) {
+    const frage = /\?\s*$/.test(text);
+    const woerter = text.replace(/[?.!]/g, ' ').replace(/wie viel/gi, (w) => (w[0] === 'W' ? 'Wieviel' : 'wieviel'))
+      .trim().split(/\s+/);
+    const namen = [];
+    for (let i = 0; i < woerter.length; i++) {
+      const w = woerter[i];
+      const letztes = i === woerter.length - 1;
+      if (/^\d+$/.test(w) && +w <= 100) namen.push((letztes ? (frage ? 'f' : 'e') : 'z') + +w);
+      else if (w === 'Wieviel') namen.push('wieviel-anfang');
+      else if (['wieviel', 'plus', 'minus', 'mal', 'durch', 'ergibt'].includes(w.toLowerCase())) namen.push(w.toLowerCase());
+      else return null;
+    }
+    return namen.length ? namen : null;
+  }
+
+  function holen(name) {
+    if (!roh.has(name)) {
+      const p = fetch(ORDNER + name + '.mp3').then((r) => {
+        if (!r.ok) throw new Error(r.status);
+        return r.arrayBuffer();
+      });
+      p.catch(() => roh.delete(name)); // später nochmal versuchen
+      roh.set(name, p);
+    }
+    return roh.get(name);
+  }
+
+  // Stille am Anfang und Ende überspringen: [start, dauer] in Sekunden
+  function hoerbar(buf) {
+    const d = buf.getChannelData(0);
+    const schwelle = 0.003; // höher schneidet leise Anlaute wie f/s ab
+    let a = 0;
+    let b = d.length - 1;
+    while (a < b && Math.abs(d[a]) < schwelle) a++;
+    while (b > a && Math.abs(d[b]) < schwelle) b--;
+    const rand = 0.01 * buf.sampleRate;
+    a = Math.max(0, a - rand);
+    b = Math.min(d.length - 1, b + rand);
+    return [a / buf.sampleRate, (b - a) / buf.sampleRate];
+  }
+
+  const dekodieren = (ctx, ab) => new Promise((ok, fehler) => ctx.decodeAudioData(ab.slice(0), ok, fehler));
+
+  // Spielt den Satz; true, wenn es geklappt hat.
+  async function sagen(text) {
+    const namen = zerlegen(text);
+    if (!namen || typeof Ton === 'undefined' || !Ton.init()) return false;
+    const ctx = Ton.ctx;
+    try {
+      if (ctx.state !== 'running') await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 300))]);
+      if (ctx.state !== 'running') return false;
+      const puffer = await Promise.all(namen.map((n) => holen(n).then((ab) => dekodieren(ctx, ab))));
+      stop();
+      let t = ctx.currentTime + 0.05;
+      const quellen = puffer.map((buf) => {
+        const [start, dauer] = hoerbar(buf);
+        const q = ctx.createBufferSource();
+        q.buffer = buf;
+        q.connect(ctx.destination);
+        q.start(t, start, dauer);
+        t += dauer + LUECKE;
+        return q;
+      });
+      laufend = quellen;
+      const gesamt = t - ctx.currentTime;
+      await new Promise((resolve) => {
+        const notfall = setTimeout(resolve, gesamt * 1000 + 500);
+        quellen[quellen.length - 1].onended = () => { clearTimeout(notfall); resolve(); };
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function stop() {
+    laufend.forEach((q) => { try { q.stop(); } catch (e) { /* schon fertig */ } });
+    laufend = [];
+  }
+
+  // Alle Schnipsel einmal laden, damit sie offline im Cache liegen.
+  function vorladen() {
+    const namen = ['plus', 'minus', 'mal', 'durch', 'ergibt', 'wieviel', 'wieviel-anfang'];
+    for (let n = 0; n <= 100; n++) namen.push('z' + n, 'e' + n, 'f' + n);
+    let i = 0;
+    const weiter = () => { if (i < namen.length) holen(namen[i++]).catch(() => {}).then(weiter); };
+    for (let k = 0; k < 4; k++) weiter();
+  }
+
+  return { moeglich: !!AC && typeof fetch !== 'undefined', sagen, stop, vorladen, zerlegen };
+})();
+
 const Sprache = (() => {
   const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const Rec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
@@ -90,10 +193,16 @@ const Sprache = (() => {
     });
   }
 
-  function vorlesen(text) {
+  // Ohne deutsche System-Stimme (z. B. Brave): mitgelieferte Schnipsel, sonst Systemstimme.
+  async function vorlesen(text) {
+    if (!stimme) stimmeWaehlen();
+    if (!stimme && Jonas.moeglich && await Jonas.sagen(text)) return;
+    return systemVorlesen(text);
+  }
+
+  function systemVorlesen(text) {
     return new Promise((resolve) => {
       if (!synth) { resolve(); return; }
-      if (!stimme) stimmeWaehlen();
       synth.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = stimme ? stimme.lang : 'de-DE';
@@ -206,12 +315,14 @@ const Sprache = (() => {
     // Nach der Runde: Mikrofon schließen
     ruhe() { if (typeof VoskErkennung !== 'undefined') VoskErkennung.ruhe(); },
     get kannHoeren() { return mitVosk() || !!Rec; },
-    stimmenBereit,
+    // Ohne deutsche System-Stimme gleich die Jonas-Schnipsel holen (dann auch offline da).
+    stimmenBereit: () => stimmenBereit().then((st) => { if (!st && Jonas.moeglich) Jonas.vorladen(); return st; }),
     stimme: () => stimme,
+    jonasMoeglich: Jonas.moeglich,
     alleStimmen: () => (synth ? synth.getVoices() : []),
-    kannSprechen: !!synth,
-    stopVorlesen() { if (synth) synth.cancel(); },
+    kannSprechen: !!synth || Jonas.moeglich,
+    stopVorlesen() { if (synth) synth.cancel(); Jonas.stop(); },
   };
 })();
 
-if (typeof module !== 'undefined') module.exports = { Zahlwort };
+if (typeof module !== 'undefined') module.exports = { Zahlwort, Jonas };

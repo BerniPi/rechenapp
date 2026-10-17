@@ -1,7 +1,7 @@
 // Selbsttest: node tools/test.js
 const assert = require('assert');
 const A = require('../js/aufgaben.js');
-const { Zahlwort } = require('../js/sprache.js');
+const { Zahlwort, Jonas } = require('../js/sprache.js');
 const Schrauben = require('../js/spiele/schrauben.js');
 const Unblock = require('../js/spiele/unblock.js');
 
@@ -69,6 +69,24 @@ pruefe('alle Zahlen 0-100 als Wort', () => {
     else if (n % 10 === 0) w = Z[n / 10];
     else w = (n % 10 === 1 ? 'ein' : E[n % 10]) + 'und' + Z[Math.floor(n / 10)];
     assert.strictEqual(Zahlwort.parse(w), n, w);
+  }
+});
+
+// ---- Jonas-Schnipsel ----
+const fs = require('fs');
+const path = require('path');
+pruefe('Jonas zerlegt Vorlese-Sätze', () => {
+  assert.deepStrictEqual(Jonas.zerlegen('7 minus 5'), ['z7', 'minus', 'e5']);
+  assert.deepStrictEqual(Jonas.zerlegen('Wie viel plus 4 ergibt 9?'), ['wieviel-anfang', 'plus', 'z4', 'ergibt', 'f9']);
+  assert.deepStrictEqual(Jonas.zerlegen('23 durch wie viel ergibt 1?'), ['z23', 'durch', 'wieviel', 'ergibt', 'f1']);
+  assert.strictEqual(Jonas.zerlegen('Hallo Welt'), null);
+});
+pruefe('Jonas hat Schnipsel für alle Aufgaben', () => {
+  const gen = A.erzeuger({ ops: ['+', '-', '*', '/'], raum: 100, einsetzen: true });
+  for (let i = 0; i < 20000; i++) {
+    const namen = Jonas.zerlegen(A.alsSatz(gen()));
+    assert.ok(namen);
+    for (const n of namen) assert.ok(fs.existsSync(path.join(__dirname, '..', 'audio', 'jonas', n + '.mp3')), n);
   }
 });
 

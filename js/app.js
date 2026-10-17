@@ -84,7 +84,7 @@
       return;
     }
     const st = await Sprache.stimmenBereit();
-    if (d.settings.modus === 'sprache' && !st) {
+    if (d.settings.modus === 'sprache' && !st && !Sprache.jonasMoeglich) {
       el.textContent = '⚠️ Keine deutsche Vorlese-Stimme gefunden. Android: Einstellungen → Sprachausgabe → Deutsch installieren.';
     }
   }
@@ -781,7 +781,9 @@
     const alle = Sprache.alleStimmen();
     $('#stimme-info').textContent = st
       ? `Vorlese-Stimme: ${st.name} (${st.lang})`
-      : `Keine deutsche Stimme gefunden (${alle.length} Stimmen vorhanden: ${alle.slice(0, 4).map((v) => v.lang).join(', ') || 'keine'}).`
+      : Sprache.jonasMoeglich
+        ? 'Vorlese-Stimme: Jonas (mitgeliefert) – der Browser hat keine deutsche Stimme.'
+        : `Keine deutsche Stimme gefunden (${alle.length} Stimmen vorhanden: ${alle.slice(0, 4).map((v) => v.lang).join(', ') || 'keine'}).`
         + ' Android: Einstellungen → Sprachausgabe → Deutsch installieren.';
   }
 
@@ -801,7 +803,7 @@
     Speicher.speichern();
   });
 
-  $('#test-stimme').addEventListener('click', () => Sprache.vorlesen('Sieben plus drei'));
+  $('#test-stimme').addEventListener('click', () => Sprache.vorlesen('7 plus 3'));
 
   let mikroTest = null;
   $('#test-mikro').addEventListener('click', () => {
