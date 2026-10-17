@@ -168,10 +168,9 @@ else Spiele.registrieren({
       hilfe.speichern();
       const box = document.createElement('div');
       box.className = 'r-sieg';
-      box.innerHTML = `<div class="overlay-box"><h2>Super! 🎉</h2><p>Level ${stand.level - 1} geschafft!</p>
-        <button class="knopf gross gruen">Weiter ➡️</button></div>`;
-      box.querySelector('button').addEventListener('click', () => { box.remove(); laden(); });
+      box.innerHTML = `<div class="overlay-box"><h2>Super! 🎉</h2><p>Level ${stand.level - 1} geschafft!</p></div>`;
       flaeche.appendChild(box);
+      hilfe.vorbei();
     }
 
     flaeche.querySelector('[data-a="zurueck"]').addEventListener('click', () => {
@@ -182,7 +181,8 @@ else Spiele.registrieren({
     laden();
     return {
       stop() {},
-      zusammenfassung: () => `${geschafft} Level geschafft. Weiter geht's bei Level ${stand.level}.`,
+      zusammenfassung: () => (geschafft ? `Level ${stand.level - 1} geschafft! Nächstes Mal geht's bei Level ${stand.level} weiter.`
+        : `Nicht ganz geschafft – nächstes Mal wieder Level ${stand.level}.`),
     };
   },
 });

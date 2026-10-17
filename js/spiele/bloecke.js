@@ -35,7 +35,7 @@ Spiele.registrieren({
     const lw = spielCanvas(bereich);
     const { ctx } = lw;
 
-    let feld, teil, naechstes, beutel, punkte, reihen, zustand, akku, letzte, lauf = true, bestRunde = 0;
+    let feld, teil, naechstes, beutel, punkte, reihen, zustand, akku, letzte, lauf = true;
 
     function ausBeutel() {
       if (!beutel || !beutel.length) {
@@ -55,8 +55,8 @@ Spiele.registrieren({
       if (kollision(teil.zellen, teil.x, teil.y)) {
         zustand = 'aus';
         hilfe.ton.crash();
-        bestRunde = Math.max(bestRunde, punkte);
         if (punkte > stand.best) { stand.best = punkte; hilfe.speichern(); }
+        hilfe.vorbei();
       }
     }
 
@@ -196,8 +196,6 @@ Spiele.registrieren({
         ctx.textAlign = 'center';
         ctx.font = `900 ${Math.round(z * 1.1)}px system-ui, sans-serif`;
         ctx.fillText('Voll!', ox + z * B / 2, oy + z * H * 0.35 + z * 0.6);
-        ctx.font = `800 ${Math.round(z * 0.6)}px system-ui, sans-serif`;
-        ctx.fillText('Tippen = neues Spiel', ox + z * B / 2, oy + z * H * 0.35 + z * 2.3);
       }
     }
 
@@ -220,7 +218,7 @@ Spiele.registrieren({
       const stopp = () => { clearTimeout(wdh); clearInterval(wdh); wdh = null; };
       b.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
-        if (zustand === 'aus') { reset(); return; }
+        if (zustand === 'aus') return;
         const a = b.dataset.a;
         AKTION[a]();
         if (a === 'links' || a === 'rechts' || a === 'runter') {
@@ -235,7 +233,7 @@ Spiele.registrieren({
     let wisch = null;
     bereich.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
-      if (zustand === 'aus') { reset(); return; }
+      if (zustand === 'aus') return;
       wisch = { x: ev.clientX, y: ev.clientY, sx: ev.clientX, sy: ev.clientY, bewegt: false };
     });
     bereich.addEventListener('pointermove', (ev) => {
@@ -256,7 +254,7 @@ Spiele.registrieren({
       const k = { ArrowLeft: 'links', ArrowRight: 'rechts', ArrowUp: 'drehen', ArrowDown: 'runter', ' ': 'fallen' }[ev.key];
       if (!k) return;
       ev.preventDefault();
-      if (zustand === 'aus') { reset(); return; }
+      if (zustand === 'aus') return;
       AKTION[k]();
     };
     document.addEventListener('keydown', taste);
@@ -267,8 +265,7 @@ Spiele.registrieren({
     return {
       stop() { lauf = false; lw.weg(); document.removeEventListener('keydown', taste); },
       zusammenfassung() {
-        bestRunde = Math.max(bestRunde, punkte);
-        return `Beste Runde: ${bestRunde} Punkte. Rekord: ${stand.best}`;
+        return `${punkte} Punkte. Rekord: ${stand.best}`;
       },
     };
   },

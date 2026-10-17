@@ -1,7 +1,8 @@
 // Register der Minispiele.
 // Jedes Spiel: { id, name, emoji, beschr, start(flaeche, hilfe) -> { stop(), zusammenfassung?() } }
 //   flaeche: leeres <div>, das den ganzen Spielbereich füllt
-//   hilfe:   { ton, stand(), speichern() } – stand() ist ein Objekt, das gespeichert bleibt
+//   hilfe:   { ton, stand(), speichern(), vorbei() } – stand() ist ein Objekt, das gespeichert bleibt;
+//            vorbei() meldet das Ende der (einzigen) Runde: verloren oder Level geschafft
 const Spiele = {
   liste: [],
   registrieren(def) { this.liste.push(def); },

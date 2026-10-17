@@ -444,7 +444,7 @@
   // ---------- Spiele ----------
   function spieleOeffnen() {
     sterneAnzeigen();
-    $('#spiele-info').textContent = `Eine Spielrunde (${e.spielMinuten} Min.) kostet ${e.preis} ⭐`;
+    $('#spiele-info').textContent = `Eine Spielrunde kostet ${e.preis} ⭐ – du hast genau einen Versuch!`;
     $('#spiele-meldung').textContent = '';
     const liste = $('#spiele-liste');
     liste.innerHTML = '';
@@ -477,27 +477,26 @@
     $('#spiel-name').textContent = `${def.emoji} ${def.name}`;
     const flaeche = $('#spiel-flaeche');
     flaeche.innerHTML = '';
-    S = { def, ende: performance.now() + e.spielMinuten * 60000, instanz: null };
+    const runde = { def, instanz: null, timer: null };
+    S = runde;
     wachHalten(true);
     const hilfe = {
       ton: Ton,
       stand: () => (d.spielstand[def.id] = d.spielstand[def.id] || {}),
       speichern: () => Speicher.speichern(),
+      // Das Spiel meldet: Runde zu Ende (verloren oder Level geschafft).
+      // Kurz warten, damit man den Absturz bzw. das gelöste Level noch sieht.
+      vorbei: () => {
+        if (S !== runde || runde.timer) return;
+        runde.timer = setTimeout(() => { if (S === runde) spielVorbei(true); }, 1500);
+      },
     };
-    requestAnimationFrame(() => { if (S) S.instanz = def.start(flaeche, hilfe); });
-    const tick = () => {
-      if (!S) return;
-      const rest = (S.ende - performance.now()) / 1000;
-      $('#spiel-zeit').textContent = fmt(Math.ceil(rest));
-      if (rest <= 0) spielVorbei(true);
-    };
-    S.timer = setInterval(tick, 250);
-    tick();
+    requestAnimationFrame(() => { if (S === runde) runde.instanz = def.start(flaeche, hilfe); });
   }
 
-  function spielVorbei(zeitUm) {
+  function spielVorbei(fertig) {
     if (!S) return;
-    clearInterval(S.timer);
+    clearTimeout(S.timer);
     let text = '';
     try {
       if (S.instanz && S.instanz.zusammenfassung) text = S.instanz.zusammenfassung();
@@ -505,7 +504,7 @@
     } catch (err) { console.error(err); }
     S = null;
     wachHalten(false);
-    if (zeitUm) {
+    if (fertig) {
       $('#spiel-vorbei-text').textContent = text || '';
       $('#spiel-vorbei').classList.remove('versteckt');
       Ton.jubel();
@@ -516,7 +515,7 @@
   }
 
   $('#spiel-ende').addEventListener('click', () => {
-    if (confirm('Spiel beenden? Die restliche Zeit verfällt.')) spielVorbei(false);
+    if (confirm('Spiel beenden? Die Runde ist dann verbraucht.')) spielVorbei(false);
   });
   $('#spiel-zurueck').addEventListener('click', () => {
     $('#spiel-vorbei').classList.add('versteckt');

@@ -14,8 +14,7 @@ const Speicher = {
         zehn: [4, 6, 9, 14],     // Sekunden pro Aufgabe für 5/4/3/2 Sterne
         minute: [20, 14, 9, 5],  // richtige pro Minute für 5/4/3/2 Sterne
         strafe: 3,               // Strafsekunden pro falscher Antwort
-        preis: 3,                // Sterne pro Spielrunde
-        spielMinuten: 3,         // Länge einer Spielrunde
+        preis: 10,               // Sterne pro Spielrunde (mindestens 10, eine Runde ohne Zeitlimit)
         erkennung: 'vosk',       // 'vosk' oder 'google'
       },
     };
@@ -32,6 +31,8 @@ const Speicher = {
       eltern: { ...std.eltern, ...(d.eltern || {}) },
       spielstand: { ...(d.spielstand || {}) },
     };
+    delete this.data.eltern.spielMinuten;
+    if (!(this.data.eltern.preis >= 10)) this.data.eltern.preis = 10;
     return this.data;
   },
 

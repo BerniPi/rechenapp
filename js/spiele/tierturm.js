@@ -21,7 +21,7 @@ Spiele.registrieren({
     const lw = spielCanvas(bereich);
     const { ctx } = lw;
 
-    let turm, schwebt, faellt, kippt, kamera, zustand, letzte, lauf = true, perfektText = 0, bestRunde = 0;
+    let turm, schwebt, faellt, kippt, kamera, zustand, letzte, lauf = true, perfektText = 0;
 
     const U = () => Math.min(lw.b * 0.2, lw.h * 0.13);
     const hoehe = () => U() * 0.8;
@@ -55,7 +55,7 @@ Spiele.registrieren({
 
     function tippen(ev) {
       if (ev) ev.preventDefault();
-      if (zustand === 'aus') { reset(); return; }
+      if (zustand === 'aus') return;
       if (faellt || kippt) return;
       faellt = { ...schwebt, y: schwebY(), v: 0 };
       schwebt = null;
@@ -74,8 +74,8 @@ Spiele.registrieren({
         faellt = null;
         zustand = 'aus';
         hilfe.ton.crash();
-        bestRunde = Math.max(bestRunde, punkte());
         if (punkte() > stand.best) { stand.best = punkte(); hilfe.speichern(); }
+        hilfe.vorbei();
         return;
       }
       let x = faellt.x;
@@ -172,8 +172,8 @@ Spiele.registrieren({
       }
       if (zustand === 'aus' && (!kippt || kippt.y + kamera > lw.h)) {
         ctx.font = `800 ${Math.round(Math.min(lw.h * 0.04, lw.b * 0.045))}px system-ui, sans-serif`;
-        ctx.strokeText('Runtergefallen! Tippen = neuer Turm', lw.b / 2, lw.h * 0.3);
-        ctx.fillText('Runtergefallen! Tippen = neuer Turm', lw.b / 2, lw.h * 0.3);
+        ctx.strokeText('Runtergefallen!', lw.b / 2, lw.h * 0.3);
+        ctx.fillText('Runtergefallen!', lw.b / 2, lw.h * 0.3);
       } else if (punkte() === 0 && schwebt) {
         ctx.font = `800 ${Math.round(Math.min(lw.h * 0.035, lw.b * 0.045))}px system-ui, sans-serif`;
         ctx.strokeText('Tippe, um das Tier fallen zu lassen', lw.b / 2, lw.h * 0.3);
@@ -196,8 +196,7 @@ Spiele.registrieren({
     return {
       stop() { lauf = false; lw.weg(); document.removeEventListener('keydown', taste); },
       zusammenfassung() {
-        bestRunde = Math.max(bestRunde, punkte());
-        return `Höchster Turm: ${bestRunde} Tiere. Rekord: ${stand.best}`;
+        return `Dein Turm: ${punkte()} Tiere. Rekord: ${stand.best}`;
       },
     };
   },

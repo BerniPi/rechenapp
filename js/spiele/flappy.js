@@ -13,7 +13,7 @@ Spiele.registrieren({
     stand.best = stand.best || 0;
 
     let zustand = 'warten'; // warten | fliegt | tot
-    let vogel, roehren, punkte, letzte, totSeit, bestRunde = 0, versuche = 0;
+    let vogel, roehren, punkte, letzte;
     let lauf = true;
 
     function reset() {
@@ -42,11 +42,8 @@ Spiele.registrieren({
 
     function tippen(ev) {
       if (ev) ev.preventDefault();
-      if (zustand === 'tot') {
-        if (performance.now() - totSeit < 600) return;
-        reset();
-      }
-      if (zustand === 'warten') { zustand = 'fliegt'; versuche++; }
+      if (zustand === 'tot') return;
+      if (zustand === 'warten') zustand = 'fliegt';
       vogel.v = masse().sprung;
       hilfe.ton.flap();
     }
@@ -56,10 +53,9 @@ Spiele.registrieren({
 
     function sterben() {
       zustand = 'tot';
-      totSeit = performance.now();
       hilfe.ton.crash();
-      bestRunde = Math.max(bestRunde, punkte);
       if (punkte > stand.best) { stand.best = punkte; hilfe.speichern(); }
+      hilfe.vorbei();
     }
 
     function schritt(dt) {
@@ -141,7 +137,7 @@ Spiele.registrieren({
       ctx.font = `800 ${Math.round(Math.min(m.b, m.h) * 0.055)}px system-ui, sans-serif`;
       let text = '';
       if (zustand === 'warten') text = 'Tippen zum Starten!';
-      if (zustand === 'tot') text = 'Autsch! Tippen für neuen Versuch';
+      if (zustand === 'tot') text = 'Autsch!';
       if (text) { ctx.strokeText(text, m.b / 2, m.h * 0.66); ctx.fillText(text, m.b / 2, m.h * 0.66); }
       ctx.font = `700 ${Math.round(Math.min(m.b, m.h) * 0.04)}px system-ui, sans-serif`;
       const best = `Rekord: ${stand.best}`;
@@ -169,8 +165,7 @@ Spiele.registrieren({
         document.removeEventListener('keydown', taste);
       },
       zusammenfassung() {
-        bestRunde = Math.max(bestRunde, punkte);
-        return `Beste Runde: ${bestRunde} Punkte (${versuche} Versuche). Rekord: ${stand.best}`;
+        return `${punkte} Punkte. Rekord: ${stand.best}`;
       },
     };
   },

@@ -264,10 +264,9 @@ else Spiele.registrieren({
         const box = document.createElement('div');
         box.className = 'r-sieg';
         box.innerHTML = `<div class="overlay-box"><h2>${perfekt ? 'Perfekt! 🌟' : 'Geschafft! 🎉'}</h2>
-          <p>Level ${stand.level - 1} in ${zuege} Zügen${perfekt ? ' – besser geht\'s nicht!' : ` (am besten ${lv.d})`}</p>
-          <button class="knopf gross gruen">Weiter ➡️</button></div>`;
-        box.querySelector('button').addEventListener('click', () => { box.remove(); laden(); });
+          <p>Level ${stand.level - 1} in ${zuege} Zügen${perfekt ? ' – besser geht\'s nicht!' : ` (am besten ${lv.d})`}</p></div>`;
         flaeche.appendChild(box);
+        hilfe.vorbei();
       }, 500);
     }
 
@@ -276,7 +275,8 @@ else Spiele.registrieren({
     laden();
     return {
       stop() {},
-      zusammenfassung: () => `${geschafft} Level geschafft. Weiter geht's bei Level ${stand.level}.`,
+      zusammenfassung: () => (geschafft ? `Level ${stand.level - 1} geschafft! Nächstes Mal geht's bei Level ${stand.level} weiter.`
+        : `Nicht ganz geschafft – nächstes Mal wieder Level ${stand.level}.`),
     };
   },
 });

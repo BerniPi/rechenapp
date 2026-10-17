@@ -24,7 +24,7 @@ Spiele.registrieren({
     const { ctx } = lw;
 
     let spalten, zeilen, zelle, ox, oy;
-    let schlange, richtung, naechsteRichtung, apfel, punkte, zustand, takt, akku, letzte, versuche = 0, bestRunde = 0;
+    let schlange, richtung, naechsteRichtung, apfel, punkte, zustand, takt, akku, letzte;
     let lauf = true;
 
     function raster() {
@@ -59,7 +59,7 @@ Spiele.registrieren({
 
     function lenken(x, y) {
       if (zustand === 'tot') return;
-      if (zustand === 'warten') { zustand = 'laeuft'; versuche++; }
+      if (zustand === 'warten') zustand = 'laeuft';
       if (x === -richtung.x && y === -richtung.y) return; // nicht umdrehen
       naechsteRichtung = { x, y };
     }
@@ -72,8 +72,8 @@ Spiele.registrieren({
       if (wand || selbst) {
         zustand = 'tot';
         hilfe.ton.crash();
-        bestRunde = Math.max(bestRunde, punkte);
         if (punkte > stand.best) { stand.best = punkte; hilfe.speichern(); }
+        hilfe.vorbei();
         return;
       }
       schlange.unshift(kopf);
@@ -131,7 +131,7 @@ Spiele.registrieren({
       ctx.fillText(`🍎 ${punkte}   🏆 ${stand.best}`, lw.b / 2, zelle * 0.8);
       let text = '';
       if (zustand === 'warten') text = 'Wisch oder drück einen Pfeil!';
-      if (zustand === 'tot') text = 'Autsch! Tippen für neuen Versuch';
+      if (zustand === 'tot') text = 'Autsch!';
       if (text) {
         ctx.font = `800 ${Math.round(zelle * 0.8)}px system-ui, sans-serif`;
         ctx.strokeText(text, lw.b / 2, lw.h * 0.7);
@@ -155,7 +155,7 @@ Spiele.registrieren({
     let wischStart = null;
     bereich.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
-      if (zustand === 'tot') { reset(); return; }
+      if (zustand === 'tot') return;
       wischStart = { x: ev.clientX, y: ev.clientY };
     });
     bereich.addEventListener('pointermove', (ev) => {
@@ -170,7 +170,7 @@ Spiele.registrieren({
 
     flaeche.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
-      if (zustand === 'tot') { reset(); return; }
+      if (zustand === 'tot') return;
       const [x, y] = b.dataset.r.split(',').map(Number);
       lenken(x, y);
     }));
@@ -178,7 +178,7 @@ Spiele.registrieren({
     const taste = (ev) => {
       if (!TASTEN[ev.key]) return;
       ev.preventDefault();
-      if (zustand === 'tot') { reset(); return; }
+      if (zustand === 'tot') return;
       lenken(...TASTEN[ev.key]);
     };
     document.addEventListener('keydown', taste);
@@ -189,8 +189,7 @@ Spiele.registrieren({
     return {
       stop() { lauf = false; lw.weg(); document.removeEventListener('keydown', taste); },
       zusammenfassung() {
-        bestRunde = Math.max(bestRunde, punkte);
-        return `Längste Schlange: ${bestRunde} Äpfel (${versuche} Versuche). Rekord: ${stand.best}`;
+        return `Deine Schlange: ${punkte} Äpfel. Rekord: ${stand.best}`;
       },
     };
   },
