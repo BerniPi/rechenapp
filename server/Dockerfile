@@ -11,6 +11,7 @@ COPY js public/js
 COPY icons public/icons
 COPY vendor public/vendor
 COPY models public/models
+COPY audio public/audio
 ENV APP=/app/public DATEN=/daten PORT=8080 NODE_ENV=production
 RUN mkdir /daten && chown node:node /daten
 USER node

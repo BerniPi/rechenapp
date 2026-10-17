@@ -114,8 +114,9 @@ setInterval(() => {
 
 function ip(req) {
   if (process.env.HINTER_PROXY !== '0') {
+    // Der letzte Eintrag stammt vom eigenen Proxy – die davor kann jeder Aufrufer selbst setzen.
     const f = req.headers['x-forwarded-for'];
-    if (f) return String(f).split(',')[0].trim();
+    if (f) return String(f).split(',').pop().trim() || req.socket.remoteAddress || '?';
   }
   return req.socket.remoteAddress || '?';
 }

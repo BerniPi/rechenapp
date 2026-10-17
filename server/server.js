@@ -181,10 +181,10 @@ async function api(req, res, url) {
 const TYPEN = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
-  '.gz': 'application/gzip', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json',
+  '.gz': 'application/gzip', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json',
 };
 // Nur diese Teile der App werden ausgeliefert – nie server/, .git usw.
-const APP_ERLAUBT = /^\/(index\.html|manifest\.json|sw\.js|(css|js|icons|vendor|models)\/[\w./-]+)$/;
+const APP_ERLAUBT = /^\/(index\.html|manifest\.json|sw\.js|(css|js|icons|vendor|models|audio)\/[\w./-]+)$/;
 
 function datei(res, wurzel, rel, extra = {}) {
   const ziel = path.normalize(path.join(wurzel, rel));
