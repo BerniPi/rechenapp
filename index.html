@@ -12,11 +12,42 @@
 </head>
 <body>
 
+<!-- ============ BENUTZER ============ -->
+<section id="benutzer" class="screen aktiv">
+  <h1 class="titel">Rechenheld</h1>
+  <h2 class="benutzer-frage">Wer rechnet?</h2>
+  <div id="benutzer-liste" class="benutzer-liste"></div>
+  <div class="aktionen">
+    <button id="benutzer-neu" class="knopf gross gruen">➕ Neuer Spieler</button>
+    <button id="benutzer-bearbeiten" class="knopf grau">🗑️ Spieler löschen</button>
+  </div>
+</section>
+
+<!-- ============ NEUER BENUTZER ============ -->
+<section id="neu" class="screen">
+  <header class="kopf">
+    <button id="neu-zurueck" class="rund klein" title="Zurück">⬅</button>
+    <h1>Neuer Spieler</h1>
+    <div></div>
+  </header>
+  <p id="neu-hinweis" class="neu-hinweis versteckt">Deine bisherigen Sterne und Rekorde gehören dann diesem Spieler.</p>
+  <div id="neu-vorschau" class="avatar riesig"></div>
+  <input id="neu-name" class="name-eingabe" type="text" maxlength="16" placeholder="Wie heißt du?" autocomplete="off">
+  <label class="knopf blau foto-knopf">📷 Foto machen
+    <input id="neu-foto" type="file" accept="image/*" capture="user" hidden>
+  </label>
+  <h2 class="bild-titel">… oder such dir ein Bild aus:</h2>
+  <div id="neu-bilder" class="bilder"></div>
+  <div class="aktionen">
+    <button id="neu-fertig" class="knopf gross gruen">Fertig ✅</button>
+  </div>
+</section>
+
 <!-- ============ START ============ -->
-<section id="start" class="screen aktiv">
+<section id="start" class="screen">
   <header class="kopf">
     <button id="eltern-knopf" class="rund klein" title="Eltern (lange drücken)">⚙️</button>
-    <h1>Rechenheld</h1>
+    <button id="wer" class="wer" title="Spieler wechseln"></button>
     <button id="konto-start" class="konto">⭐ <span class="sterne-zahl">0</span></button>
   </header>
 
@@ -24,16 +55,20 @@
     <div class="gruppe">
       <h2>Wie?</h2>
       <div class="chips" data-feld="modus" data-einfach>
-        <button data-wert="schrift">✏️ Schreiben</button>
+        <button data-wert="schrift">⌨️ Tippen</button>
         <button data-wert="sprache">🎤 Sprechen</button>
       </div>
     </div>
     <div class="gruppe">
       <h2>Spielart</h2>
       <div class="chips" data-feld="art" data-einfach>
-        <button data-wert="zehn">🔟 10 Aufgaben</button>
-        <button data-wert="m1">⏱️ 1 Minute</button>
-        <button data-wert="m5">⏱️ 5 Minuten</button>
+        <button data-wert="aufgaben">🔢 Aufgaben</button>
+        <button data-wert="zeit">⏱️ Zeit</button>
+      </div>
+      <div class="stepper">
+        <button id="weniger" class="rund" aria-label="weniger">−</button>
+        <div id="laenge" class="laenge"></div>
+        <button id="mehr" class="rund" aria-label="mehr">+</button>
       </div>
     </div>
     <div class="gruppe">
@@ -109,6 +144,7 @@
   <div id="erg-sterne" class="erg-sterne"></div>
   <div id="erg-text" class="erg-text"></div>
   <div id="erg-rekord" class="erg-rekord"></div>
+  <div id="erg-bestenliste" class="bestenliste"></div>
   <div id="erg-fehler" class="erg-fehler"></div>
   <div class="aktionen">
     <button id="nochmal-runde" class="knopf gross gruen">Nochmal 🔁</button>
@@ -186,8 +222,8 @@
     <p class="hinweis">Nach 3 Runden einer Aufgabenart zählt der eigene Schnitt: gleich schnell = 3 ⭐, deutlich schneller = 5 ⭐. Besser werden hebt den Schnitt schnell, schlechter werden senkt ihn nur langsam. Die Werte unten bleiben als Rahmen und gelten für die ersten 3 Runden.</p>
     <button id="tempo-loeschen" class="knopf klein">Schnitt neu messen</button>
 
-    <h2>Sterne bei „10 Aufgaben" (Sekunden pro Aufgabe)</h2>
-    <p class="hinweis">Jede falsche Antwort zählt als +<span data-zeige="strafe"></span> s. Ab 3 Fehlern gibt es je 3 Fehler einen Stern weniger, unter 5 richtigen gar keinen.</p>
+    <h2>Sterne bei „Aufgaben" (Sekunden pro Aufgabe)</h2>
+    <p class="hinweis">Jede falsche Antwort zählt als +<span data-zeige="strafe"></span> s. Je 3 Fehler auf 10 Aufgaben gibt es einen Stern weniger, unter der Hälfte richtig gar keinen. 10 Aufgaben = Sterne ×1, 20 Aufgaben = ×2 usw.</p>
     <div class="schwellen">
       <label>5 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="0"> s</label>
       <label>4 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="1"> s</label>
@@ -195,8 +231,8 @@
       <label>2 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="3"> s</label>
     </div>
 
-    <h2>Sterne bei Zeit-Challenge (richtige pro Minute)</h2>
-    <p class="hinweis">Falsche Antworten werden abgezogen. Beim Sprechen gilt automatisch 60 % davon. 5 Minuten zählen doppelt.</p>
+    <h2>Sterne bei „Zeit" (richtige pro Minute)</h2>
+    <p class="hinweis">Falsche Antworten werden abgezogen. Beim Sprechen gilt automatisch 60 % davon. 1 Minute = Sterne ×1, 5 Minuten = ×2, 10 Minuten = ×3,25.</p>
     <div class="schwellen">
       <label>5 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="0"></label>
       <label>4 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="1"></label>

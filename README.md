@@ -2,10 +2,11 @@
 
 Rechen-Trainer für die Volksschule als Web-App (PWA) – ohne Build-Schritt, reines HTML/CSS/JS.
 
-- **Schreiben**: Aufgabe sehen, Ergebnis auf der Bildschirmtastatur tippen. Jede Ziffer wird sofort geprüft; „Überspringen" zählt als falsch.
+- **Tippen**: Aufgabe sehen, Ergebnis auf der Bildschirmtastatur tippen. Bewertet wird, sobald so viele Ziffern getippt sind, wie das Ergebnis Stellen hat; „⌫ Zurück" löscht die letzte Ziffer, „Überspringen" zählt als falsch.
 - **Sprechen**: Aufgabe wird vorgelesen, das Kind sagt das Ergebnis. Erkennung wahlweise mit **Vosk** (offline im Browser, nur Zahlwörter 0–100 erlaubt – Standard) oder der Google-Erkennung von Chrome (braucht Internet). Umschalten im Eltern-Bereich. Mikrofon braucht HTTPS.
-- **Spielarten**: 10 Aufgaben auf Zeit, Zeit-Challenge 1 Minute oder 5 Minuten.
-- Rechenarten + − · : (mischbar), Zahlenraum 10/20/50/100, Einsetzaufgaben (nur Schreiben).
+- **Spielarten**: Aufgaben auf Zeit (5–50 Aufgaben) oder Zeit-Challenge (1–10 Minuten). Rekorde gibt es bei 10/20 Aufgaben und 1/5 Minuten.
+- **Spieler**: Beim Start Spieler wählen, anlegen (Name + Foto oder Bild) oder löschen. Alles wird pro Spieler gespeichert; die Bestenliste vergleicht alle Spieler auf dem Gerät.
+- Rechenarten + − · : (mischbar), Zahlenraum 10/20/50/100, Einsetzaufgaben.
 - 1–5 Sterne pro Runde → Sterne sind Währung für Minispiele: Flattervogel, Apfelschlange, Farbblöcke, Tierturm, Schrauben, Ausparken.
 - **Eltern-Bereich**: Zahnrad oben links **lange drücken** – Sterne-Schwellen, Spielpreis (mind. 10 ⭐ für genau eine Runde), Verlauf.
 

@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar.
 // Bei jeder Änderung an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'rechenheld-10';
+const VERSION = 'rechenheld-12';
 const GROSS = 'rechenheld-gross-1'; // Sprachmodell + Vosk-Bibliothek, bleibt über Updates erhalten
 const DATEIEN = [
   './', 'index.html', 'manifest.json', 'css/style.css',

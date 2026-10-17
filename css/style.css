@@ -406,3 +406,131 @@ button {
 .sprach-hinweis { text-align: center; color: #b54708; font-weight: 800; margin: 10px 0 0; min-height: 0; }
 .sprach-hinweis:empty { display: none; }
 .mikro-test { font-size: 20px; font-weight: 800; text-align: center; margin: 4px 0; min-height: 1.3em; }
+
+/* ---------- Spieler ---------- */
+.titel { margin: 8px 0 0; text-align: center; font-size: clamp(32px, 8vw, 48px); color: var(--blau); }
+.benutzer-frage { margin: 6px 0 18px; text-align: center; font-size: 22px; color: var(--leise); }
+.benutzer-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+.benutzer-karte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px 14px;
+  background: var(--karte);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+}
+.benutzer-karte:active { transform: translateY(3px); }
+.benutzer-karte .name { font-size: 22px; font-weight: 800; overflow-wrap: anywhere; }
+.benutzer-karte .weg {
+  position: absolute; top: -8px; right: -8px;
+  width: 38px; height: 38px; line-height: 38px;
+  border-radius: 50%;
+  background: var(--rot); color: #fff;
+  font-size: 18px; font-weight: 900;
+}
+.benutzer-liste.loeschen .benutzer-karte { animation: wackeln .3s infinite alternate; }
+@keyframes wackeln { from { transform: rotate(-1.5deg); } to { transform: rotate(1.5deg); } }
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  background: var(--bg);
+  font-size: 54px;
+  line-height: 1;
+  overflow: hidden;
+  flex: none;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.klein { width: 40px; height: 40px; font-size: 26px; }
+.avatar.riesig { width: 140px; height: 140px; font-size: 86px; background: var(--karte); box-shadow: var(--schatten); }
+#neu-vorschau { display: flex; justify-content: center; margin: 4px auto 14px; width: auto; height: auto; background: none; box-shadow: none; }
+
+.wer {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 16px 6px 6px;
+  background: var(--karte);
+  border-radius: 999px;
+  box-shadow: var(--schatten);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--blau);
+}
+.wer span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wer:active { transform: translateY(3px); }
+
+.unsichtbar { visibility: hidden; }
+.neu-hinweis { text-align: center; color: var(--leise); font-weight: 700; margin: 0 0 8px; }
+.name-eingabe {
+  width: 100%;
+  font: inherit;
+  font-size: 26px;
+  font-weight: 800;
+  text-align: center;
+  padding: 14px;
+  border: 3px solid var(--grau);
+  border-radius: var(--rund);
+  background: var(--karte);
+  color: var(--text);
+  user-select: text;
+  -webkit-user-select: text;
+}
+.name-eingabe:focus { outline: none; border-color: var(--blau); }
+.foto-knopf { display: block; text-align: center; margin-top: 12px; cursor: pointer; }
+.bild-titel { margin: 18px 0 8px 4px; font-size: 17px; color: var(--leise); text-transform: uppercase; letter-spacing: 1px; }
+.bilder { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
+.bilder button {
+  aspect-ratio: 1;
+  font-size: 34px;
+  background: var(--karte);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+  border: 3px solid transparent;
+}
+.bilder button.an { border-color: var(--blau); background: #dfe7ff; }
+
+/* Spielart-Länge */
+.stepper {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.stepper .rund { width: 56px; height: 56px; font-size: 30px; font-weight: 900; }
+.stepper .rund:disabled { opacity: .4; }
+.laenge { text-align: center; font-size: 24px; font-weight: 900; }
+.laenge small { display: block; font-size: 14px; font-weight: 700; color: var(--leise); }
+
+/* Bestenliste */
+.bestenliste { margin: 10px auto 0; width: 100%; max-width: 420px; }
+.bestenliste h3 { margin: 0 0 6px; text-align: center; color: var(--leise); font-size: 17px; text-transform: uppercase; letter-spacing: 1px; }
+.bestenliste ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bestenliste li {
+  display: grid;
+  grid-template-columns: 30px auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--karte);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+  font-weight: 800;
+  font-size: 19px;
+}
+.bestenliste li.ich { background: #dfe7ff; }
+.bestenliste li .platz { text-align: center; }
+.bestenliste li .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,7 +1,7 @@
 // Hauptlogik: Bildschirme, Einstellungen, Rechenrunden, Sterne, Spiele-Menü, Eltern-Bereich.
 (() => {
-  const d = Speicher.laden();
-  const e = d.eltern;
+  let d = null; // Daten des aktiven Spielers
+  let e = null; // seine Eltern-Einstellungen
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -16,7 +16,17 @@
     return `${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, '0')}`;
   }
   const OP_NAME = { '+': '+', '-': '−', '*': '·', '/': ':' };
-  const ART_NAME = { zehn: '10 Aufgaben', m1: '1 Minute', m5: '5 Minuten' };
+  const ART_NAME = { zehn: '10 Aufgaben', m1: '1 Minute', m5: '5 Minuten' }; // alte Verlaufseinträge
+  const GRENZEN = { aufgaben: { min: 5, max: 50, schritt: 5 }, zeit: { min: 1, max: 10, schritt: 1 } };
+  const istAufgaben = (s) => s.art === 'aufgaben';
+  function laengeText(s) {
+    return istAufgaben(s) ? `${s.anzahl} Aufgaben` : `${s.minuten} ${s.minuten === 1 ? 'Minute' : 'Minuten'}`;
+  }
+  // Rekorde gibt es nur bei festen Längen: 10/20 Aufgaben, 1/5 Minuten.
+  function rekordArt(s) {
+    if (istAufgaben(s)) return s.anzahl === 10 ? 'zehn' : s.anzahl === 20 ? 'a20' : null;
+    return s.minuten === 1 ? 'm1' : s.minuten === 5 ? 'm5' : null;
+  }
 
   let wakeLock = null;
   async function wachHalten(an) {
@@ -37,9 +47,33 @@
         b.classList.toggle('an', an);
       });
     });
+    laengeAnzeigen();
     rekordInfo();
     sprachHinweis();
   }
+
+  function laengeAnzeigen() {
+    const s = d.settings;
+    const g = GRENZEN[s.art];
+    const wert = istAufgaben(s) ? s.anzahl : s.minuten;
+    $('#laenge').innerHTML = `${laengeText(s)}<small>${rekordArt(s) ? '🏆 mit Rekord' : 'Rekord nur bei ' + (istAufgaben(s) ? '10 und 20' : '1 und 5')}</small>`;
+    $('#weniger').disabled = wert <= g.min;
+    $('#mehr').disabled = wert >= g.max;
+  }
+
+  function laengeAendern(richtung) {
+    const s = d.settings;
+    const g = GRENZEN[s.art];
+    const feld = istAufgaben(s) ? 'anzahl' : 'minuten';
+    // auf das Raster einrasten, z. B. 5, 10, 15 …
+    const neu = Math.round((s[feld] + richtung * g.schritt) / g.schritt) * g.schritt;
+    s[feld] = Math.min(g.max, Math.max(g.min, neu));
+    Ton.klick();
+    Speicher.speichern();
+    chipsAnzeigen();
+  }
+  $('#weniger').addEventListener('click', () => laengeAendern(-1));
+  $('#mehr').addEventListener('click', () => laengeAendern(1));
 
   async function sprachHinweis() {
     const el = $('#sprach-hinweis');
@@ -75,17 +109,37 @@
     });
   });
 
-  function rekordSchluessel(s) {
+  function schluessel(s, art) {
     const ein = s.einsetzen ? 'E' : '';
-    return `${s.modus}|${s.art}|${[...s.ops].sort().join('')}|${s.raum}|${ein}`;
+    return `${s.modus}|${art}|${[...s.ops].sort().join('')}|${s.raum}|${ein}`;
   }
-  function rekordText(r, art) {
+  // null = für diese Länge gibt es keinen Rekord
+  function rekordSchluessel(s) {
+    const art = rekordArt(s);
+    return art ? schluessel(s, art) : null;
+  }
+  // Der persönliche Schnitt ist ein Tempo und gilt für jede Länge.
+  function tempoSchluessel(s) { return schluessel(s, istAufgaben(s) ? 'zehn' : 'm1'); }
+  function rekordWert(wert, s) { return istAufgaben(s) ? fmt(wert) : `${wert} Punkte`; }
+  function rekordText(r, s) {
     if (!r) return '';
-    return art === 'zehn' ? `🏆 Bestzeit: ${fmt(r.wert)}` : `🏆 Rekord: ${r.wert} Punkte`;
+    return istAufgaben(s) ? `🏆 Bestzeit: ${fmt(r.wert)}` : `🏆 Rekord: ${r.wert} Punkte`;
+  }
+  // Beste zuerst: bei Aufgaben die kleinste Zeit, bei Zeit die meisten Punkte.
+  function bestenliste(s) {
+    const key = rekordSchluessel(s);
+    if (!key) return [];
+    return Speicher.bestenliste(key).sort((a, b) => (istAufgaben(s) ? a.wert - b.wert : b.wert - a.wert) || a.datum - b.datum);
   }
   function rekordInfo() {
     const s = d.settings;
-    $('#rekord-info').textContent = rekordText(d.rekorde[rekordSchluessel(s)], s.art);
+    const key = rekordSchluessel(s);
+    let text = key ? rekordText(d.rekorde[key], s) : '';
+    const erster = bestenliste(s)[0];
+    if (erster && erster.benutzer.id !== Speicher.benutzer.aktiv && Speicher.benutzer.liste.length > 1) {
+      text += `${text ? '  ·  ' : ''}👑 ${erster.benutzer.name}: ${rekordWert(erster.wert, s)}`;
+    }
+    $('#rekord-info').textContent = text;
   }
 
   // Eltern-Knopf: lange drücken
@@ -115,7 +169,7 @@
     const s = { ...d.settings, ops: [...d.settings.ops] };
     if (s.modus === 'sprache') {
       if (!Sprache.kannHoeren) {
-        alert('Dieser Browser kann leider keine Sprache erkennen. Bitte Chrome verwenden – jetzt geht es mit Schreiben weiter.');
+        alert('Dieser Browser kann leider keine Sprache erkennen. Bitte Chrome verwenden – jetzt geht es mit Tippen weiter.');
         s.modus = 'schrift';
       }
     }
@@ -159,10 +213,11 @@
       falsch: 0,
       eingabe: '',
       aktiv: true,
-      zeit: 0,          // gemessene Zeit in ms (10-Aufgaben-Modus)
+      zeit: 0,          // gemessene Zeit in ms (Aufgaben-Modus)
       laufSeit: null,
       start: performance.now(),
-      dauer: s.art === 'm1' ? 60 : s.art === 'm5' ? 300 : 0,
+      dauer: istAufgaben(s) ? 0 : s.minuten * 60,
+      punkte: istAufgaben(s) && s.anzahl <= 20, // Fortschritt als Punkte, sonst als Balken
       zuhoerer: null,
       tastatur: s.modus === 'schrift' || !!sprachFehler,
       hinweis: sprachFehler ? `${sprachFehler} Tippe die Antwort.` : '',
@@ -174,8 +229,8 @@
     $('#sprach-knoepfe').classList.toggle('versteckt', !sprache || R.tastatur);
 
     const fort = $('#fortschritt');
-    fort.innerHTML = s.art === 'zehn'
-      ? Array.from({ length: 10 }, () => '<span class="punkt"></span>').join('')
+    fort.innerHTML = R.punkte
+      ? Array.from({ length: s.anzahl }, () => '<span class="punkt"></span>').join('')
       : '<div class="balken"><div></div></div>';
 
     zeige('runde');
@@ -196,7 +251,7 @@
 
   function tick() {
     if (!R || !R.aktiv) return;
-    if (R.s.art === 'zehn') {
+    if (istAufgaben(R.s)) {
       $('#uhr').textContent = fmt(gemessen() / 1000);
     } else {
       const rest = R.dauer - (performance.now() - R.start) / 1000;
@@ -210,14 +265,16 @@
 
   function naechste() {
     if (!R || !R.aktiv) return;
-    if (R.s.art === 'zehn' && R.nr >= 10) { rundeEnde(); return; }
+    if (istAufgaben(R.s) && R.nr >= R.s.anzahl) { rundeEnde(); return; }
     R.auf = R.gen();
     R.nr++;
     R.eingabe = '';
     aufgabeZeigen();
-    if (R.s.art === 'zehn') {
+    if (istAufgaben(R.s)) {
       $$('#fortschritt .punkt').forEach((p, i) => p.classList.toggle('jetzt', i === R.nr - 1));
-      $('#zaehler').textContent = `Aufgabe ${R.nr} von 10`;
+      const balken = $('#fortschritt .balken');
+      if (balken) balken.firstElementChild.style.width = `${((R.nr - 1) / R.s.anzahl) * 100}%`;
+      $('#zaehler').textContent = `Aufgabe ${R.nr} von ${R.s.anzahl}`;
     } else {
       $('#zaehler').textContent = `✅ ${R.richtig}   ❌ ${R.falsch}`;
     }
@@ -260,7 +317,7 @@
     R.liste.push({ auf: R.auf, gegeben, ok });
     if (ok) { R.richtig++; Ton.richtig(); } else { R.falsch++; Ton.falsch(); }
     blitz(ok);
-    if (R.s.art === 'zehn') {
+    if (R.punkte) {
       const p = $$('#fortschritt .punkt')[R.nr - 1];
       if (p) p.classList.add(ok ? 'richtig' : 'falsch');
     }
@@ -294,7 +351,7 @@
   async function frageVorlesen() {
     const auf = R.auf;
     zuhoerenStoppen();
-    if (R.s.art === 'zehn') uhrLaeuft(false);
+    if (istAufgaben(R.s)) uhrLaeuft(false);
     mikroStatus('spricht');
     $('#gehoert').innerHTML = '&nbsp;';
     await new Promise((r) => setTimeout(r, 250)); // Ton ausklingen lassen
@@ -321,7 +378,7 @@
       onZahl: (zahl, ok) => {
         if (!R || R.auf !== auf) return;
         R.zuhoerer = null;
-        if (R.s.art === 'zehn') uhrLaeuft(false);
+        if (istAufgaben(R.s)) uhrLaeuft(false);
         $('#gehoert').textContent = `${zahl}`;
         bewerte(ok, zahl);
       },
@@ -332,7 +389,7 @@
   $('#ueberspringen-sprache').addEventListener('click', () => {
     if (!R || !R.aktiv) return;
     zuhoerenStoppen();
-    if (R.s.art === 'zehn') uhrLaeuft(false);
+    if (istAufgaben(R.s)) uhrLaeuft(false);
     bewerte(false, null);
   });
 
@@ -372,10 +429,10 @@
   }
 
   // --- Auswertung ---
-  // Leistung der Runde: Sekunden pro Aufgabe (zehn, kleiner = besser) bzw. netto richtige pro Minute.
-  // null = Runde zählt nicht (zu wenig richtig / netto nichts).
+  // Leistung der Runde: Sekunden pro Aufgabe (Aufgaben, kleiner = besser) bzw. netto richtige pro Minute.
+  // null = Runde zählt nicht (weniger als die Hälfte richtig / netto nichts).
   function leistung() {
-    if (R.s.art === 'zehn') return R.richtig < 5 ? null : (R.zeit / 1000 + R.falsch * e.strafe) / 10;
+    if (istAufgaben(R.s)) return R.richtig < R.s.anzahl / 2 ? null : (R.zeit / 1000 + R.falsch * e.strafe) / R.s.anzahl;
     const netto = (R.richtig - R.falsch) / (R.dauer / 60);
     return netto > 0 ? netto : null;
   }
@@ -383,19 +440,19 @@
   // Persönlicher Schnitt, begrenzt durch die festen Schwellen, damit absichtlich
   // langsames Spielen die Latte nicht beliebig senkt.
   function tempoRahmen(s) {
-    if (s.art === 'zehn') return [e.zehn[0] * 0.75, e.zehn[3] * 1.5];
+    if (istAufgaben(s)) return [e.zehn[0] * 0.75, e.zehn[3] * 1.5];
     const f = s.modus === 'sprache' ? 0.6 : 1;
     return [e.minute[3] * f * 0.6, e.minute[0] * f * 1.25];
   }
 
   function tempoAktualisieren(s, wert) {
-    const key = rekordSchluessel(s);
+    const key = tempoSchluessel(s);
     const t = d.tempo[key] || { wert, n: 0 };
     if (t.n < 3) {
       t.wert = (t.wert * t.n + wert) / (t.n + 1);
     } else {
       // Besser werden zählt schnell, schlechter werden nur langsam.
-      const besser = s.art === 'zehn' ? wert < t.wert : wert > t.wert;
+      const besser = istAufgaben(s) ? wert < t.wert : wert > t.wert;
       t.wert += (wert - t.wert) * (besser ? 0.5 : 0.1);
     }
     const [lo, hi] = tempoRahmen(s);
@@ -407,13 +464,13 @@
   function sterneBerechnen(wert) {
     if (wert === null) return 0;
     const s = R.s;
-    const t = d.tempo[rekordSchluessel(s)];
+    const t = d.tempo[tempoSchluessel(s)];
     let st;
     if (e.anpassen && t && t.n >= 3) {
       // Verhältnis > 1 heißt: besser als der eigene Schnitt
-      const v = s.art === 'zehn' ? t.wert / wert : wert / t.wert;
+      const v = istAufgaben(s) ? t.wert / wert : wert / t.wert;
       st = v >= 1.2 ? 5 : v >= 1.08 ? 4 : v >= 0.92 ? 3 : v >= 0.8 ? 2 : 1;
-    } else if (s.art === 'zehn') {
+    } else if (istAufgaben(s)) {
       const th = e.zehn;
       st = wert <= th[0] ? 5 : wert <= th[1] ? 4 : wert <= th[2] ? 3 : wert <= th[3] ? 2 : 1;
     } else {
@@ -421,15 +478,16 @@
       const th = e.minute.map((x) => x * f);
       st = wert >= th[0] ? 5 : wert >= th[1] ? 4 : wert >= th[2] ? 3 : wert >= th[3] ? 2 : 1;
     }
-    if (s.art === 'zehn') st = Math.max(1, st - Math.floor(R.falsch / 3));
+    // je 3 Fehler auf 10 Aufgaben ein Stern weniger
+    if (istAufgaben(s)) st = Math.max(1, st - Math.floor((R.falsch * 10) / s.anzahl / 3));
     return st;
   }
 
   function tempoText(s) {
-    const t = d.tempo[rekordSchluessel(s)];
+    const t = d.tempo[tempoSchluessel(s)];
     if (!e.anpassen || !t) return '';
     if (t.n < 3) return `<br>📈 Noch ${3 - t.n} Runde${t.n === 2 ? '' : 'n'}, dann zählt dein eigenes Tempo`;
-    const w = s.art === 'zehn'
+    const w = istAufgaben(s)
       ? `${t.wert.toFixed(1).replace('.', ',')} s pro Aufgabe`
       : `${t.wert.toFixed(1).replace('.', ',')} pro Minute`;
     return `<br>📈 Dein Schnitt: ${w}`;
@@ -442,28 +500,33 @@
     const wert = leistung();
     const st = sterneBerechnen(wert);
     if (wert !== null) tempoAktualisieren(s, wert);
-    const faktor = s.art === 'm5' ? 2 : 1;
-    const gewinn = st * faktor;
+    // Längere Runden geben mehr Sterne: 10 Aufgaben bzw. 1 Minute = ×1, 5 Minuten = ×2.
+    const faktor = istAufgaben(s) ? s.anzahl / 10 : 1 + (s.minuten - 1) / 4;
+    const gewinn = st > 0 ? Math.max(1, Math.round(st * faktor)) : 0;
     d.sterne += gewinn;
 
     // Rekord
     const key = rekordSchluessel(s);
-    const alt = d.rekorde[key];
+    const alt = key && d.rekorde[key];
+    const geraeteBest = bestenliste(s)[0];
     let neuerRekord = false;
     let rekWert;
-    if (s.art === 'zehn') {
+    if (istAufgaben(s)) {
       rekWert = Math.round(R.zeit / 1000 + R.falsch * e.strafe);
-      if (R.richtig >= 5 && (!alt || rekWert < alt.wert)) neuerRekord = true;
+      if (key && R.richtig >= s.anzahl / 2 && (!alt || rekWert < alt.wert)) neuerRekord = true;
     } else {
       rekWert = R.richtig - R.falsch;
-      if (rekWert > 0 && (!alt || rekWert > alt.wert)) neuerRekord = true;
+      if (key && rekWert > 0 && (!alt || rekWert > alt.wert)) neuerRekord = true;
     }
     if (neuerRekord) d.rekorde[key] = { wert: rekWert, datum: Date.now() };
+    const geraeteRekord = neuerRekord && Speicher.benutzer.liste.length > 1 && (!geraeteBest
+      || (istAufgaben(s) ? rekWert < geraeteBest.wert : rekWert > geraeteBest.wert));
 
     d.verlauf.unshift({
-      t: Date.now(), modus: s.modus, art: s.art, ops: s.ops.join(''), raum: s.raum,
+      t: Date.now(), modus: s.modus, art: s.art, anzahl: s.anzahl, minuten: s.minuten,
+      ops: s.ops.join(''), raum: s.raum,
       einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch,
-      zeit: Math.round((s.art === 'zehn' ? R.zeit / 1000 : R.dauer)), sterne: gewinn,
+      zeit: Math.round((istAufgaben(s) ? R.zeit / 1000 : R.dauer)), sterne: gewinn,
     });
     d.verlauf = d.verlauf.slice(0, 300);
     Speicher.speichern();
@@ -473,16 +536,19 @@
     $('#erg-titel').textContent = st >= 4 ? 'Super gemacht! 🎉' : st >= 2 ? 'Gut gemacht! 👍' : st === 1 ? 'Geschafft! 💪' : 'Probier es nochmal! 💪';
     const sterneEl = $('#erg-sterne');
     sterneEl.innerHTML = Array.from({ length: 5 }, () => '<span>⭐</span>').join('')
-      + (faktor > 1 && st > 0 ? '<div style="font-size:28px;font-weight:900">× 2</div>' : '');
+      + (faktor !== 1 && st > 0 ? `<div style="font-size:28px;font-weight:900">× ${String(Math.round(faktor * 100) / 100).replace('.', ',')}</div>` : '');
     const spans = sterneEl.querySelectorAll('span');
     for (let i = 0; i < st; i++) {
       setTimeout(() => { spans[i].classList.add('an'); Ton.stern(i); }, 450 + i * 320);
     }
-    const zeitText = s.art === 'zehn' ? `⏱️ ${fmt(R.zeit / 1000)}` : `⏱️ ${ART_NAME[s.art]}`;
+    const zeitText = istAufgaben(s) ? `⏱️ ${fmt(R.zeit / 1000)}` : `⏱️ ${laengeText(s)}`;
     $('#erg-text').innerHTML = `${zeitText} &nbsp; ✅ ${R.richtig} richtig &nbsp; ❌ ${R.falsch} falsch`
       + `<br>+${gewinn} ⭐ &nbsp;→&nbsp; Konto: ${d.sterne} ⭐` + tempoText(s);
     const rek = $('#erg-rekord');
-    rek.textContent = neuerRekord ? (alt ? '🏆 Neuer Rekord!' : '🏆 Erster Rekord!') : rekordText(d.rekorde[key], s.art);
+    rek.textContent = geraeteRekord ? '👑 Neuer Geräte-Rekord!'
+      : neuerRekord ? (alt ? '🏆 Neuer Rekord!' : '🏆 Erster Rekord!')
+        : key ? rekordText(d.rekorde[key], s) : '';
+    bestenlisteZeigen(s);
     if (neuerRekord) setTimeout(() => Ton.jubel(), 450 + st * 320 + 200);
 
     const fehler = R.liste.filter((x) => !x.ok);
@@ -498,6 +564,32 @@
   $('#nochmal-runde').addEventListener('click', rundeStarten);
   $('#erg-menue').addEventListener('click', () => { chipsAnzeigen(); zeige('start'); });
   $('#erg-spiele').addEventListener('click', spieleOeffnen);
+
+  // Bestenliste aller Spieler auf diesem Gerät (nur wenn es mehrere gibt)
+  function bestenlisteZeigen(s) {
+    const box = $('#erg-bestenliste');
+    box.innerHTML = '';
+    const liste = bestenliste(s);
+    if (Speicher.benutzer.liste.length < 2 || !liste.length) return;
+    const h = document.createElement('h3');
+    h.textContent = `Bestenliste · ${laengeText(s)}`;
+    const ol = document.createElement('ol');
+    liste.slice(0, 5).forEach((x, i) => {
+      const li = document.createElement('li');
+      if (x.benutzer.id === Speicher.benutzer.aktiv) li.className = 'ich';
+      const platz = document.createElement('span');
+      platz.className = 'platz';
+      platz.textContent = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = x.benutzer.name;
+      const wert = document.createElement('span');
+      wert.textContent = rekordWert(x.wert, s);
+      li.append(platz, avatar(x.benutzer, 'klein'), name, wert);
+      ol.appendChild(li);
+    });
+    box.append(h, ol);
+  }
 
   // ---------- Spiele ----------
   function spieleOeffnen() {
@@ -694,9 +786,10 @@
     sterneAnzeigen();
   }));
   $('#alles-loeschen').addEventListener('click', () => {
-    if (!confirm('Wirklich alles löschen? Sterne, Rekorde, Verlauf und Einstellungen gehen verloren.')) return;
+    const u = Speicher.aktiverBenutzer();
+    if (!confirm(`Wirklich alles von ${u ? u.name : 'diesem Spieler'} löschen? Sterne, Rekorde, Verlauf und Einstellungen gehen verloren.`)) return;
     Speicher.zuruecksetzen();
-    location.reload();
+    benutzerStarten(Speicher.benutzer.aktiv);
   });
 
   function verlaufZeigen() {
@@ -706,17 +799,140 @@
       const dt = new Date(x.t);
       const datum = `${dt.getDate()}.${dt.getMonth() + 1}. ${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`;
       const ops = [...x.ops].map((o) => OP_NAME[o]).join(' ');
-      return `<tr><td>${datum}</td><td>${x.modus === 'sprache' ? '🎤' : '✏️'} ${ART_NAME[x.art]}</td>`
+      const art = ART_NAME[x.art] || laengeText(x);
+      return `<tr><td>${datum}</td><td>${x.modus === 'sprache' ? '🎤' : '⌨️'} ${art}</td>`
         + `<td>${ops} bis ${x.raum}${x.einsetzen ? ' (E)' : ''}</td>`
-        + `<td>✅${x.richtig} ❌${x.falsch}</td><td>${x.art === 'zehn' ? fmt(x.zeit) : ''}</td><td>+${x.sterne}⭐</td></tr>`;
+        + `<td>✅${x.richtig} ❌${x.falsch}</td><td>${x.art === 'zehn' || x.art === 'aufgaben' ? fmt(x.zeit) : ''}</td><td>+${x.sterne}⭐</td></tr>`;
     }).join('');
     $('#verlauf').innerHTML = `<table><tr><th>Wann</th><th>Art</th><th>Rechnungen</th><th>Ergebnis</th><th>Zeit</th><th>Sterne</th></tr>${zeilen}</table>`;
   }
 
+  // ---------- Spieler ----------
+  const BILDER = ['🚗', '✈️', '🐴', '🦄', '🚀', '🚒', '🚜', '🐶', '🐱', '🦁', '🐼', '🦊', '🐸', '🦖', '🐬', '🦋', '⚽', '🌈'];
+
+  function avatar(u, klasse = '') {
+    const el = document.createElement('span');
+    el.className = `avatar ${klasse}`;
+    if (u.bild && u.bild.art === 'foto') {
+      const img = document.createElement('img');
+      img.src = u.bild.wert;
+      img.alt = '';
+      el.appendChild(img);
+    } else {
+      el.textContent = (u.bild && u.bild.wert) || '🙂';
+    }
+    return el;
+  }
+
+  let loeschModus = false;
+  function benutzerZeigen() {
+    const liste = Speicher.benutzerLaden();
+    if (!liste.length) { neuOeffnen(); return; }
+    const box = $('#benutzer-liste');
+    box.innerHTML = '';
+    box.classList.toggle('loeschen', loeschModus);
+    liste.forEach((u) => {
+      const k = document.createElement('button');
+      k.className = 'benutzer-karte';
+      k.appendChild(avatar(u));
+      const n = document.createElement('span');
+      n.className = 'name';
+      n.textContent = u.name;
+      k.appendChild(n);
+      if (loeschModus) {
+        const x = document.createElement('span');
+        x.className = 'weg';
+        x.textContent = '✖';
+        k.appendChild(x);
+      }
+      k.addEventListener('click', () => {
+        if (!loeschModus) { Ton.klick(); benutzerStarten(u.id); return; }
+        if (!confirm(`${u.name} wirklich löschen? Alle Sterne, Rekorde und Einstellungen gehen verloren.`)) return;
+        Speicher.benutzerLoeschen(u.id);
+        if (!Speicher.benutzer.liste.length) loeschModus = false;
+        benutzerZeigen();
+      });
+      box.appendChild(k);
+    });
+    $('#benutzer-bearbeiten').textContent = loeschModus ? '✔️ Fertig mit Löschen' : '🗑️ Spieler löschen';
+    zeige('benutzer');
+  }
+
+  function benutzerStarten(id) {
+    d = Speicher.waehlen(id);
+    e = d.eltern;
+    Sprache.setzeMotor(e.erkennung);
+    const wer = $('#wer');
+    wer.innerHTML = '';
+    const u = Speicher.aktiverBenutzer();
+    wer.appendChild(avatar(u, 'klein'));
+    const n = document.createElement('span');
+    n.textContent = u.name;
+    wer.appendChild(n);
+    chipsAnzeigen();
+    sterneAnzeigen();
+    zeige('start');
+  }
+
+  $('#wer').addEventListener('click', () => { loeschModus = false; benutzerZeigen(); });
+  $('#benutzer-neu').addEventListener('click', () => { loeschModus = false; neuOeffnen(); });
+  $('#benutzer-bearbeiten').addEventListener('click', () => { loeschModus = !loeschModus; benutzerZeigen(); });
+
+  // Neuer Spieler: Name + Foto oder fertiges Bild
+  let neuBild = null;
+  function neuVorschau() {
+    const v = $('#neu-vorschau');
+    v.innerHTML = '';
+    v.appendChild(avatar({ bild: neuBild }, 'riesig'));
+    $$('#neu-bilder button').forEach((b) => b.classList.toggle('an', !!neuBild && neuBild.art === 'emoji' && b.textContent === neuBild.wert));
+  }
+  function neuOeffnen() {
+    neuBild = { art: 'emoji', wert: BILDER[Math.floor(Math.random() * BILDER.length)] };
+    $('#neu-name').value = '';
+    $('#neu-hinweis').classList.toggle('versteckt', !Speicher.hatAlteDaten());
+    $('#neu-zurueck').classList.toggle('unsichtbar', !Speicher.benutzer.liste.length);
+    neuVorschau();
+    zeige('neu');
+  }
+  BILDER.forEach((b) => {
+    const k = document.createElement('button');
+    k.textContent = b;
+    k.addEventListener('click', () => { Ton.klick(); neuBild = { art: 'emoji', wert: b }; neuVorschau(); });
+    $('#neu-bilder').appendChild(k);
+  });
+
+  // Foto quadratisch zuschneiden und klein rechnen, damit es in den Speicher passt.
+  $('#neu-foto').addEventListener('change', (ev) => {
+    const datei = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!datei) return;
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const g = 240;
+      const seite = Math.min(img.naturalWidth, img.naturalHeight);
+      const c = document.createElement('canvas');
+      c.width = g; c.height = g;
+      c.getContext('2d').drawImage(img, (img.naturalWidth - seite) / 2, (img.naturalHeight - seite) / 2, seite, seite, 0, 0, g, g);
+      URL.revokeObjectURL(url);
+      neuBild = { art: 'foto', wert: c.toDataURL('image/jpeg', 0.8) };
+      neuVorschau();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); alert('Das Foto konnte nicht geladen werden.'); };
+    img.src = url;
+  });
+
+  $('#neu-zurueck').addEventListener('click', benutzerZeigen);
+  $('#neu-fertig').addEventListener('click', () => {
+    const name = $('#neu-name').value.trim();
+    if (!name) { Ton.falsch(); $('#neu-name').focus(); return; }
+    const u = Speicher.benutzerAnlegen(name, neuBild);
+    Ton.klick();
+    benutzerStarten(u.id);
+  });
+
   // ---------- Los ----------
-  Sprache.setzeMotor(e.erkennung);
-  chipsAnzeigen();
-  sterneAnzeigen();
+  benutzerZeigen();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
