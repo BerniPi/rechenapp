@@ -393,3 +393,7 @@ button {
 .sp-steuer.kreuz { grid-template-columns: repeat(3, 72px); grid-template-rows: repeat(3, 56px); }
 .sp-steuer.kreuz button { min-height: 0; }
 .sp-steuer.reihe5 { grid-template-columns: repeat(5, minmax(56px, 90px)); }
+
+.sprach-hinweis { text-align: center; color: #b54708; font-weight: 800; margin: 10px 0 0; min-height: 0; }
+.sprach-hinweis:empty { display: none; }
+.mikro-test { font-size: 20px; font-weight: 800; text-align: center; margin: 4px 0; min-height: 1.3em; }

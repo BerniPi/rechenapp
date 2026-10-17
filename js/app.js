@@ -39,6 +39,21 @@
     });
     $('#gruppe-einsetzen').classList.toggle('aus', s.modus === 'sprache');
     rekordInfo();
+    sprachHinweis();
+  }
+
+  async function sprachHinweis() {
+    const el = $('#sprach-hinweis');
+    el.textContent = '';
+    if (d.settings.modus !== 'sprache') return;
+    if (!Sprache.kannHoeren) {
+      el.textContent = '⚠️ Dieser Browser kann keine Sprache erkennen – bitte Chrome verwenden.';
+      return;
+    }
+    const st = await Sprache.stimmenBereit();
+    if (d.settings.modus === 'sprache' && !st) {
+      el.textContent = '⚠️ Keine deutsche Vorlese-Stimme gefunden. Android: Einstellungen → Sprachausgabe → Deutsch installieren.';
+    }
   }
 
   $$('.chips').forEach((ch) => {
@@ -180,7 +195,7 @@
   function aufgabeZeigen() {
     const t = Aufgaben.teile(R.auf);
     const zahl = (n) => (n === null ? `<span class="luecke" id="luecke">${R.eingabe}</span>` : n);
-    const c = R.s.modus === 'sprache' && t.c === null ? '<span class="luecke">?</span>' : zahl(t.c);
+    const c = R.s.modus === 'sprache' && !R.tastatur && t.c === null ? '<span class="luecke">?</span>' : zahl(t.c);
     $('#aufgabe').innerHTML = `${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${c}`;
   }
 
@@ -242,14 +257,15 @@
     await Sprache.vorlesen(Aufgaben.alsSatz(auf));
     if (!R || !R.aktiv || R.auf !== auf) return;
     uhrLaeuft(true);
+    if (R.tastatur) { mikroStatus('aus'); return; } // Mikro ging nicht – vorlesen, aber tippen
     mikroStatus('hoert');
     R.zuhoerer = Sprache.zuhoeren({
       loesung: auf.loesung,
       onText: (t) => { $('#gehoert').textContent = t; },
-      onStatus: (st) => {
-        if (st === 'verboten') {
+      onStatus: (st, meldung) => {
+        if (st === 'aus') {
           mikroStatus('aus');
-          $('#gehoert').textContent = 'Mikrofon ist nicht erlaubt – tippe die Antwort.';
+          $('#gehoert').textContent = `${meldung} Tippe die Antwort.`;
           R.tastatur = true;
           $('#tastatur').classList.remove('versteckt');
           $('#sprach-knoepfe').classList.add('versteckt');
@@ -477,8 +493,38 @@
     $$('[data-schwelle]').forEach((inp) => { inp.value = e[inp.dataset.schwelle][Number(inp.dataset.i)]; });
     $$('[data-zeige]').forEach((el) => { el.textContent = e[el.dataset.zeige]; });
     verlaufZeigen();
+    stimmeInfo();
     zeige('eltern');
   }
+
+  async function stimmeInfo() {
+    const st = await Sprache.stimmenBereit();
+    const alle = Sprache.alleStimmen();
+    $('#stimme-info').textContent = st
+      ? `Vorlese-Stimme: ${st.name} (${st.lang})`
+      : `Keine deutsche Stimme gefunden (${alle.length} Stimmen vorhanden: ${alle.slice(0, 4).map((v) => v.lang).join(', ') || 'keine'}).`
+        + ' Android: Einstellungen → Sprachausgabe → Deutsch installieren.';
+  }
+
+  $('#test-stimme').addEventListener('click', () => Sprache.vorlesen('Sieben plus drei'));
+
+  let mikroTest = null;
+  $('#test-mikro').addEventListener('click', () => {
+    const aus = $('#mikro-test');
+    if (!Sprache.kannHoeren) { aus.textContent = '❌ Dieser Browser kann keine Sprache erkennen – bitte Chrome verwenden.'; return; }
+    if (mikroTest) mikroTest.stop();
+    aus.textContent = '🎤 Sag eine Zahl …';
+    const ende = setTimeout(() => { if (mikroTest) { mikroTest.stop(); mikroTest = null; aus.textContent += ' (Zeit um – nichts erkannt)'; } }, 12000);
+    mikroTest = Sprache.zuhoeren({
+      loesung: -1,
+      onStatus: (st, meldung) => {
+        if (st === 'hoert') aus.textContent = '🎤 Ich höre zu – sag eine Zahl …';
+        if (st === 'aus') { clearTimeout(ende); mikroTest = null; aus.textContent = `❌ ${meldung}`; }
+      },
+      onText: (t) => { aus.textContent = `🎤 Gehört: „${t}"`; },
+      onZahl: (z) => { clearTimeout(ende); mikroTest = null; aus.textContent += ` → ✅ Zahl ${z} erkannt`; },
+    });
+  });
 
   $$('[data-eltern]').forEach((inp) => inp.addEventListener('change', () => {
     const v = Number(inp.value);

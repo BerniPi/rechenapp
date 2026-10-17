@@ -47,22 +47,38 @@ const Sprache = (() => {
   const Rec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
   let stimme = null;
 
+  // Android meldet Sprachen teils als "de_DE" oder "deu-DEU" – vereinheitlichen.
+  const sprachCode = (v) => (v.lang || '').replace('_', '-').toLowerCase();
+
   function stimmeWaehlen() {
-    if (!synth) return;
-    const alle = synth.getVoices();
-    stimme = alle.find((v) => v.lang === 'de-AT')
-      || alle.find((v) => v.lang === 'de-DE' && /google/i.test(v.name))
-      || alle.find((v) => v.lang && v.lang.startsWith('de'))
+    if (!synth) return null;
+    const deutsch = synth.getVoices().filter((v) => sprachCode(v).startsWith('de'));
+    stimme = deutsch.find((v) => sprachCode(v) === 'de-at')
+      || deutsch.find((v) => /google/i.test(v.name))
+      || deutsch.find((v) => v.localService)
+      || deutsch[0]
       || null;
+    return stimme;
   }
   if (synth) {
     stimmeWaehlen();
-    synth.onvoiceschanged = stimmeWaehlen;
+    synth.addEventListener('voiceschanged', stimmeWaehlen);
+  }
+
+  // Stimmen laden bei manchen Browsern verzögert – kurz darauf warten.
+  function stimmenBereit() {
+    if (!synth || synth.getVoices().length) return Promise.resolve(stimmeWaehlen());
+    return new Promise((resolve) => {
+      const fertig = () => resolve(stimmeWaehlen());
+      synth.addEventListener('voiceschanged', fertig, { once: true });
+      setTimeout(fertig, 1500);
+    });
   }
 
   function vorlesen(text) {
     return new Promise((resolve) => {
       if (!synth) { resolve(); return; }
+      if (!stimme) stimmeWaehlen();
       synth.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = stimme ? stimme.lang : 'de-DE';
@@ -77,6 +93,14 @@ const Sprache = (() => {
       synth.speak(u);
     });
   }
+
+  const FEHLER_TEXT = {
+    'not-allowed': 'Das Mikrofon ist nicht erlaubt. Bitte im Browser das Mikrofon für diese Seite erlauben.',
+    'service-not-allowed': 'Dieser Browser erlaubt keine Spracherkennung. Bitte Chrome verwenden.',
+    'audio-capture': 'Kein Mikrofon gefunden.',
+    'network': 'Spracherkennung braucht Internet – keine Verbindung zum Sprachdienst.',
+    'language-not-supported': 'Deutsch wird von der Spracherkennung hier nicht unterstützt.',
+  };
 
   // Hört zu, bis eine Zahl erkannt wurde.
   //   loesung: richtige Zahl – wird schon bei Zwischenergebnissen akzeptiert,
@@ -116,21 +140,29 @@ const Sprache = (() => {
       rec.continuous = false;
       rec.onstart = () => onStatus && onStatus('hoert');
       rec.onresult = (ev) => {
+        fehlerInFolge = 0;
         for (let i = ev.resultIndex; i < ev.results.length; i++) {
           pruefe(ev.results[i], ev.results[i].isFinal);
           if (!aktiv) return;
         }
       };
       rec.onerror = (ev) => {
-        if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        if (ev.error === 'no-speech' || ev.error === 'aborted') return; // einfach weiter zuhören
+        const sofortAus = FEHLER_TEXT[ev.error] && ev.error !== 'network';
+        fehlerInFolge++;
+        if (sofortAus || fehlerInFolge >= 3) {
           aktiv = false;
-          onStatus && onStatus('verboten');
+          onStatus && onStatus('aus', FEHLER_TEXT[ev.error] || `Spracherkennung funktioniert hier nicht (${ev.error}).`);
         }
       };
       // Nichts (Verwertbares) gehört -> weiter zuhören
       rec.onend = () => { if (aktiv) setTimeout(starten, 150); };
-      try { rec.start(); } catch (e) { setTimeout(starten, 300); }
+      try { rec.start(); } catch (e) {
+        fehlerInFolge++;
+        if (fehlerInFolge >= 3) { aktiv = false; onStatus && onStatus('aus', 'Spracherkennung startet nicht.'); } else setTimeout(starten, 300);
+      }
     }
+    let fehlerInFolge = 0;
 
     if (Rec) starten();
     return {
@@ -144,6 +176,9 @@ const Sprache = (() => {
   return {
     vorlesen,
     zuhoeren,
+    stimmenBereit,
+    stimme: () => stimme,
+    alleStimmen: () => (synth ? synth.getVoices() : []),
     kannSprechen: !!synth,
     kannHoeren: !!Rec,
     stopVorlesen() { if (synth) synth.cancel(); },
