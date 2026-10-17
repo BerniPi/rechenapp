@@ -108,7 +108,10 @@
   // ---------- Rechenrunde ----------
   let R = null;
 
-  function rundeStarten() {
+  let laedt = false;
+
+  async function rundeStarten() {
+    if (laedt) return;
     Ton.init();
     const s = { ...d.settings, ops: [...d.settings.ops] };
     if (s.modus === 'sprache') {
@@ -119,6 +122,37 @@
         s.einsetzen = false;
       }
     }
+    // Sprechen: erst Sprachmodell laden und Mikrofon öffnen, dann startet die Uhr.
+    let sprachFehler = null;
+    if (s.modus === 'sprache') {
+      R = null;
+      laedt = true;
+      $('#fortschritt').innerHTML = '';
+      $('#uhr').textContent = '0:00';
+      $('#aufgabe').textContent = '⏳';
+      $('#zaehler').textContent = '';
+      $('#tastatur').classList.add('versteckt');
+      $('#sprach-knoepfe').classList.add('versteckt');
+      $('#sprach-bereich').classList.remove('versteckt');
+      mikroStatus('aus');
+      $('#gehoert').textContent = 'Mikrofon wird vorbereitet …';
+      zeige('runde');
+      try {
+        await Sprache.vorbereiten((p) => {
+          $('#gehoert').textContent = p === 'entpacken'
+            ? 'Sprachmodell wird vorbereitet …'
+            : `Sprachmodell wird geladen … ${p} % (nur beim ersten Mal)`;
+        });
+      } catch (err) {
+        sprachFehler = (err && err.name === 'NotAllowedError')
+          ? 'Das Mikrofon ist nicht erlaubt.'
+          : (err && err.message) || 'Spracherkennung geht nicht.';
+      }
+      const abgebrochen = !laedt;
+      laedt = false;
+      if (abgebrochen) { Sprache.ruhe(); return; }
+    }
+
     R = {
       s,
       gen: Aufgaben.erzeuger(s),
@@ -133,13 +167,14 @@
       start: performance.now(),
       dauer: s.art === 'm1' ? 60 : s.art === 'm5' ? 300 : 0,
       zuhoerer: null,
-      tastatur: s.modus === 'schrift',
+      tastatur: s.modus === 'schrift' || !!sprachFehler,
+      hinweis: sprachFehler ? `${sprachFehler} Tippe die Antwort.` : '',
     };
 
     const sprache = s.modus === 'sprache';
-    $('#tastatur').classList.toggle('versteckt', sprache);
+    $('#tastatur').classList.toggle('versteckt', !R.tastatur);
     $('#sprach-bereich').classList.toggle('versteckt', !sprache);
-    $('#sprach-knoepfe').classList.toggle('versteckt', !sprache);
+    $('#sprach-knoepfe').classList.toggle('versteckt', !sprache || R.tastatur);
 
     const fort = $('#fortschritt');
     fort.innerHTML = s.art === 'zehn'
@@ -257,7 +292,7 @@
     await Sprache.vorlesen(Aufgaben.alsSatz(auf));
     if (!R || !R.aktiv || R.auf !== auf) return;
     uhrLaeuft(true);
-    if (R.tastatur) { mikroStatus('aus'); return; } // Mikro ging nicht – vorlesen, aber tippen
+    if (R.tastatur) { mikroStatus('aus'); $('#gehoert').textContent = R.hinweis; return; } // Mikro ging nicht – vorlesen, aber tippen
     mikroStatus('hoert');
     R.zuhoerer = Sprache.zuhoeren({
       loesung: auf.loesung,
@@ -265,7 +300,8 @@
       onStatus: (st, meldung) => {
         if (st === 'aus') {
           mikroStatus('aus');
-          $('#gehoert').textContent = `${meldung} Tippe die Antwort.`;
+          R.hinweis = `${meldung} Tippe die Antwort.`;
+          $('#gehoert').textContent = R.hinweis;
           R.tastatur = true;
           $('#tastatur').classList.remove('versteckt');
           $('#sprach-knoepfe').classList.add('versteckt');
@@ -307,6 +343,7 @@
   });
 
   $('#abbrechen').addEventListener('click', () => {
+    if (laedt) { laedt = false; chipsAnzeigen(); zeige('start'); return; }
     if (!R) return;
     if (!confirm('Runde abbrechen? Dann gibt es keine Sterne.')) return;
     rundeAufraeumen();
@@ -320,6 +357,7 @@
     clearInterval(R.tick);
     zuhoerenStoppen();
     Sprache.stopVorlesen();
+    Sprache.ruhe();
     uhrLaeuft(false);
     wachHalten(false);
   }
@@ -493,6 +531,7 @@
     $$('[data-schwelle]').forEach((inp) => { inp.value = e[inp.dataset.schwelle][Number(inp.dataset.i)]; });
     $$('[data-zeige]').forEach((el) => { el.textContent = e[el.dataset.zeige]; });
     verlaufZeigen();
+    $('#erkennung').value = e.erkennung;
     stimmeInfo();
     zeige('eltern');
   }
@@ -506,6 +545,12 @@
         + ' Android: Einstellungen → Sprachausgabe → Deutsch installieren.';
   }
 
+  $('#erkennung').addEventListener('change', () => {
+    e.erkennung = $('#erkennung').value;
+    Speicher.speichern();
+    Sprache.setzeMotor(e.erkennung);
+  });
+
   $('#test-stimme').addEventListener('click', () => Sprache.vorlesen('Sieben plus drei'));
 
   let mikroTest = null;
@@ -514,15 +559,19 @@
     if (!Sprache.kannHoeren) { aus.textContent = '❌ Dieser Browser kann keine Sprache erkennen – bitte Chrome verwenden.'; return; }
     if (mikroTest) mikroTest.stop();
     aus.textContent = '🎤 Sag eine Zahl …';
-    const ende = setTimeout(() => { if (mikroTest) { mikroTest.stop(); mikroTest = null; aus.textContent += ' (Zeit um – nichts erkannt)'; } }, 12000);
+    // Zeitlimit erst, wenn wirklich zugehört wird (Modell laden kann dauern)
+    let ende = null;
+    const zeitlimit = () => { clearTimeout(ende); ende = setTimeout(() => { if (mikroTest) { mikroTest.stop(); mikroTest = null; Sprache.ruhe(); aus.textContent += ' (Zeit um – nichts erkannt)'; } }, 12000); };
     mikroTest = Sprache.zuhoeren({
       loesung: -1,
       onStatus: (st, meldung) => {
-        if (st === 'hoert') aus.textContent = '🎤 Ich höre zu – sag eine Zahl …';
-        if (st === 'aus') { clearTimeout(ende); mikroTest = null; aus.textContent = `❌ ${meldung}`; }
+        if (st === 'laedt') aus.textContent = meldung === 'entpacken' ? '⏳ Sprachmodell wird vorbereitet …' : `⏳ Sprachmodell wird geladen … ${meldung} %`;
+        if (st === 'hoert') zeitlimit();
+        if (st === 'hoert') aus.textContent = `🎤 Ich höre zu (${Sprache.motor() === 'vosk' ? 'Vosk' : 'Google'}) – sag eine Zahl …`;
+        if (st === 'aus') { clearTimeout(ende); mikroTest = null; Sprache.ruhe(); aus.textContent = `❌ ${meldung}`; }
       },
       onText: (t) => { aus.textContent = `🎤 Gehört: „${t}"`; },
-      onZahl: (z) => { clearTimeout(ende); mikroTest = null; aus.textContent += ` → ✅ Zahl ${z} erkannt`; },
+      onZahl: (z) => { clearTimeout(ende); mikroTest = null; Sprache.ruhe(); aus.textContent += ` → ✅ Zahl ${z} erkannt`; },
     });
   });
 
@@ -562,6 +611,7 @@
   }
 
   // ---------- Los ----------
+  Sprache.setzeMotor(e.erkennung);
   chipsAnzeigen();
   sterneAnzeigen();
 

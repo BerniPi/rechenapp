@@ -122,7 +122,7 @@ const Sprache = (() => {
   //   sofern sie nicht Anfang einer längeren Zahl sein kann (1–9: "drei" vs. "dreiundzwanzig").
   //   onZahl(zahl, richtig), onText(text) für die Anzeige.
   // Rückgabe: Objekt mit stop().
-  function zuhoeren({ loesung, onZahl, onText, onStatus }) {
+  function googleZuhoeren({ loesung, onZahl, onText, onStatus }) {
     let aktiv = true;
     let rec = null;
     const sofortOk = loesung === 0 || loesung >= 10;
@@ -188,14 +188,28 @@ const Sprache = (() => {
     };
   }
 
+  // Welche Erkennung? 'vosk' (offline, nur Zahlen) oder 'google' (Chrome)
+  let motor = 'vosk';
+  const mitVosk = () => motor === 'vosk' && typeof VoskErkennung !== 'undefined' && VoskErkennung.moeglich;
+
+  function zuhoeren(opts) {
+    return mitVosk() ? VoskErkennung.zuhoeren(opts) : googleZuhoeren(opts);
+  }
+
   return {
     vorlesen,
     zuhoeren,
+    setzeMotor(m) { motor = m; },
+    motor: () => (mitVosk() ? 'vosk' : 'google'),
+    // Vor der Runde: Modell laden + Mikrofon öffnen (nur Vosk)
+    vorbereiten: (onFortschritt) => (mitVosk() ? VoskErkennung.vorbereiten(onFortschritt) : Promise.resolve()),
+    // Nach der Runde: Mikrofon schließen
+    ruhe() { if (typeof VoskErkennung !== 'undefined') VoskErkennung.ruhe(); },
+    get kannHoeren() { return mitVosk() || !!Rec; },
     stimmenBereit,
     stimme: () => stimme,
     alleStimmen: () => (synth ? synth.getVoices() : []),
     kannSprechen: !!synth,
-    kannHoeren: !!Rec,
     stopVorlesen() { if (synth) synth.cancel(); },
   };
 })();

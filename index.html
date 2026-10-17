@@ -163,7 +163,14 @@
       <button class="knopf klein" data-sterne="5">+5</button>
     </div>
 
-    <h2>Sprache testen</h2>
+    <h2>Sprache</h2>
+    <label>Spracherkennung
+      <select id="erkennung">
+        <option value="vosk">Vosk – offline, nur Zahlen (empfohlen)</option>
+        <option value="google">Google – Chrome, braucht Internet</option>
+      </select>
+    </label>
+    <p class="hinweis">Vosk lädt beim ersten Mal ein Sprachmodell (ca. 45 MB) und funktioniert danach ohne Internet.</p>
     <p id="stimme-info" class="hinweis"></p>
     <div class="zeile">
       <button id="test-stimme" class="knopf klein">🔊 Stimme testen</button>
@@ -206,6 +213,7 @@
 <script src="js/speicher.js"></script>
 <script src="js/aufgaben.js"></script>
 <script src="js/ton.js"></script>
+<script src="js/vosk-erkennung.js"></script>
 <script src="js/sprache.js"></script>
 <script src="js/spiele/spiele.js"></script>
 <script src="js/spiele/flappy.js"></script>

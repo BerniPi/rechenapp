@@ -16,6 +16,7 @@ const Speicher = {
         strafe: 3,               // Strafsekunden pro falscher Antwort
         preis: 3,                // Sterne pro Spielrunde
         spielMinuten: 3,         // Länge einer Spielrunde
+        erkennung: 'vosk',       // 'vosk' oder 'google'
       },
     };
   },
