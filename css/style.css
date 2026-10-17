@@ -207,13 +207,20 @@ button {
   font-weight: 900;
   min-height: clamp(64px, 11vh, 96px);
 }
-.tastatur .ueberspringen {
-  grid-column: span 2;
-  font-size: 22px;
+.tastatur .nebenknopf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 30px;
+  line-height: 1;
   background: var(--grau);
   order: 10;
 }
+.tastatur .nebenknopf small { font-size: 13px; font-weight: 700; }
 .tastatur button[data-z="0"] { order: 11; }
+.tastatur .ueberspringen { order: 12; }
 
 .sprach-bereich { text-align: center; margin: 10px 0; }
 .mikro {

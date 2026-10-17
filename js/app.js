@@ -248,6 +248,13 @@
     if (neu.length >= ziel.length) bewerte(neu === ziel, Number(neu));
   }
 
+  function zurueck() {
+    if (!R || !R.aktiv || !R.tastatur || !R.eingabe) return;
+    R.eingabe = R.eingabe.slice(0, -1);
+    const l = $('#luecke');
+    if (l) l.textContent = R.eingabe;
+  }
+
   function bewerte(ok, gegeben) {
     if (!R || !R.aktiv) return;
     R.liste.push({ auf: R.auf, gegeben, ok });
@@ -335,11 +342,13 @@
     if (!b) return;
     ev.preventDefault();
     if (b.id === 'ueberspringen') { if (R && R.aktiv) bewerte(false, null); return; }
+    if (b.id === 'zurueck') { zurueck(); return; }
     ziffer(b.dataset.z);
   });
   document.addEventListener('keydown', (ev) => {
     if (!$('#runde').classList.contains('aktiv')) return;
     if (/^[0-9]$/.test(ev.key)) ziffer(ev.key);
+    else if (ev.key === 'Backspace') { ev.preventDefault(); zurueck(); }
   });
 
   $('#abbrechen').addEventListener('click', () => {
