@@ -871,8 +871,23 @@
     wer.appendChild(n);
     chipsAnzeigen();
     sterneAnzeigen();
+    tonAnzeigen();
     zeige('start');
   }
+
+  function tonAnzeigen() {
+    Ton.an = d.settings.ton !== false;
+    const k = $('#ton-knopf');
+    k.textContent = Ton.an ? '🔊' : '🔇';
+    k.title = Ton.an ? 'Ton aus' : 'Ton an';
+    k.setAttribute('aria-label', k.title);
+  }
+  $('#ton-knopf').addEventListener('click', () => {
+    d.settings.ton = !Ton.an;
+    Speicher.speichern();
+    tonAnzeigen();
+    Ton.klick();
+  });
 
   $('#wer').addEventListener('click', () => { loeschModus = false; benutzerZeigen(); });
   $('#benutzer-neu').addEventListener('click', () => { loeschModus = false; neuOeffnen(); });

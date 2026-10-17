@@ -1,6 +1,7 @@
 // Kurze Töne per WebAudio – keine Audiodateien nötig.
 const Ton = {
   ctx: null,
+  an: true, // false = alle Töne stumm
 
   init() {
     if (!this.ctx) {
@@ -13,7 +14,7 @@ const Ton = {
   },
 
   note(freq, start, dauer, typ = 'sine', laut = 0.25, bisFreq = null) {
-    if (!this.init()) return;
+    if (!this.an || !this.init()) return;
     const c = this.ctx;
     const t = c.currentTime + start;
     const o = c.createOscillator();

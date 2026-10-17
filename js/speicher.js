@@ -8,7 +8,7 @@ const Speicher = {
   standard() {
     return {
       // art: 'aufgaben' (anzahl Aufgaben auf Zeit) oder 'zeit' (minuten lang so viele wie möglich)
-      settings: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, ops: ['+'], raum: 20, einsetzen: false },
+      settings: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, ops: ['+'], raum: 20, einsetzen: false, ton: true },
       sterne: 0,
       rekorde: {},
       verlauf: [],

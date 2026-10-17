@@ -471,6 +471,7 @@ button {
 }
 .wer span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wer:active { transform: translateY(3px); }
+.kopf .rechts { display: flex; align-items: center; gap: 8px; }
 
 .unsichtbar { visibility: hidden; }
 .neu-hinweis { text-align: center; color: var(--leise); font-weight: 700; margin: 0 0 8px; }
