@@ -34,7 +34,14 @@ Nach Änderungen an Dateien `VERSION` in `sw.js` hochzählen, damit Geräte die 
 
 Icons neu erzeugen: `node tools/icon.js`
 
+### Mitgelieferte Stimme
+
+Hat der Browser keine deutsche Vorlese-Stimme (z. B. Brave), liest die App mit der mitgelieferten Stimme **Jonas** (Microsoft, de-AT) aus Wortschnipseln in `audio/jonas/` vor. Gibt es eine deutsche System-Stimme, wird weiter diese verwendet.
+
+Schnipsel neu erzeugen: `python tools/stimme.py`. Mit `AZURE_SPEECH_KEY` und `AZURE_SPEECH_REGION` in der Umgebung über den offiziellen Azure-Dienst (Gratisstufe reicht, ca. 3.000 Zeichen), sonst über `edge-tts` (`pip install edge-tts`), das nur zum Ausprobieren gedacht ist. Danach in `sw.js` den Namen `GROSS` hochzählen, sonst behalten Geräte die alten Schnipsel.
+
 ## Fremde Bestandteile
 
+- `audio/jonas/` – Wortschnipsel der Microsoft-Stimme „Jonas" (de-AT-JonasNeural), erzeugt mit `tools/stimme.py`. Derzeit über edge-tts erzeugt; für eine öffentlich verteilte App über Azure AI Speech neu erzeugen.
 - `vendor/vosk.js` – [vosk-browser](https://github.com/ccoreilly/vosk-browser) 0.0.8, Apache-2.0
 - `models/vosk-model-small-de-0.15.tar.gz` – [Vosk](https://alphacephei.com/vosk/models) deutsches Modell, Apache-2.0 (Lizenz liegt im Archiv). Aus der Original-ZIP unverändert als tar.gz umgepackt.
