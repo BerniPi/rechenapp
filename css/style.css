@@ -1,0 +1,395 @@
+:root {
+  --bg: #eef3ff;
+  --karte: #ffffff;
+  --text: #1f2a44;
+  --leise: #6b7690;
+  --blau: #4f7cff;
+  --gruen: #22b867;
+  --rot: #ef4b4b;
+  --lila: #9b5cff;
+  --gelb: #ffc531;
+  --grau: #b9c1d4;
+  --schatten: 0 4px 0 rgba(31, 42, 68, .15);
+  --rund: 18px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Nunito", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.versteckt { display: none !important; }
+
+/* ---------- Screens ---------- */
+.screen {
+  display: none;
+  min-height: 100%;
+  min-height: 100dvh;
+  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  flex-direction: column;
+  max-width: 820px;
+  margin: 0 auto;
+}
+.screen.aktiv { display: flex; }
+
+.kopf {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.kopf h1 {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(26px, 6vw, 40px);
+  color: var(--blau);
+  letter-spacing: .5px;
+}
+
+.rund {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--karte);
+  box-shadow: var(--schatten);
+  font-size: 22px;
+}
+
+.konto {
+  background: var(--gelb);
+  color: #5a3d00;
+  font-weight: 800;
+  font-size: 20px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  box-shadow: var(--schatten);
+  white-space: nowrap;
+}
+
+/* ---------- Buttons ---------- */
+.knopf {
+  background: var(--blau);
+  color: #fff;
+  font-weight: 800;
+  font-size: 22px;
+  padding: 16px 22px;
+  border-radius: var(--rund);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, .2);
+  transition: transform .06s;
+}
+.knopf:active, .chips button:active, .tastatur button:active, .rund:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.2); }
+.knopf.gross { font-size: 28px; padding: 20px 26px; }
+.knopf.klein { font-size: 18px; padding: 8px 14px; }
+.knopf.gruen { background: var(--gruen); }
+.knopf.lila { background: var(--lila); }
+.knopf.grau { background: var(--grau); color: var(--text); }
+.knopf.rot { background: var(--rot); }
+.knopf.blau { background: var(--blau); }
+.knopf:disabled { opacity: .45; }
+
+/* ---------- Start ---------- */
+.einstellungen { display: flex; flex-direction: column; gap: 14px; }
+.gruppe h2 {
+  margin: 0 0 6px 4px;
+  font-size: 17px;
+  color: var(--leise);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chips button {
+  flex: 1 1 auto;
+  min-height: 56px;
+  background: var(--karte);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+  font-size: 20px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border: 3px solid transparent;
+}
+.chips.gross button { font-size: 36px; font-weight: 900; min-width: 64px; }
+.chips button.an {
+  background: var(--blau);
+  color: #fff;
+  border-color: #2f58d9;
+}
+.gruppe.aus { opacity: .35; pointer-events: none; }
+
+.rekord-info { text-align: center; color: var(--leise); min-height: 1.4em; margin: 14px 0 4px; font-weight: 700; }
+
+.aktionen { display: flex; flex-direction: column; gap: 12px; margin-top: auto; padding-top: 14px; }
+
+/* ---------- Runde ---------- */
+.runde-kopf { grid-template-columns: auto 1fr auto; }
+.uhr {
+  font-weight: 900;
+  font-size: 24px;
+  background: var(--karte);
+  padding: 8px 14px;
+  border-radius: 999px;
+  box-shadow: var(--schatten);
+  font-variant-numeric: tabular-nums;
+  min-width: 84px;
+  text-align: center;
+}
+.fortschritt { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.fortschritt .punkt {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--grau);
+}
+.fortschritt .punkt.jetzt { background: var(--blau); transform: scale(1.2); }
+.fortschritt .punkt.richtig { background: var(--gruen); }
+.fortschritt .punkt.falsch { background: var(--rot); }
+.fortschritt .balken {
+  width: 100%; height: 22px; border-radius: 999px; background: var(--grau); overflow: hidden;
+}
+.fortschritt .balken > div { height: 100%; background: var(--gruen); width: 100%; transition: width .25s linear; }
+.fortschritt .balken.knapp > div { background: var(--rot); }
+
+.aufgabe-karte {
+  background: var(--karte);
+  border-radius: 28px;
+  box-shadow: var(--schatten);
+  padding: 24px 12px 12px;
+  margin: 8px 0 14px;
+  text-align: center;
+  border: 5px solid transparent;
+  transition: border-color .15s;
+}
+.aufgabe-karte.ok { border-color: var(--gruen); }
+.aufgabe-karte.nok { border-color: var(--rot); }
+.aufgabe {
+  font-size: clamp(44px, 13vw, 92px);
+  font-weight: 900;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.aufgabe .luecke {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 .1em;
+  border-bottom: 6px solid var(--blau);
+  color: var(--blau);
+  text-align: center;
+}
+.aufgabe .luecke:empty::after { content: "\00a0"; }
+.zaehler { color: var(--leise); font-weight: 700; min-height: 1.3em; margin-top: 6px; }
+
+.tastatur {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: auto;
+}
+.tastatur button {
+  background: var(--karte);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+  font-size: clamp(34px, 8vw, 48px);
+  font-weight: 900;
+  min-height: clamp(64px, 11vh, 96px);
+}
+.tastatur .ueberspringen {
+  grid-column: span 2;
+  font-size: 22px;
+  background: var(--grau);
+  order: 10;
+}
+.tastatur button[data-z="0"] { order: 11; }
+
+.sprach-bereich { text-align: center; margin: 10px 0; }
+.mikro {
+  width: 140px; height: 140px; margin: 0 auto;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 70px;
+  background: var(--grau);
+  transition: background .2s;
+}
+.mikro.hoert { background: var(--gruen); animation: puls 1.2s infinite; }
+.mikro.spricht { background: var(--blau); }
+@keyframes puls {
+  0% { box-shadow: 0 0 0 0 rgba(34,184,103,.6); }
+  100% { box-shadow: 0 0 0 30px rgba(34,184,103,0); }
+}
+.gehoert { margin-top: 14px; font-size: 26px; font-weight: 800; color: var(--leise); min-height: 1.3em; }
+.sprach-knoepfe { display: flex; gap: 12px; margin-top: auto; }
+.sprach-knoepfe .knopf { flex: 1; }
+
+.blitz {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0;
+  transition: opacity .25s;
+}
+.blitz.ok { background: rgba(34,184,103,.25); opacity: 1; transition: none; }
+.blitz.nok { background: rgba(239,75,75,.25); opacity: 1; transition: none; }
+
+/* ---------- Ergebnis ---------- */
+#ergebnis { text-align: center; }
+#ergebnis h1 { color: var(--blau); font-size: clamp(32px, 8vw, 52px); margin: 10px 0; }
+.erg-sterne { font-size: clamp(34px, 10vw, 76px); letter-spacing: 2px; min-height: 1.3em; white-space: nowrap; }
+.erg-sterne span { display: inline-block; opacity: .18; filter: grayscale(1); transform: scale(.8); transition: all .35s cubic-bezier(.3,1.8,.5,1); }
+.erg-sterne span.an { opacity: 1; filter: none; transform: scale(1); }
+.erg-text { font-size: 24px; font-weight: 800; line-height: 1.5; }
+.erg-rekord { font-size: 26px; font-weight: 900; color: var(--lila); min-height: 1.2em; margin: 6px 0; }
+.erg-fehler { margin: 10px auto; max-width: 480px; text-align: left; }
+.erg-fehler h3 { margin: 6px 0; color: var(--leise); text-align: center; }
+.erg-fehler .fehler-zeile {
+  background: var(--karte); border-radius: 12px; padding: 8px 14px; margin: 6px 0;
+  font-size: 22px; font-weight: 800; display: flex; justify-content: space-between; gap: 10px;
+}
+.erg-fehler .fehler-zeile .falsch { color: var(--rot); text-decoration: line-through; }
+.erg-fehler .fehler-zeile .loesung { color: var(--gruen); }
+
+/* ---------- Spiele-Menü ---------- */
+.spiele-info { text-align: center; color: var(--leise); font-weight: 700; margin: 0 0 12px; }
+.spiele-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.spiel-karte {
+  background: var(--karte);
+  border-radius: 22px;
+  box-shadow: var(--schatten);
+  padding: 18px 10px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.spiel-karte .emoji { font-size: 58px; line-height: 1; }
+.spiel-karte .name { font-size: 22px; font-weight: 900; }
+.spiel-karte .beschr { font-size: 15px; color: var(--leise); }
+.spiel-karte .preis { margin-top: 4px; font-weight: 800; color: #8a6400; }
+.spiel-karte.zu-teuer { opacity: .55; }
+.spiele-meldung { text-align: center; font-size: 22px; font-weight: 800; color: var(--rot); min-height: 1.3em; }
+
+/* ---------- Spiel ---------- */
+#spiel { padding: 0; max-width: none; height: 100dvh; min-height: 0; }
+.spiel-leiste {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  font-size: 22px; font-weight: 900;
+}
+#spiel-name { text-align: center; }
+.spiel-flaeche { flex: 1; position: relative; overflow: hidden; touch-action: none; }
+.spiel-flaeche canvas { display: block; width: 100%; height: 100%; }
+
+.overlay {
+  position: fixed; inset: 0; background: rgba(20, 28, 50, .55);
+  display: grid; place-items: center; z-index: 50; padding: 16px;
+}
+.overlay-box {
+  background: var(--karte); border-radius: 26px; padding: 26px; text-align: center;
+  max-width: 420px; width: 100%;
+}
+.overlay-box h2 { margin-top: 0; font-size: 32px; }
+.overlay-box p { font-size: 20px; font-weight: 700; }
+
+/* Spiel-Hilfsklassen (von den Minispielen genutzt) */
+.spiel-mitte {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; padding: 16px; text-align: center;
+}
+.spiel-mitte h2 { margin: 0; font-size: 30px; }
+.spiel-mitte .reihe { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.spiel-knoepfe {
+  position: absolute; left: 0; right: 0; bottom: max(10px, env(safe-area-inset-bottom));
+  display: flex; gap: 10px; justify-content: center; z-index: 5;
+}
+
+/* ---------- Eltern ---------- */
+.eltern-inhalt { display: flex; flex-direction: column; gap: 10px; padding-bottom: 30px; }
+.eltern-inhalt h2 { margin: 18px 0 2px; font-size: 20px; color: var(--blau); }
+.eltern-inhalt label { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 700; background: var(--karte); padding: 10px 14px; border-radius: 12px; }
+.eltern-inhalt input { width: 90px; font: inherit; font-size: 20px; padding: 6px 8px; border-radius: 8px; border: 2px solid var(--grau); text-align: center; }
+.eltern-inhalt .zeile { display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 24px; }
+.hinweis { color: var(--leise); margin: 0; font-size: 15px; }
+.schwellen { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.verlauf { font-size: 15px; background: var(--karte); border-radius: 12px; padding: 8px; max-height: 360px; overflow: auto; }
+.verlauf table { width: 100%; border-collapse: collapse; }
+.verlauf td, .verlauf th { padding: 5px 6px; border-bottom: 1px solid #e3e8f3; text-align: left; white-space: nowrap; }
+
+@media (min-height: 760px) {
+  .aufgabe-karte { padding: 40px 12px 16px; }
+}
+
+/* Overlay innerhalb eines Spiels */
+.r-sieg { position: absolute; inset: 0; background: rgba(20,28,50,.6); display: grid; place-items: center; z-index: 10; padding: 16px; }
+
+/* ---------- Schrauben ---------- */
+.sch-wrap { position: absolute; inset: 0 0 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 10px; background: linear-gradient(#f6efe2, #e8dcc4); }
+.sch-titel { font-size: 26px; font-weight: 900; color: #6b4f1d; }
+.sch-stangen { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 14px; max-width: 760px; }
+.sch-stange {
+  --h: clamp(30px, 6.2vh, 46px);
+  position: relative; width: clamp(60px, 15vw, 86px); height: calc(var(--h) * 4 + 50px);
+  cursor: pointer;
+}
+.sch-stab { position: absolute; left: 50%; bottom: 14px; width: 12px; margin-left: -6px; top: 0; background: linear-gradient(90deg, #8d96a8, #e5e9f1, #8d96a8); border-radius: 6px 6px 0 0; }
+.sch-fuss { position: absolute; left: 0; right: 0; bottom: 0; height: 16px; border-radius: 8px; background: #7a5a2b; }
+.sch-stange.fertig .sch-fuss { background: var(--gruen); }
+.sch-schraube {
+  position: absolute; left: 6%; right: 6%; height: calc(var(--h) - 4px);
+  bottom: calc(16px + var(--k) * var(--h));
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(170deg, rgba(255,255,255,.28) 0 4px, rgba(0,0,0,.12) 4px 9px),
+    var(--f);
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.25), 0 2px 3px rgba(0,0,0,.25);
+  transition: transform .12s;
+}
+.sch-schraube.hoch { transform: translateY(-22px); }
+
+/* ---------- Unblock ---------- */
+.ub-wrap { position: absolute; inset: 0 0 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 10px; background: #e9eef8; }
+.ub-titel { font-size: 26px; font-weight: 900; color: var(--blau); }
+.ub-info { font-size: 20px; font-weight: 800; color: var(--leise); }
+.ub-brett {
+  position: relative;
+  width: min(92vw, calc(100dvh - 300px), 560px); aspect-ratio: 1;
+  background:
+    linear-gradient(rgba(0,0,0,.06) 2px, transparent 2px) 0 0 / calc(100% / 6) calc(100% / 6),
+    linear-gradient(90deg, rgba(0,0,0,.06) 2px, transparent 2px) 0 0 / calc(100% / 6) calc(100% / 6),
+    #c9b38c;
+  border: 10px solid #6b4f1d; border-radius: 14px;
+  touch-action: none;
+}
+.ub-ausgang { position: absolute; right: -10px; top: calc(100% / 6 * 2); height: calc(100% / 6); width: 10px; background: #c9b38c; }
+.ub-teil {
+  position: absolute; border-radius: 12px;
+  background: var(--f);
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.25), 0 3px 4px rgba(0,0,0,.3);
+  display: grid; place-items: center; font-size: clamp(26px, 6vw, 44px);
+  transition: left .12s, top .12s;
+  touch-action: none; cursor: grab;
+}
+.ub-teil.zieht { transition: none; z-index: 3; filter: brightness(1.1); }
+.ub-teil.raus { transition: left .45s ease-in; }
+
+/* ---------- Gemeinsames Layout für Canvas-Spiele mit Steuerknöpfen ---------- */
+.sp-spalte { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.sp-canvas { flex: 1; position: relative; min-height: 0; touch-action: none; }
+.sp-voll { position: absolute; inset: 0; touch-action: none; }
+.sp-steuer { display: grid; gap: 8px; padding: 8px 12px max(10px, env(safe-area-inset-bottom)); background: #1f2a44; justify-content: center; }
+.sp-steuer button {
+  background: #3a4a72; border-radius: 16px; font-size: 30px; min-height: 64px; min-width: 64px;
+  box-shadow: 0 4px 0 rgba(0,0,0,.35); touch-action: none;
+}
+.sp-steuer button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.sp-steuer.kreuz { grid-template-columns: repeat(3, 72px); grid-template-rows: repeat(3, 56px); }
+.sp-steuer.kreuz button { min-height: 0; }
+.sp-steuer.reihe5 { grid-template-columns: repeat(5, minmax(56px, 90px)); }

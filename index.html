@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4f7cff">
+<title>Rechenheld</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ START ============ -->
+<section id="start" class="screen aktiv">
+  <header class="kopf">
+    <button id="eltern-knopf" class="rund klein" title="Eltern (lange drücken)">⚙️</button>
+    <h1>Rechenheld</h1>
+    <button id="konto-start" class="konto">⭐ <span class="sterne-zahl">0</span></button>
+  </header>
+
+  <div class="einstellungen">
+    <div class="gruppe">
+      <h2>Wie?</h2>
+      <div class="chips" data-feld="modus" data-einfach>
+        <button data-wert="schrift">✏️ Schreiben</button>
+        <button data-wert="sprache">🎤 Sprechen</button>
+      </div>
+    </div>
+    <div class="gruppe">
+      <h2>Spielart</h2>
+      <div class="chips" data-feld="art" data-einfach>
+        <button data-wert="zehn">🔟 10 Aufgaben</button>
+        <button data-wert="m1">⏱️ 1 Minute</button>
+        <button data-wert="m5">⏱️ 5 Minuten</button>
+      </div>
+    </div>
+    <div class="gruppe">
+      <h2>Rechenarten</h2>
+      <div class="chips gross" data-feld="ops">
+        <button data-wert="+">+</button>
+        <button data-wert="-">−</button>
+        <button data-wert="*">·</button>
+        <button data-wert="/">:</button>
+      </div>
+    </div>
+    <div class="gruppe">
+      <h2>Zahlenraum</h2>
+      <div class="chips" data-feld="raum" data-einfach data-zahl>
+        <button data-wert="10">bis 10</button>
+        <button data-wert="20">bis 20</button>
+        <button data-wert="50">bis 50</button>
+        <button data-wert="100">bis 100</button>
+      </div>
+    </div>
+    <div class="gruppe" id="gruppe-einsetzen">
+      <h2>Einsetzaufgaben</h2>
+      <div class="chips" data-feld="einsetzen" data-einfach data-bool>
+        <button data-wert="false">Nein</button>
+        <button data-wert="true">Ja: 7 − __ = 2</button>
+      </div>
+    </div>
+  </div>
+
+  <p id="rekord-info" class="rekord-info"></p>
+
+  <div class="aktionen">
+    <button id="los" class="knopf gross gruen">Los geht's! 🚀</button>
+    <button id="zu-spielen" class="knopf lila">🎮 Spiele</button>
+  </div>
+</section>
+
+<!-- ============ RUNDE ============ -->
+<section id="runde" class="screen">
+  <header class="kopf runde-kopf">
+    <button id="abbrechen" class="rund klein" title="Abbrechen">✖</button>
+    <div id="fortschritt" class="fortschritt"></div>
+    <div id="uhr" class="uhr">0:00</div>
+  </header>
+
+  <div id="aufgabe-karte" class="aufgabe-karte">
+    <div id="aufgabe" class="aufgabe"></div>
+    <div id="zaehler" class="zaehler"></div>
+  </div>
+
+  <div id="sprach-bereich" class="sprach-bereich versteckt">
+    <div id="mikro" class="mikro">🎤</div>
+    <div id="gehoert" class="gehoert">&nbsp;</div>
+  </div>
+
+  <div id="tastatur" class="tastatur">
+    <button data-z="7">7</button><button data-z="8">8</button><button data-z="9">9</button>
+    <button data-z="4">4</button><button data-z="5">5</button><button data-z="6">6</button>
+    <button data-z="1">1</button><button data-z="2">2</button><button data-z="3">3</button>
+    <button id="ueberspringen" class="ueberspringen">Überspringen ⏭️</button><button data-z="0">0</button>
+  </div>
+
+  <div id="sprach-knoepfe" class="sprach-knoepfe versteckt">
+    <button id="nochmal" class="knopf blau">🔊 Nochmal</button>
+    <button id="ueberspringen-sprache" class="knopf grau">Überspringen ⏭️</button>
+  </div>
+</section>
+
+<!-- ============ ERGEBNIS ============ -->
+<section id="ergebnis" class="screen">
+  <h1 id="erg-titel">Geschafft!</h1>
+  <div id="erg-sterne" class="erg-sterne"></div>
+  <div id="erg-text" class="erg-text"></div>
+  <div id="erg-rekord" class="erg-rekord"></div>
+  <div id="erg-fehler" class="erg-fehler"></div>
+  <div class="aktionen">
+    <button id="nochmal-runde" class="knopf gross gruen">Nochmal 🔁</button>
+    <button id="erg-spiele" class="knopf lila">🎮 Spiele</button>
+    <button id="erg-menue" class="knopf grau">🏠 Menü</button>
+  </div>
+</section>
+
+<!-- ============ SPIELE-MENÜ ============ -->
+<section id="spiele" class="screen">
+  <header class="kopf">
+    <button class="rund klein zurueck-start" title="Zurück">⬅</button>
+    <h1>Spiele</h1>
+    <div class="konto">⭐ <span class="sterne-zahl">0</span></div>
+  </header>
+  <p id="spiele-info" class="spiele-info"></p>
+  <div id="spiele-liste" class="spiele-liste"></div>
+  <p id="spiele-meldung" class="spiele-meldung"></p>
+</section>
+
+<!-- ============ SPIEL ============ -->
+<section id="spiel" class="screen">
+  <div class="spiel-leiste">
+    <button id="spiel-ende" class="rund klein" title="Beenden">✖</button>
+    <div id="spiel-name"></div>
+    <div id="spiel-zeit" class="uhr">3:00</div>
+  </div>
+  <div id="spiel-flaeche" class="spiel-flaeche"></div>
+  <div id="spiel-vorbei" class="overlay versteckt">
+    <div class="overlay-box">
+      <h2>Zeit ist um! ⏰</h2>
+      <p id="spiel-vorbei-text"></p>
+      <button id="spiel-zurueck" class="knopf gross gruen">Zurück</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ELTERN ============ -->
+<section id="eltern" class="screen">
+  <header class="kopf">
+    <button class="rund klein zurueck-start" title="Zurück">⬅</button>
+    <h1>Eltern</h1>
+    <div></div>
+  </header>
+  <div class="eltern-inhalt">
+    <h2>Sterne-Konto</h2>
+    <div class="zeile">
+      <button class="knopf klein" data-sterne="-5">−5</button>
+      <button class="knopf klein" data-sterne="-1">−1</button>
+      <strong>⭐ <span class="sterne-zahl">0</span></strong>
+      <button class="knopf klein" data-sterne="1">+1</button>
+      <button class="knopf klein" data-sterne="5">+5</button>
+    </div>
+
+    <h2>Minispiele</h2>
+    <label>Preis pro Spielrunde (Sterne) <input type="number" min="0" max="50" data-eltern="preis"></label>
+    <label>Länge einer Spielrunde (Minuten) <input type="number" min="1" max="30" data-eltern="spielMinuten"></label>
+
+    <h2>Sterne bei „10 Aufgaben" (Sekunden pro Aufgabe)</h2>
+    <p class="hinweis">Jede falsche Antwort zählt als +<span data-zeige="strafe"></span> s. Ab 3 Fehlern gibt es je 3 Fehler einen Stern weniger, unter 5 richtigen gar keinen.</p>
+    <div class="schwellen">
+      <label>5 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="0"> s</label>
+      <label>4 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="1"> s</label>
+      <label>3 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="2"> s</label>
+      <label>2 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="3"> s</label>
+    </div>
+
+    <h2>Sterne bei Zeit-Challenge (richtige pro Minute)</h2>
+    <p class="hinweis">Falsche Antworten werden abgezogen. Beim Sprechen gilt automatisch 60 % davon. 5 Minuten zählen doppelt.</p>
+    <div class="schwellen">
+      <label>5 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="0"></label>
+      <label>4 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="1"></label>
+      <label>3 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="2"></label>
+      <label>2 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="3"></label>
+    </div>
+
+    <h2>Verlauf</h2>
+    <div id="verlauf" class="verlauf"></div>
+
+    <h2>Zurücksetzen</h2>
+    <button id="alles-loeschen" class="knopf rot">Alles zurücksetzen</button>
+  </div>
+</section>
+
+<div id="blitz" class="blitz"></div>
+
+<script src="js/speicher.js"></script>
+<script src="js/aufgaben.js"></script>
+<script src="js/ton.js"></script>
+<script src="js/sprache.js"></script>
+<script src="js/spiele/spiele.js"></script>
+<script src="js/spiele/flappy.js"></script>
+<script src="js/spiele/snake.js"></script>
+<script src="js/spiele/bloecke.js"></script>
+<script src="js/spiele/tierturm.js"></script>
+<script src="js/spiele/schrauben.js"></script>
+<script src="js/spiele/unblock.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
