@@ -486,11 +486,11 @@
   function tempoText(s) {
     const t = d.tempo[tempoSchluessel(s)];
     if (!e.anpassen || !t) return '';
-    if (t.n < 3) return `<br>📈 Noch ${3 - t.n} Runde${t.n === 2 ? '' : 'n'}, dann zählt dein eigenes Tempo`;
+    if (t.n < 3) return `📈 Noch ${3 - t.n} Runde${t.n === 2 ? '' : 'n'}, dann zählt dein eigenes Tempo`;
     const w = istAufgaben(s)
       ? `${t.wert.toFixed(1).replace('.', ',')} s pro Aufgabe`
       : `${t.wert.toFixed(1).replace('.', ',')} pro Minute`;
-    return `<br>📈 Dein Schnitt: ${w}`;
+    return `📈 Dein Schnitt: ${w}`;
   }
 
   function rundeEnde() {
@@ -544,28 +544,40 @@
     // Anzeige
     $('#erg-titel').textContent = st >= 4 ? 'Super gemacht! 🎉' : st >= 2 ? 'Gut gemacht! 👍' : st === 1 ? 'Geschafft! 💪' : 'Probier es nochmal! 💪';
     const sterneEl = $('#erg-sterne');
-    sterneEl.innerHTML = Array.from({ length: 5 }, () => '<span>⭐</span>').join('')
-      + (faktor !== 1 && st > 0 ? `<div style="font-size:28px;font-weight:900">× ${String(Math.round(faktor * 100) / 100).replace('.', ',')}</div>` : '');
+    sterneEl.innerHTML = Array.from({ length: 5 }, () => '<span>⭐</span>').join('');
     const spans = sterneEl.querySelectorAll('span');
     for (let i = 0; i < st; i++) {
       setTimeout(() => { spans[i].classList.add('an'); Ton.stern(i); }, 450 + i * 320);
     }
-    const zeitText = istAufgaben(s) ? `⏱️ ${fmt(R.zeit / 1000)}` : `⏱️ ${laengeText(s)}`;
-    $('#erg-text').innerHTML = `${zeitText} &nbsp; ✅ ${R.richtig} richtig &nbsp; ❌ ${R.falsch} falsch`
-      + `<br>+${gewinn} ⭐ &nbsp;→&nbsp; Konto: ${d.sterne} ⭐` + tempoText(s);
+    const kachel = (zeichen, wert, text, art) => `<div class="erg-kachel ${art}"><b>${zeichen} ${wert}</b><small>${text}</small></div>`;
+    const faktorText = String(Math.round(faktor * 100) / 100).replace('.', ',');
+    $('#erg-text').innerHTML = '<div class="erg-kacheln">'
+      + kachel('⏱️', istAufgaben(s) ? fmt(R.zeit / 1000) : laengeText(s), 'Zeit', 'zeit')
+      + kachel('✅', R.richtig, 'richtig', 'richtig')
+      + kachel('❌', R.falsch, 'falsch', 'falsch')
+      + '</div>'
+      + `<div class="erg-konto"><span class="gewinn">+${gewinn} ⭐</span>`
+      + (faktor !== 1 && st > 0 ? `<small>${st} ⭐ × ${faktorText}</small>` : '')
+      + `<span class="stand">Konto: ${d.sterne} ⭐</span></div>`;
     const rek = $('#erg-rekord');
     rek.textContent = geraeteRekord ? '👑 Neuer Geräte-Rekord!'
       : neuerRekord ? (alt ? '🏆 Neuer Rekord!' : '🏆 Erster Rekord!')
         : key ? rekordText(d.rekorde[key], s) : '';
+    rek.classList.toggle('neu', neuerRekord);
+    $('#erg-tempo').textContent = tempoText(s);
     bestenlisteZeigen(s, gesendet);
     if (neuerRekord) setTimeout(() => Ton.jubel(), 450 + st * 320 + 200);
 
+    // Fehler: Aufgabe mit durchgestrichener Antwort und richtiger Lösung in der Lücke
     const fehler = R.liste.filter((x) => !x.ok);
     $('#erg-fehler').innerHTML = fehler.length
-      ? '<h3>Das üben wir noch:</h3>' + fehler.map((x) => {
+      ? '<h3>Das üben wir noch</h3><div class="fehler-liste">' + fehler.map((x) => {
+        const t = Aufgaben.teile(x.auf);
         const g = x.gegeben === null ? '⏭️' : x.gegeben;
-        return `<div class="fehler-zeile"><span>${Aufgaben.alsText(x.auf, true)}</span><span><span class="falsch">${g}</span> → <span class="loesung">${x.auf.loesung}</span></span></div>`;
-      }).join('')
+        const luecke = `<span class="falsch">${g}</span> <span class="loesung">${x.auf.loesung}</span>`;
+        const zahl = (n) => (n === null ? luecke : n);
+        return `<div class="fehler-zeile">${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${zahl(t.c)}</div>`;
+      }).join('') + '</div>'
       : '';
     zeige('ergebnis');
   }

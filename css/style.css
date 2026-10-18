@@ -254,15 +254,32 @@ button {
 .erg-sterne { font-size: clamp(34px, 10vw, 76px); letter-spacing: 2px; min-height: 1.3em; white-space: nowrap; }
 .erg-sterne span { display: inline-block; opacity: .18; filter: grayscale(1); transform: scale(.8); transition: all .35s cubic-bezier(.3,1.8,.5,1); }
 .erg-sterne span.an { opacity: 1; filter: none; transform: scale(1); }
-.erg-text { font-size: 24px; font-weight: 800; line-height: 1.5; }
-.erg-rekord { font-size: 26px; font-weight: 900; color: var(--lila); min-height: 1.2em; margin: 6px 0; }
-.erg-fehler { margin: 10px auto; max-width: 480px; text-align: left; }
-.erg-fehler h3 { margin: 6px 0; color: var(--leise); text-align: center; }
-.erg-fehler .fehler-zeile {
-  background: var(--karte); border-radius: 12px; padding: 8px 14px; margin: 6px 0;
-  font-size: 22px; font-weight: 800; display: flex; justify-content: space-between; gap: 10px;
+.erg-text { width: 100%; max-width: 480px; margin: 6px auto 0; }
+.erg-kacheln { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.erg-kachel { background: var(--karte); border-radius: var(--rund); box-shadow: var(--schatten); padding: 8px 4px; }
+.erg-kachel b { display: block; font-size: 22px; font-weight: 900; white-space: nowrap; }
+.erg-kachel small { display: block; font-size: 14px; font-weight: 700; color: var(--leise); }
+.erg-kachel.richtig b { color: var(--gruen); }
+.erg-kachel.falsch b { color: var(--rot); }
+.erg-konto {
+  display: flex; align-items: center; justify-content: center; gap: 6px 12px; flex-wrap: wrap;
+  margin-top: 8px; padding: 8px 14px; border-radius: var(--rund); background: #fff4cf; font-weight: 800;
 }
-.erg-fehler .fehler-zeile .falsch { color: var(--rot); text-decoration: line-through; }
+.erg-konto .gewinn { font-size: 24px; font-weight: 900; }
+.erg-konto small { font-size: 15px; color: var(--leise); }
+.erg-konto .stand { font-size: 17px; color: var(--leise); }
+.erg-rekord { font-size: 20px; font-weight: 800; color: var(--leise); margin: 10px 0 0; }
+.erg-rekord.neu { font-size: 26px; font-weight: 900; color: var(--lila); }
+.erg-rekord:empty, .erg-tempo:empty, .erg-fehler:empty { display: none; }
+.erg-tempo { font-size: 15px; font-weight: 700; color: var(--leise); margin: 4px 0 0; }
+.erg-fehler { margin: 14px auto 0; width: 100%; max-width: 480px; }
+.erg-fehler h3 { margin: 0 0 6px; color: var(--leise); font-size: 17px; text-transform: uppercase; letter-spacing: 1px; }
+.fehler-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.erg-fehler .fehler-zeile {
+  background: var(--karte); border-radius: 12px; padding: 6px 10px; box-shadow: var(--schatten);
+  font-size: 20px; font-weight: 800; white-space: nowrap;
+}
+.erg-fehler .fehler-zeile .falsch { color: var(--rot); text-decoration: line-through; font-size: .8em; opacity: .8; }
 .erg-fehler .fehler-zeile .loesung { color: var(--gruen); }
 
 /* ---------- Spiele-Menü ---------- */
