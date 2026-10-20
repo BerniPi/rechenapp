@@ -119,5 +119,32 @@ pruefe('Unblock-Levels 1-30', () => {
   console.log('      Mindestzüge:', d.join(' '));
 });
 
-console.log(fehler ? `\n${fehler} Fehler` : '\nAlles ok');
-process.exit(fehler ? 1 : 0);
+// ---- Server: Konten und Klassen-Import ----
+const H = require('../server/hilfe.js');
+pruefe('Benutzername und Adresse', () => {
+  assert.strictEqual(H.benutzername(' lena.m '), 'lena.m');
+  assert.strictEqual(H.benutzername('max mustermann'), null);
+  assert.strictEqual(H.benutzername('a'), null);
+  assert.strictEqual(H.email('Lena@Piazzi.at', 'piazzi.at'), 'lena@piazzi.at');
+  assert.strictEqual(H.email('lena@piazzi.at.evil.com', 'piazzi.at'), null);
+  assert.strictEqual(H.email('lena@xpiazzi.at', 'piazzi.at'), null);
+  assert.strictEqual(H.passwort('12345'), null);
+});
+pruefe('Klassen-CSV', () => {
+  const csv = '﻿Benutzername;Klasse\r\nmax.muster;1a\r\n\r\n"Lena.Berg@bgblumenstrasse.at","2b"\nfremd@gmail.com;1a\nnurname\nzu viel leer;1a\nanna\t3c\n';
+  const r = H.klassenCsv(csv, 'bgblumenstrasse.at');
+  assert.deepStrictEqual(r.zeilen, [
+    { benutzername: 'max.muster', klasse: '1a' }, { benutzername: 'lena.berg', klasse: '2b' }, { benutzername: 'anna', klasse: '3c' },
+  ]);
+  assert.deepStrictEqual(r.fehler.map((f) => f.zeile), [5, 6, 7]);
+});
+
+(async () => {
+  const h = await H.pwHash('geheim123');
+  pruefe('Passwort-Hash', () => assert(/^scrypt\$[\w-]+\$[\w-]+$/.test(h) && !h.includes('geheim123')));
+  const [ja, nein, leer] = await Promise.all([H.pwPruefen('geheim123', h), H.pwPruefen('geheim124', h), H.pwPruefen('x', null)]);
+  pruefe('Passwort prüfen', () => { assert(ja); assert(!nein); assert(!leer); });
+
+  console.log(fehler ? `\n${fehler} Fehler` : '\nAlles ok');
+  process.exit(fehler ? 1 : 0);
+})();

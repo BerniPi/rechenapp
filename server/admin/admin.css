@@ -139,3 +139,13 @@ select { font: inherit; color: inherit; background: var(--bg); border: 2px solid
 .filter { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .filter label, label.inline { flex-direction: row; align-items: center; gap: 8px; }
 .fett { font-weight: 700; }
+
+/* Adressen + Klassen-Import */
+input, textarea { font: inherit; color: inherit; background: var(--bg); border: 2px solid var(--linie); border-radius: 8px; padding: 7px 10px; }
+textarea { width: 100%; resize: vertical; }
+textarea:focus { outline: none; border-color: var(--blau); }
+#adressen-form, #klassen-form { display: flex; flex-direction: column; gap: 12px; }
+#klassen-form p { margin: 0; }
+section > .reihe { align-items: center; justify-content: space-between; }
+section > .reihe h3 { margin: 6px 0; }
+.fehlerliste { margin: 6px 0 0; padding-left: 20px; color: var(--rot); }

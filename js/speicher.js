@@ -127,10 +127,11 @@ const Speicher = {
   },
 
   zuruecksetzen() {
-    // Die Online-Verbindung bleibt – sonst wäre der Einladungs-Code verloren.
+    // Die Online-Verbindung bleibt – sonst wäre der Einladungs-Code verloren. Offene Sterne-Buchungen bleiben,
+    // damit das Konto mit auf 0 geht.
     const online = this.data && this.data.online;
     this.data = this.standard();
-    if (online) this.data.online = { ...online, warte: { rekorde: {}, runden: [] } };
+    if (online) this.data.online = { ...online, warte: { rekorde: {}, runden: [], sterne: online.warte.sterne || [] } };
     this.speichern();
   },
 };

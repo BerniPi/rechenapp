@@ -7,6 +7,7 @@
   const SPIELE = { flappy: 'Flattervogel', snake: 'Apfelschlange', bloecke: 'Farbblöcke', tierturm: 'Tierturm', schrauben: 'Schrauben', unblock: 'Ausparken' };
   let daten = { spieler: [], codes: [], gruppen: [] };
   let offen = null; // Spieler in der Detailansicht
+  let modus = 'codes'; // Anmeldung am Server: codes | piazzi | bgbb
 
   async function api(methode, pfad, body) {
     const r = await fetch(`api/${pfad}`, {
@@ -87,13 +88,34 @@
   }
   $$('.tabs button').forEach((b) => b.addEventListener('click', () => tab(b.dataset.tab)));
 
+  // Reiter und Texte passend zur Anmeldung
+  const LEER = {
+    codes: 'Noch niemand verbunden. Erzeuge unter „Codes" einen Code für jedes Kind.',
+    piazzi: 'Noch keine Konten. Gib unter „Adressen" die erlaubten Adressen frei – damit legen die Kinder in der App ein Konto an.',
+    bgbb: 'Noch niemand angemeldet. Die Schüler:innen melden sich in der App mit ihrem Microsoft-Schulkonto an.',
+  };
+  function modusAnwenden(m) {
+    modus = m || 'codes';
+    $$('.tabs button[data-modus]').forEach((b) => b.classList.toggle('versteckt', b.dataset.modus !== modus));
+    $('#spalte-konto').textContent = { codes: 'Code-Notiz', piazzi: 'Konto', bgbb: 'Benutzername' }[modus];
+    $('#spieler-leer').textContent = LEER[modus];
+    $('#gruppen-hinweis').textContent = {
+      codes: 'Beim Erzeugen eines Codes wählst du die Gruppe – das Kind landet beim Einlösen automatisch darin. Jede Gruppe hat in der App ihre eigene Bestenliste.',
+      piazzi: 'Neue Konten sind ohne Gruppe – ordne sie in der Spieler-Ansicht zu. Jede Gruppe hat in der App ihre eigene Bestenliste.',
+      bgbb: 'Klassen entstehen auch beim Klassen-Import. Jede Klasse hat in der App ihre eigene Bestenliste.',
+    }[modus];
+  }
+
   // ---------- Übersicht ----------
   async function laden() {
     daten = await api('GET', 'uebersicht');
+    modusAnwenden(daten.anmeldung);
     gruppenAuswahl();
     spielerZeigen();
     codesZeigen();
     gruppenZeigen();
+    if (modus === 'piazzi') await adressenLaden();
+    if (modus === 'bgbb') await klassenLaden();
   }
 
   // Auswahllisten mit den Gruppen füllen; der gewählte Wert bleibt erhalten
@@ -156,8 +178,9 @@
       const name = el('button', `${s.emoji} ${s.name}`, 'link');
       name.addEventListener('click', versuch(() => detailOeffnen(s.id)));
       const quote = s.richtig + s.falsch ? Math.round((s.richtig / (s.richtig + s.falsch)) * 100) : null;
+      const konto = modus === 'codes' ? s.notiz || '' : `${s.benutzername || ''}${modus === 'piazzi' && s.email ? ` · ${s.email}` : ''}`;
       const tr = zeile([
-        name, s.gruppe || '–', s.notiz || '', zahl(s.rechnen), zahl(s.rechnen7), zahl(s.rechnenHeute), zahl(s.spiele),
+        name, s.gruppe || '–', konto, zahl(s.sterne), zahl(s.geraete), zahl(s.rechnen), zahl(s.rechnen7), zahl(s.rechnenHeute), zahl(s.spiele),
         { text: quote === null ? '–' : `${quote} %`, klasse: 'zahl' }, wann(s.zuletzt),
         el('span', s.gesperrt ? 'gesperrt' : 'aktiv', `marke ${s.gesperrt ? 'rot' : 'gruen'}`),
         el('span', `seit ${wann(s.erstellt)}`, 'leise'),
@@ -213,6 +236,12 @@
     $('#detail-titel').textContent = `${s.emoji} ${s.name}`;
     $('#d-sperren').textContent = s.gesperrt ? 'Entsperren' : 'Sperren';
     $('#d-gruppe').value = s.gruppe_id ? String(s.gruppe_id) : '';
+    $('#d-passwort').classList.toggle('versteckt', !s.hatPasswort);
+    $('#d-geraete').disabled = !s.geraete;
+    $('#d-konto').textContent = [
+      s.benutzername && `Benutzername: ${s.benutzername}`, s.email && `Adresse: ${s.email}`,
+      `${s.geraete} ${s.geraete === 1 ? 'Gerät' : 'Geräte'} angemeldet`, `${s.sterne} ⭐`,
+    ].filter(Boolean).join(' · ');
 
     const box = $('#tage');
     box.innerHTML = '';
@@ -279,13 +308,97 @@
     meldung(`${r.geloescht} Rekorde gelöscht`);
     await laden();
   }));
+  $('#d-geraete').addEventListener('click', versuch(async () => {
+    const s = aktuell();
+    if (!confirm(`${s.name} auf allen Geräten abmelden? ${modus === 'codes' ? 'Zum Wiederverbinden braucht es dann einen neuen Code.' : 'Danach muss man sich neu anmelden.'}`)) return;
+    const r = await api('DELETE', `spieler/${s.id}/geraete`);
+    meldung(`${r.abgemeldet} ${r.abgemeldet === 1 ? 'Gerät' : 'Geräte'} abgemeldet`);
+    await laden();
+    await detailOeffnen(s.id);
+  }));
+  $('#d-passwort').addEventListener('click', versuch(async () => {
+    const s = aktuell();
+    if (!confirm(`Neues Passwort für ${s.benutzername} erzeugen? Das bisherige gilt dann nicht mehr; angemeldete Geräte bleiben angemeldet.`)) return;
+    const r = await api('POST', `spieler/${s.id}/passwort`);
+    prompt(`Neues Passwort für ${s.benutzername} – nur jetzt sichtbar, bitte weitergeben:`, r.passwort);
+  }));
   $('#d-loeschen').addEventListener('click', versuch(async () => {
     const s = aktuell();
-    if (!confirm(`${s.name} mit allen Rekorden und Runden endgültig löschen? Das Gerät kann sich danach nur mit einem neuen Code wieder verbinden.`)) return;
+    const danach = {
+      codes: 'Das Gerät kann sich danach nur mit einem neuen Code wieder verbinden.',
+      piazzi: 'Der Benutzername wird wieder frei.',
+      bgbb: 'Beim nächsten Anmelden entsteht ein neues, leeres Konto.',
+    }[modus];
+    if (!confirm(`${s.name} mit allen Rekorden, Sternen und Runden endgültig löschen? ${danach}`)) return;
     await api('DELETE', `spieler/${s.id}`);
     offen = null;
     $('#detail').classList.add('versteckt');
     await laden();
+  }));
+
+  // ---------- Piazzi: Adressen ----------
+  async function adressenLaden() {
+    const r = await api('GET', 'adressen');
+    const tb = $('#adressen-tabelle tbody');
+    tb.innerHTML = '';
+    if (!r.adressen.length) { tb.appendChild(zeile([{ text: 'Noch keine Adressen freigegeben.', klasse: 'leise' }])); return; }
+    r.adressen.forEach((a) => {
+      const weg = el('button', 'Entfernen', 'knopf leise klein');
+      weg.addEventListener('click', versuch(async () => {
+        if (!confirm(`${a.email} entfernen? Bestehende Konten bleiben, neue können damit nicht mehr angelegt werden.`)) return;
+        await api('DELETE', `adressen/${encodeURIComponent(a.email)}`);
+        await adressenLaden();
+      }));
+      tb.appendChild(zeile([{ text: a.email, klasse: 'mono' }, a.notiz, zahl(a.konten), wann(a.erstellt), weg]));
+    });
+  }
+  $('#adressen-form').addEventListener('submit', versuch(async (ev) => {
+    ev.preventDefault();
+    const r = await api('POST', 'adressen', { text: $('#adressen-text').value, notiz: $('#adressen-notiz').value });
+    meldung(`${r.neu} ${r.neu === 1 ? 'Adresse' : 'Adressen'} freigegeben${r.falsch.length ? ` – ungültig: ${r.falsch.join(', ')}` : ''}`, r.falsch.length > 0);
+    $('#adressen-text').value = r.falsch.join('\n');
+    await adressenLaden();
+  }));
+
+  // ---------- BGBB: Klassen-Import ----------
+  async function klassenLaden() {
+    const r = await api('GET', 'klassen');
+    const tb = $('#klassen-tabelle tbody');
+    tb.innerHTML = '';
+    if (!r.zuordnungen.length) { tb.appendChild(zeile([{ text: 'Noch keine Zuordnungen.', klasse: 'leise' }])); return; }
+    r.zuordnungen.forEach((z) => tb.appendChild(zeile([{ text: z.benutzername, klasse: 'mono' }, z.klasse,
+      el('span', z.spieler_id ? 'ja' : 'noch nicht', `marke ${z.spieler_id ? 'gruen' : 'grau'}`)])));
+  }
+  $('#klassen-form').addEventListener('submit', versuch(async (ev) => {
+    ev.preventDefault();
+    const f = $('#klassen-datei').files[0];
+    if (!f) return;
+    if (f.size > 500 * 1024) throw new Error('Datei ist zu groß (höchstens 500 KB)');
+    const ersetzen = $('#klassen-ersetzen').checked;
+    if (ersetzen && !confirm('Alle bisherigen Zuordnungen vorher löschen? Bereits angemeldete Schüler:innen bleiben in ihrer Klasse, bis die neue Liste sie verschiebt.')) return;
+    // Excel speichert CSV oft als Windows-1252 – dann so lesen
+    const roh = await f.arrayBuffer();
+    let csv = new TextDecoder('utf-8').decode(roh);
+    if (csv.includes('�')) csv = new TextDecoder('windows-1252').decode(roh);
+    const r = await api('POST', 'klassen', { csv, ersetzen });
+    const box = $('#klassen-ergebnis');
+    box.innerHTML = '';
+    box.appendChild(el('p', `${r.zugeordnet} Zuordnungen übernommen, ${r.verschoben} angemeldete Schüler:innen verschoben${r.neueKlassen.length ? `, neue Klassen: ${r.neueKlassen.join(', ')}` : ''}.`));
+    if (r.fehler.length) {
+      box.appendChild(el('p', `${r.fehlerGesamt} Zeilen übersprungen:`, 'fehler'));
+      const ul = el('ul', null, 'fehlerliste');
+      r.fehler.forEach((x) => ul.appendChild(el('li', `Zeile ${x.zeile}: ${x.text}`)));
+      box.appendChild(ul);
+    }
+    box.classList.remove('versteckt');
+    $('#klassen-form').reset();
+    await laden();
+  }));
+  $('#klassen-leeren').addEventListener('click', versuch(async () => {
+    if (!confirm('Alle Klassen-Zuordnungen löschen? Klassen und Schüler:innen bleiben, wie sie sind.')) return;
+    const r = await api('DELETE', 'klassen');
+    meldung(`${r.geloescht} Zuordnungen gelöscht`);
+    await klassenLaden();
   }));
 
   // ---------- Bestenliste ----------
@@ -325,7 +438,8 @@
   }
   (async () => {
     try {
-      await api('GET', 'ich');
+      const ich = await api('GET', 'ich');
+      modusAnwenden(ich.anmeldung);
       await start();
     } catch (err) { if (err.message !== 'abgemeldet') meldung(err.message, true); }
   })();

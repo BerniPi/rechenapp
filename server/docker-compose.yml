@@ -3,16 +3,18 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
-    container_name: rechenheld
+    # Zwei Instanzen nebeneinander (z. B. piazzi und bgbb): je eigene Env-Datei mit NAME, PORT_HOST und ENV_DATEI, siehe README
+    container_name: ${NAME:-rechenheld}
     restart: unless-stopped
-    env_file: .env
+    env_file: ${ENV_DATEI:-.env}
     environment:
       TZ: Europe/Vienna
     volumes:
       - rechenheld-daten:/daten
-    # Nur lokal offen – der Reverse-Proxy leitet https://deine-domain → 127.0.0.1:8080
+    # Nur lokal offen – der Reverse-Proxy leitet https://deine-domain → 127.0.0.1:PORT_HOST
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${PORT_HOST:-8080}:8080"
 
+# Mit „-p <name>" bekommt jede Instanz ihr eigenes Volume
 volumes:
   rechenheld-daten:

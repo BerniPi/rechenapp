@@ -1,5 +1,8 @@
-// Online-Bestenliste: Code einlösen, Rekorde und Runden senden (mit Warteschlange für offline), Weltliste holen.
-// Pro Spieler liegt in seinen Daten: online = { server, schluessel, spielerId, name, emoji, gruppe, status, warte: { rekorde, runden } }
+// Online-Bestenliste: verbinden (Code, Konto oder Microsoft-Schulkonto), Rekorde, Runden und Sterne senden
+// (mit Warteschlange für offline), Rekorde und Sterne anderer Geräte übernehmen, Weltliste holen.
+// Pro Spieler liegt in seinen Daten:
+//   online = { server, schluessel, spielerId, name, emoji, gruppe, benutzername, status, sterneSync, warte: { rekorde, runden, sterne } }
+// Sterne werden als Buchungen (+/−) geschickt; der Kontostand kommt vom Server, damit mehrere Geräte zusammenpassen.
 const Online = {
   // Zugriff auf die Daten eines Spielers – auch wenn inzwischen ein anderer gewählt ist.
   daten: (id) => Speicher.datenVon(id),
@@ -29,18 +32,70 @@ const Online = {
     }
   },
 
-  async einloesen(server, code, name, emoji) {
+  // Anfrage, deren Fehler dem Kind/den Eltern gezeigt wird
+  async muss(server, methode, pfad, opt) {
     let r;
     try {
-      r = await this.anfrage(server, 'POST', 'einloesen', { body: { code, name, emoji } });
+      r = await this.anfrage(server, methode, pfad, opt);
     } catch (e) {
       throw new Error('Server nicht erreichbar – Internet und Server-Adresse prüfen.');
     }
-    if (r.status !== 200 || !r.j || !r.j.schluessel) throw new Error((r.j && r.j.fehler) || `Fehler ${r.status}`);
+    if (r.status !== 200 || !r.j) throw new Error((r.j && r.j.fehler) || `Fehler ${r.status}`);
+    return r.j;
+  },
+
+  // Welche Anmeldung bietet der Server an? → { anmeldung: 'codes'|'piazzi'|'bgbb', domain }
+  async info(server) {
+    const j = await this.muss(server, 'GET', 'ping');
+    return { anmeldung: j.anmeldung || 'codes', domain: j.domain || null };
+  },
+
+  // Antwort des Servers → Verbindung. neu = frisches Konto: die Sterne dieses Geräts werden zum Startguthaben.
+  verbindung(server, j, neu) {
     return {
-      server, schluessel: r.j.schluessel, spielerId: r.j.spielerId, name: r.j.name, emoji: r.j.emoji, gruppe: r.j.gruppe || null,
-      status: 'ok', warte: { rekorde: {}, runden: [] },
+      server, schluessel: j.schluessel, spielerId: j.spielerId, name: j.name, emoji: j.emoji, gruppe: j.gruppe || null,
+      benutzername: j.benutzername || null, status: 'ok', sterneSync: !neu, warte: { rekorde: {}, runden: [], sterne: [] },
     };
+  },
+
+  async einloesen(server, code, name, emoji) {
+    return this.verbindung(server, await this.muss(server, 'POST', 'einloesen', { body: { code, name, emoji } }), true);
+  },
+  async kontoAnlegen(server, email, benutzername, passwort, emoji) {
+    return this.verbindung(server, await this.muss(server, 'POST', 'konto', { body: { email, benutzername, passwort, emoji } }), true);
+  },
+  // Anmelden auf einem weiteren Gerät: gibt auch Rekorde und Sterne des Kontos zurück
+  async anmelden(server, benutzername, passwort) {
+    const j = await this.muss(server, 'POST', 'anmelden', { body: { benutzername, passwort } });
+    return { verbindung: this.verbindung(server, j, false), j };
+  },
+  ssoStarten(server) {
+    location.href = `${this.basis(server)}sso/start`;
+  },
+  async ssoEinloesen(server, token) {
+    const j = await this.muss(server, 'POST', 'sso/einloesen', { body: { token } });
+    return { verbindung: this.verbindung(server, j, j.neu), j };
+  },
+
+  // Verbindung an einen Spieler hängen: eigene Rekorde mitschicken, bei einem bestehenden Konto dessen Stand übernehmen
+  verbinden(d, verbindung, kontoStand) {
+    d.online = verbindung;
+    Object.entries(d.rekorde).forEach(([key, r]) => this.merkeRekord(d, key, r.wert, r.datum));
+    if (kontoStand) this.uebernehmen(d, kontoStand);
+  },
+
+  // Dieses Gerät abmelden (Server leise mitnehmen, lokal immer)
+  async abmelden(d) {
+    const o = d.online;
+    if (o && o.status === 'ok') {
+      try { await this.anfrage(o.server, 'DELETE', 'ich', { schluessel: o.schluessel }); } catch (e) { /* egal */ }
+    }
+    d.online = null;
+  },
+
+  async passwortAendern(d, passwortAlt, passwortNeu) {
+    const o = d.online;
+    await this.muss(o.server, 'PATCH', 'ich', { body: { passwortAlt, passwortNeu }, schluessel: o.schluessel });
   },
 
   merkeRekord(d, key, wert, datum) {
@@ -48,19 +103,47 @@ const Online = {
     d.online.warte.rekorde[key] = { wert, datum };
   },
 
+  neueClientId: () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+
   merkeRunde(d, runde) {
     if (!d.online) return;
-    const clientId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    d.online.warte.runden.push({ clientId, ...runde });
+    d.online.warte.runden.push({ clientId: this.neueClientId(), ...runde });
     if (d.online.warte.runden.length > 500) d.online.warte.runden.splice(0, d.online.warte.runden.length - 500);
+  },
+
+  // Sterne-Buchung: grund 'runde' | 'spiel' | 'eltern' | 'start'
+  merkeSterne(d, delta, grund) {
+    // Ohne Sterne-Abgleich (alte Verbindung) nimmt die Start-Buchung in senden() den ganzen Stand mit
+    if (!d.online || !d.online.sterneSync || !delta) return;
+    const w = d.online.warte;
+    if (!w.sterne) w.sterne = [];
+    w.sterne.push({ clientId: this.neueClientId(), delta, t: Date.now(), grund });
   },
 
   wartet(d) {
     if (!d.online) return 0;
-    return Object.keys(d.online.warte.rekorde).length + d.online.warte.runden.length;
+    const w = d.online.warte;
+    return Object.keys(w.rekorde).length + w.runden.length + (w.sterne || []).length;
+  },
+
+  // Stand vom Server übernehmen: bessere Rekorde, Sterne = Kontostand + was hier noch nicht gesendet ist
+  uebernehmen(d, j) {
+    if (!j) return;
+    (j.rekorde || []).forEach((r) => {
+      const art = r.key.split('|')[1];
+      const klein = art === 'zehn' || art === 'a20';
+      const alt = d.rekorde[r.key];
+      if (!alt || (klein ? r.wert < alt.wert : r.wert > alt.wert)) d.rekorde[r.key] = { wert: r.wert, datum: r.datum };
+    });
+    if (Number.isInteger(j.sterne) && d.online && d.online.sterneSync) {
+      const offen = (d.online.warte.sterne || []).reduce((s, b) => s + b.delta, 0);
+      d.sterne = Math.max(0, j.sterne + offen);
+    }
   },
 
   // Schickt alles, was wartet. Leise: ohne Netz bleibt es einfach liegen.
+  // Danach wird beiAenderung(id) aufgerufen – Sterne/Rekorde können sich durch andere Geräte geändert haben.
+  beiAenderung: null,
   async senden(id) {
     if (this.laeuft.has(id)) return;
     this.laeuft.add(id);
@@ -69,12 +152,20 @@ const Online = {
         const d = this.daten(id);
         const o = d && d.online;
         if (!o || o.status !== 'ok') return;
+        if (!o.warte.sterne) o.warte.sterne = [];
+        // Verbindung aus der Zeit vor dem Sterne-Abgleich: der jetzige Stand wird zum Startguthaben
+        if (!o.sterneSync) {
+          o.sterneSync = true;
+          this.merkeSterne(d, d.sterne, 'start');
+          this.speichern(id, d);
+        }
         const rekorde = Object.entries(o.warte.rekorde).slice(0, 50).map(([key, r]) => ({ key, ...r }));
         const runden = o.warte.runden.slice(0, 50);
-        if (!rekorde.length && !runden.length && runde > 0) return;
+        const sterne = o.warte.sterne.slice(0, 100);
+        if (!rekorde.length && !runden.length && !sterne.length && runde > 0) return;
         let r;
         try {
-          r = await this.anfrage(o.server, 'POST', 'sync', { body: { rekorde, runden }, schluessel: o.schluessel });
+          r = await this.anfrage(o.server, 'POST', 'sync', { body: { rekorde, runden, sterne }, schluessel: o.schluessel });
         } catch (e) { return; }
         // frisch holen: währenddessen kann gespielt oder gewechselt worden sein
         const neu = this.daten(id);
@@ -91,7 +182,11 @@ const Online = {
         rekorde.forEach((x) => { if (w.rekorde[x.key] && w.rekorde[x.key].datum === x.datum) delete w.rekorde[x.key]; });
         const weg = new Set(runden.map((x) => x.clientId));
         w.runden = w.runden.filter((x) => !weg.has(x.clientId));
+        const wegS = new Set(sterne.map((x) => x.clientId));
+        w.sterne = (w.sterne || []).filter((x) => !wegS.has(x.clientId));
+        this.uebernehmen(neu, r.j);
         this.speichern(id, neu);
+        if (this.beiAenderung) this.beiAenderung(id);
       }
     } finally {
       this.laeuft.delete(id);
@@ -110,14 +205,8 @@ const Online = {
 
   async aendern(d, name, emoji) {
     const o = d.online;
-    let r;
-    try {
-      r = await this.anfrage(o.server, 'PATCH', 'ich', { body: { name, emoji }, schluessel: o.schluessel });
-    } catch (e) {
-      throw new Error('Server nicht erreichbar.');
-    }
-    if (r.status !== 200) throw new Error((r.j && r.j.fehler) || `Fehler ${r.status}`);
-    o.name = r.j.name;
-    o.emoji = r.j.emoji;
+    const j = await this.muss(o.server, 'PATCH', 'ich', { body: { name, emoji }, schluessel: o.schluessel });
+    o.name = j.name;
+    o.emoji = j.emoji;
   },
 };

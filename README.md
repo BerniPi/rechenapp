@@ -66,6 +66,59 @@ Der Container hört nur auf `127.0.0.1:8080`; im Reverse-Proxy z. B. `https://re
 
 Lokal ohne Docker (Node 24): `ADMIN_PASSWORT=test HINTER_PROXY=0 node server/server.js` → http://localhost:8080
 
+### Anmeldung: Codes, Piazzi oder BGBB
+
+Derselbe Code kann drei Arten der Anmeldung; gewählt wird mit `ANMELDUNG` in der Env-Datei. Die App fragt den Server und zeigt im Eltern-Bereich die passende Anmeldung.
+
+| `ANMELDUNG` | Wer darf? | Anmeldung |
+|---|---|---|
+| `codes` (Standard) | wer einen Code bekommt | Einmal-Code, wie oben beschrieben |
+| `piazzi` | wer eine im Admin freigegebene Adresse `@piazzi.at` angibt | Konto mit Benutzername, Bild und Passwort |
+| `bgbb` | alle mit Microsoft-Schulkonto `@bgblumenstrasse.at` | „Mit Microsoft anmelden", Benutzername = Teil vor dem @ |
+
+Bei `piazzi` und `bgbb` ist ein Konto auf **mehreren Geräten** gleichzeitig anmeldbar. **Sterne und Rekorde** werden abgeglichen: jede Änderung wird als Buchung (+/−) geschickt, der Kontostand kommt vom Server. Beim ersten Verbinden eines neuen Kontos werden die Sterne des Geräts zum Startguthaben; beim Anmelden an einem bestehenden Konto ersetzt dessen Stand die Sterne auf dem Gerät. Bestehende Code-Verbindungen bekommen beim ersten Senden ebenfalls ein Startguthaben und gleichen ab dann ab.
+
+**Piazzi**
+- Admin → „Adressen": Adressen freigeben (eine pro Zeile). Eine Adresse darf für mehrere Konten verwendet werden (z. B. Geschwister). Es wird keine Mail verschickt.
+- App → Eltern-Bereich → Online-Bestenliste → „Neues Konto" (Adresse, Benutzername, Bild, Passwort) bzw. „Anmelden" auf weiteren Geräten.
+- Admin → Spieler: Passwort zurücksetzen (neues Einmal-Passwort wird einmal angezeigt), alle Geräte abmelden.
+
+**BGBB (Microsoft-SSO)**
+
+Einmalig im Microsoft Entra Admin Center der Schule (*Identität → Anwendungen → App-Registrierungen → Neue Registrierung*):
+1. Name z. B. „Rechenheld", *Unterstützte Kontotypen*: **Nur Konten in diesem Organisationsverzeichnis**.
+2. *Umleitungs-URI*: Plattform **Web**, `https://<OEFFENTLICHE_ADRESSE>/api/sso/rueckruf`.
+3. Unter *Zertifikate & Geheimnisse* einen geheimen Clientschlüssel anlegen (Ablaufdatum notieren und rechtzeitig erneuern).
+4. In die Env-Datei: `MS_TENANT_ID` (Verzeichnis-ID), `MS_CLIENT_ID` (Anwendungs-ID), `MS_CLIENT_SECRET` (Wert des Schlüssels), `OEFFENTLICHE_ADRESSE`.
+
+Angemeldet wird mit `openid profile email`; Berechtigungen, die ein Admin genehmigen muss, braucht es nicht. Geprüft werden Tenant, Anwendung und die Domain `@bgblumenstrasse.at`.
+
+Klassen: Admin → „Klassen-Import" → CSV hochladen, z. B.
+
+```
+benutzername;klasse
+max.muster;1a
+lena.berg@bgblumenstrasse.at;2b
+```
+
+Trenner `;` `,` oder Tab, Kopfzeile optional, Adresse oder Benutzername. Fehlende Klassen werden angelegt, schon angemeldete Schüler:innen sofort verschoben, alle anderen beim ersten Anmelden.
+
+**Zwei Instanzen auf einem Server** – je eine Env-Datei in `server/`, z. B. `piazzi.env`:
+
+```
+NAME=rechenheld-piazzi
+PORT_HOST=8081
+ENV_DATEI=piazzi.env
+ANMELDUNG=piazzi
+ADMIN_PASSWORT=…
+```
+
+```bash
+docker compose -p piazzi --env-file server/piazzi.env -f server/docker-compose.yml up -d --build
+```
+
+Genauso `bgbb.env` mit `NAME=rechenheld-bgbb`, `PORT_HOST=8082`, `ENV_DATEI=bgbb.env` und `-p bgbb`. Jede Instanz hat ihr eigenes Volume und damit ihre eigene Datenbank.
+
 ## Fremde Bestandteile
 
 - `audio/jonas/` – Wortschnipsel der Microsoft-Stimme „Jonas" (de-AT-JonasNeural), erzeugt mit `tools/stimme.py`. Derzeit über edge-tts erzeugt; für eine öffentlich verteilte App über Azure AI Speech neu erzeugen.

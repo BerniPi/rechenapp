@@ -24,7 +24,9 @@
     <nav class="tabs">
       <button data-tab="spieler" class="an">Spieler</button>
       <button data-tab="gruppen">Gruppen</button>
-      <button data-tab="codes">Codes</button>
+      <button data-tab="codes" data-modus="codes">Codes</button>
+      <button data-tab="adressen" data-modus="piazzi">Adressen</button>
+      <button data-tab="klassen" data-modus="bgbb">Klassen-Import</button>
       <button data-tab="rekorde">Bestenliste</button>
     </nav>
     <button id="abmelden" class="knopf leise">Abmelden</button>
@@ -36,13 +38,13 @@
     <div class="tabelle-box">
       <table id="spieler-tabelle">
         <thead><tr>
-          <th>Spieler</th><th>Gruppe</th><th>Code-Notiz</th><th class="zahl">Runden</th><th class="zahl">7 Tage</th><th class="zahl">Heute</th>
+          <th>Spieler</th><th>Gruppe</th><th id="spalte-konto">Code-Notiz</th><th class="zahl">Sterne</th><th class="zahl">Geräte</th><th class="zahl">Runden</th><th class="zahl">7 Tage</th><th class="zahl">Heute</th>
           <th class="zahl">Minispiele</th><th class="zahl">Richtig</th><th>Zuletzt</th><th>Status</th><th></th>
         </tr></thead>
         <tbody></tbody>
       </table>
     </div>
-    <p id="spieler-leer" class="leise versteckt">Noch niemand verbunden. Erzeuge unter „Codes" einen Code für jedes Kind.</p>
+    <p id="spieler-leer" class="leise versteckt"></p>
 
     <div id="detail" class="karte versteckt">
       <div class="detail-kopf">
@@ -52,10 +54,13 @@
           <button id="d-umbenennen" class="knopf leise">Umbenennen</button>
           <button id="d-sperren" class="knopf leise"></button>
           <button id="d-rekorde" class="knopf leise">Rekorde löschen</button>
+          <button id="d-geraete" class="knopf leise">Geräte abmelden</button>
+          <button id="d-passwort" class="knopf leise versteckt">Passwort zurücksetzen</button>
           <button id="d-loeschen" class="knopf rot">Spieler löschen</button>
           <button id="d-zu" class="knopf leise" aria-label="Schließen">✕</button>
         </div>
       </div>
+      <p id="d-konto" class="leise"></p>
       <h3>Runden pro Tag (30 Tage)</h3>
       <div id="tage" class="tage"></div>
       <p class="legende"><span class="punkt rechnen"></span> Rechenrunden <span class="punkt spiel"></span> Minispiele</p>
@@ -90,6 +95,45 @@
     </div>
   </section>
 
+  <!-- Piazzi: freigegebene Adressen -->
+  <section data-bereich="adressen" class="versteckt">
+    <form id="adressen-form" class="karte">
+      <label>Adressen freigeben – eine pro Zeile (mehrere Konten pro Adresse sind erlaubt)
+        <textarea id="adressen-text" rows="4" placeholder="vorname@piazzi.at" required></textarea></label>
+      <div class="reihe">
+        <label class="breit">Notiz (optional) <input id="adressen-notiz" type="text" maxlength="60" placeholder="Familie"></label>
+        <button class="knopf">Freigeben</button>
+      </div>
+    </form>
+    <div class="tabelle-box">
+      <table id="adressen-tabelle">
+        <thead><tr><th>Adresse</th><th>Notiz</th><th class="zahl">Konten</th><th>Seit</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="leise">Mit einer freigegebenen Adresse kann in der App (Eltern-Bereich → Online-Bestenliste) ein Konto mit Benutzername, Bild und Passwort angelegt werden. Entfernen sperrt keine bestehenden Konten, verhindert aber neue.</p>
+  </section>
+
+  <!-- BGBB: Klassen-Import -->
+  <section data-bereich="klassen" class="versteckt">
+    <form id="klassen-form" class="karte">
+      <label>CSV-Datei <input id="klassen-datei" type="file" accept=".csv,.txt,text/csv" required></label>
+      <p class="leise">Zwei Spalten: <span class="mono">benutzername;klasse</span> oder <span class="mono">vorname.nachname@bgblumenstrasse.at;1a</span>. Trenner <span class="mono">;</span> <span class="mono">,</span> oder Tab, Kopfzeile optional. Fehlende Klassen werden angelegt; wer schon angemeldet ist, wird sofort verschoben, alle anderen beim ersten Anmelden.</p>
+      <div class="reihe">
+        <label class="inline"><input id="klassen-ersetzen" type="checkbox"> bisherige Zuordnungen vorher löschen</label>
+        <button class="knopf">Hochladen</button>
+      </div>
+    </form>
+    <div id="klassen-ergebnis" class="karte versteckt"></div>
+    <div class="reihe"><h3>Zuordnungen</h3><button id="klassen-leeren" class="knopf leise klein">Alle Zuordnungen löschen</button></div>
+    <div class="tabelle-box">
+      <table id="klassen-tabelle">
+        <thead><tr><th>Benutzername</th><th>Klasse</th><th>Angemeldet</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- Gruppen -->
   <section data-bereich="gruppen" class="versteckt">
     <form id="gruppe-form" class="karte reihe">
@@ -102,7 +146,7 @@
         <tbody></tbody>
       </table>
     </div>
-    <p class="leise">Beim Erzeugen eines Codes wählst du die Gruppe – das Kind landet beim Einlösen automatisch darin. Jede Gruppe hat in der App ihre eigene Bestenliste.</p>
+    <p id="gruppen-hinweis" class="leise">Jede Gruppe hat in der App ihre eigene Bestenliste.</p>
   </section>
 
   <!-- Bestenliste -->

@@ -504,6 +504,7 @@
     const faktor = istAufgaben(s) ? s.anzahl / 10 : 1 + (s.minuten - 1) / 4;
     const gewinn = st > 0 ? Math.max(1, Math.round(st * faktor)) : 0;
     d.sterne += gewinn;
+    Online.merkeSterne(d, gewinn, 'runde');
 
     // Rekord
     const key = rekordSchluessel(s);
@@ -675,6 +676,7 @@
           return;
         }
         d.sterne -= e.preis;
+        Online.merkeSterne(d, -e.preis, 'spiel');
         Online.merkeRunde(d, { typ: 'spiel', t: Date.now(), spiel: def.id });
         Speicher.speichern();
         Online.senden(Speicher.benutzer.aktiv);
@@ -852,14 +854,20 @@
     inp.value = e[inp.dataset.schwelle][Number(inp.dataset.i)];
   }));
   $$('[data-sterne]').forEach((b) => b.addEventListener('click', () => {
+    const vorher = d.sterne;
     d.sterne = Math.max(0, d.sterne + Number(b.dataset.sterne));
+    Online.merkeSterne(d, d.sterne - vorher, 'eltern');
     Speicher.speichern();
     sterneAnzeigen();
+    Online.senden(Speicher.benutzer.aktiv);
   }));
   $('#alles-loeschen').addEventListener('click', () => {
     const u = Speicher.aktiverBenutzer();
-    if (!confirm(`Wirklich alles von ${u ? u.name : 'diesem Spieler'} löschen? Sterne, Rekorde, Verlauf und Einstellungen gehen verloren.`)) return;
+    const konto = d.online ? ' Die Sterne im Online-Konto werden auf 0 gesetzt; Online-Rekorde bleiben.' : '';
+    if (!confirm(`Wirklich alles von ${u ? u.name : 'diesem Spieler'} löschen? Sterne, Rekorde, Verlauf und Einstellungen gehen verloren.${konto}`)) return;
+    Online.merkeSterne(d, -d.sterne, 'eltern');
     Speicher.zuruecksetzen();
+    Online.senden(Speicher.benutzer.aktiv);
     benutzerStarten(Speicher.benutzer.aktiv);
   });
 
@@ -879,6 +887,12 @@
   }
 
   // ---------- Online-Bestenliste (Eltern-Bereich) ----------
+  // Welche Anmeldung es gibt, sagt der Server: codes (Einmal-Code), piazzi (Konto mit Passwort), bgbb (Microsoft-Schulkonto)
+  let onlineServer = '';   // eigene Server-Adresse, leer = dieselbe wie die App
+  let onlineReiter = 'neu'; // piazzi: 'neu' oder 'anmelden'
+  let onlineHinweis = '';  // Meldung, die beim nächsten Zeichnen erscheint (z. B. nach der Microsoft-Anmeldung)
+  let onlineLauf = 0;
+
   function onlineZeigen() {
     const box = $('#online-box');
     box.innerHTML = '';
@@ -890,15 +904,15 @@
       if (klasse) el.className = klasse;
       return el;
     };
-    const feld = (titel, wert, platzhalter) => {
+    const feld = (titel, wert, platzhalter, typ = 'text', ziel = box) => {
       const l = neu('label', titel);
       const i = neu('input', null, 'text');
-      i.type = 'text';
+      i.type = typ;
       i.value = wert || '';
       i.placeholder = platzhalter || '';
-      i.autocomplete = 'off';
+      i.autocomplete = typ === 'password' ? 'current-password' : 'off';
       l.appendChild(i);
-      box.appendChild(l);
+      ziel.appendChild(l);
       return i;
     };
     // Bildauswahl wie bei „Neuer Spieler" – nur Emojis, keine Fotos
@@ -919,7 +933,8 @@
       return () => gewaehlt;
     };
     const meldung = neu('p', '', 'hinweis online-meldung');
-    const knopfZeile = () => { const z = neu('div', null, 'zeile'); box.appendChild(z); return z; };
+    if (onlineHinweis) { meldung.textContent = onlineHinweis; onlineHinweis = ''; }
+    const knopfZeile = (ziel = box) => { const z = neu('div', null, 'zeile'); ziel.appendChild(z); return z; };
     const knopf = (zeile, text, klasse, fn) => {
       const k = neu('button', text, `knopf klein ${klasse || ''}`);
       k.addEventListener('click', async () => {
@@ -931,66 +946,188 @@
       zeile.appendChild(k);
       return k;
     };
-
-    if (!o) {
-      box.appendChild(neu('p', `Mit einem Code nimmt ${u.name} an der Bestenliste der Klasse/Gruppe und der Welt teil. Online sichtbar sind nur Spitzname und Bild – nie ein Foto. Jeder Code gilt nur einmal.`, 'hinweis'));
-      const code = feld('Code', '', 'RH-XXXX-XXXX');
-      code.autocapitalize = 'characters';
-      const name = feld('Spitzname', u.name);
-      name.maxLength = 16;
-      box.appendChild(neu('p', 'Bild für die Bestenliste:', 'hinweis'));
-      const eigenes = u.bild && u.bild.art === 'emoji' && BILDER.includes(u.bild.wert) ? u.bild.wert : BILDER[0];
-      const bild = bildWahl(eigenes);
+    const eigenesBild = u.bild && u.bild.art === 'emoji' && BILDER.includes(u.bild.wert) ? u.bild.wert : BILDER[0];
+    // Nach dem Verbinden: speichern, Rekorde/Sterne senden, neu zeichnen
+    const fertig = async (art) => {
+      d.online.art = art;
+      Speicher.speichern();
+      sterneAnzeigen();
+      await Online.senden(Speicher.benutzer.aktiv);
+      onlineZeigen();
+    };
+    const serverWahl = () => {
       const mehr = neu('details', null, 'online-mehr');
       mehr.appendChild(neu('summary', 'Server-Adresse'));
       box.appendChild(mehr);
-      const server = feld('Adresse (leer = dieselbe wie die App)', '', 'https://rechnen.example.at');
-      mehr.appendChild(server.parentElement);
-      knopf(knopfZeile(), '🌍 Verbinden', 'gruen', async () => {
-        if (!code.value.trim()) throw new Error('Bitte den Code eingeben.');
-        const verbindung = await Online.einloesen(server.value.trim(), code.value, name.value.trim(), bild());
-        d.online = verbindung;
-        // bisherige Rekorde gleich mitnehmen
-        Object.entries(d.rekorde).forEach(([key, r]) => Online.merkeRekord(d, key, r.wert, r.datum));
+      const server = feld('Adresse (leer = dieselbe wie die App)', onlineServer, 'https://rechnen.example.at', 'url', mehr);
+      knopf(knopfZeile(mehr), 'Übernehmen', 'grau', async () => { onlineServer = server.value.trim(); onlineZeigen(); });
+    };
+
+    if (o) {
+      const status = o.status === 'gesperrt' ? '⛔ Dieser Spieler wurde gesperrt.'
+        : o.status === 'ungueltig' ? `⚠️ Die Anmeldung gilt nicht mehr. Bitte ${o.art && o.art !== 'codes' ? 'abmelden und neu anmelden' : 'trennen und einen neuen Code eingeben'}.`
+          : `✅ Verbunden als ${o.emoji} ${o.name}${o.benutzername && o.benutzername !== o.name ? ` (${o.benutzername})` : ''}${o.gruppe ? ` · Gruppe ${o.gruppe}` : ''}`;
+      box.appendChild(neu('p', status, 'online-status'));
+      const n = Online.wartet(d);
+      if (n) box.appendChild(neu('p', `📤 ${n} ${n === 1 ? 'Eintrag wartet' : 'Einträge warten'} auf Übertragung (passiert automatisch, sobald Internet da ist).`, 'hinweis'));
+      if (o.art && o.art !== 'codes') box.appendChild(neu('p', 'Sterne und Rekorde werden mit allen Geräten abgeglichen, auf denen dieses Konto angemeldet ist.', 'hinweis'));
+
+      if (o.status === 'ok') {
+        const name = feld('Spitzname', o.name);
+        name.maxLength = 16;
+        const bild = bildWahl(o.emoji);
+        knopf(knopfZeile(), 'Spitzname/Bild speichern', '', async () => {
+          await Online.aendern(d, name.value.trim(), bild());
+          Speicher.speichern();
+          onlineZeigen();
+        });
+        if (o.art === 'piazzi') {
+          const pw = neu('details', null, 'online-mehr');
+          pw.appendChild(neu('summary', 'Passwort ändern'));
+          box.appendChild(pw);
+          const alt = feld('Bisheriges Passwort', '', '', 'password', pw);
+          const neuPw = feld('Neues Passwort (mind. 6 Zeichen)', '', '', 'password', pw);
+          neuPw.autocomplete = 'new-password';
+          knopf(knopfZeile(pw), 'Passwort ändern', '', async () => {
+            await Online.passwortAendern(d, alt.value, neuPw.value);
+            alt.value = '';
+            neuPw.value = '';
+            meldung.textContent = '✅ Passwort geändert';
+          });
+        }
+      }
+      const z = knopfZeile();
+      if (o.status === 'ok') {
+        knopf(z, '📤 Jetzt senden', 'blau', async () => {
+          await Online.senden(Speicher.benutzer.aktiv);
+          sterneAnzeigen();
+          onlineZeigen();
+        });
+      }
+      const konto = o.art && o.art !== 'codes';
+      knopf(z, konto ? 'Auf diesem Gerät abmelden' : 'Trennen', 'grau', async () => {
+        const frage = konto
+          ? 'Auf diesem Gerät abmelden? Sterne und Rekorde bleiben im Konto – anmelden geht jederzeit wieder.'
+          : 'Online-Verbindung trennen? Zum Wiederverbinden braucht es einen neuen Code.';
+        if (!confirm(frage)) return;
+        if (konto && Online.wartet(d)) await Online.senden(Speicher.benutzer.aktiv);
+        await Online.abmelden(d);
         Speicher.speichern();
-        await Online.senden(Speicher.benutzer.aktiv);
         onlineZeigen();
       });
       box.appendChild(meldung);
       return;
     }
 
-    const status = o.status === 'gesperrt' ? '⛔ Dieser Spieler wurde gesperrt.'
-      : o.status === 'ungueltig' ? '⚠️ Die Verbindung gilt nicht mehr. Bitte trennen und einen neuen Code eingeben.'
-        : `✅ Verbunden als ${o.emoji} ${o.name}${o.gruppe ? ` · Gruppe ${o.gruppe}` : ''}`;
-    box.appendChild(neu('p', status, 'online-status'));
-    const n = Online.wartet(d);
-    if (n) box.appendChild(neu('p', `📤 ${n} ${n === 1 ? 'Eintrag wartet' : 'Einträge warten'} auf Übertragung (passiert automatisch, sobald Internet da ist).`, 'hinweis'));
+    // Nicht verbunden: erst fragen, welche Anmeldung der Server anbietet
+    box.appendChild(neu('p', '⏳ Verbinde mit dem Server …', 'hinweis'));
+    const lauf = ++onlineLauf;
+    Online.info(onlineServer).then((info) => formular(info, null), (err) => formular(null, err));
 
-    if (o.status === 'ok') {
-      const name = feld('Spitzname', o.name);
-      name.maxLength = 16;
-      const bild = bildWahl(o.emoji);
-      knopf(knopfZeile(), 'Spitzname/Bild speichern', '', async () => {
-        await Online.aendern(d, name.value.trim(), bild());
+    function formular(info, err) {
+      if (lauf !== onlineLauf || d.online || $('#online-box') !== box) return;
+      box.innerHTML = '';
+      if (!info) {
+        box.appendChild(neu('p', `❌ ${err.message}`, 'hinweis'));
+        serverWahl();
+        box.appendChild(meldung);
+        return;
+      }
+
+      if (info.anmeldung === 'piazzi') {
+        box.appendChild(neu('p', `Mit einem Konto spielt ${u.name} bei der Bestenliste mit. Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Benutzername und Bild – nie ein Foto.`, 'hinweis'));
+        const reiter = knopfZeile();
+        [['neu', '✨ Neues Konto'], ['anmelden', '🔑 Anmelden']].forEach(([wert, text]) => {
+          const k = neu('button', text, `knopf klein ${onlineReiter === wert ? 'blau' : 'grau'}`);
+          k.addEventListener('click', () => { onlineReiter = wert; onlineZeigen(); });
+          reiter.appendChild(k);
+        });
+        if (onlineReiter === 'neu') {
+          const email = feld('E-Mail-Adresse', '', `name@${info.domain}`, 'email');
+          box.appendChild(neu('p', 'Die Adresse muss vom Admin freigegeben sein. Mehrere Kinder dürfen dieselbe Adresse verwenden.', 'hinweis'));
+          const benutzer = feld('Benutzername (zum Anmelden, auch in der Bestenliste)', u.name.replace(/\s+/g, ''));
+          benutzer.maxLength = 16;
+          box.appendChild(neu('p', 'Bild für die Bestenliste:', 'hinweis'));
+          const bild = bildWahl(eigenesBild);
+          const pw1 = feld('Passwort (mind. 6 Zeichen)', '', '', 'password');
+          const pw2 = feld('Passwort wiederholen', '', '', 'password');
+          pw1.autocomplete = 'new-password';
+          pw2.autocomplete = 'new-password';
+          knopf(knopfZeile(), '🌍 Konto anlegen', 'gruen', async () => {
+            if (!email.value.trim()) throw new Error('Bitte die E-Mail-Adresse eingeben.');
+            if (pw1.value !== pw2.value) throw new Error('Die Passwörter sind verschieden.');
+            const v = await Online.kontoAnlegen(onlineServer, email.value, benutzer.value.trim(), pw1.value, bild());
+            Online.verbinden(d, v);
+            await fertig('piazzi');
+          });
+        } else {
+          const benutzer = feld('Benutzername', '');
+          benutzer.autocomplete = 'username';
+          const pw = feld('Passwort', '', '', 'password');
+          knopf(knopfZeile(), '🔑 Anmelden', 'gruen', async () => {
+            if (!benutzer.value.trim() || !pw.value) throw new Error('Bitte Benutzername und Passwort eingeben.');
+            if (d.sterne > 0 && !confirm(`Die ${d.sterne} ⭐ von ${u.name} auf diesem Gerät werden durch den Sterne-Stand des Kontos ersetzt. Weiter?`)) return;
+            const { verbindung, j } = await Online.anmelden(onlineServer, benutzer.value.trim(), pw.value);
+            Online.verbinden(d, verbindung, j);
+            await fertig('piazzi');
+          });
+        }
+      } else if (info.anmeldung === 'bgbb') {
+        box.appendChild(neu('p', `Mit dem Schulkonto (@${info.domain}) spielt ${u.name} bei der Bestenliste der Klasse und der Schule mit. Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Spitzname und Bild – nie ein Foto.`, 'hinweis'));
+        box.appendChild(neu('p', 'Ist das Konto schon auf einem anderen Gerät benutzt worden, ersetzt sein Sterne-Stand die Sterne auf diesem Gerät.', 'hinweis'));
+        knopf(knopfZeile(), '🔑 Mit Microsoft anmelden', 'blau', async () => {
+          // Nach der Rückkehr von Microsoft weiß die App so, zu welchem Spieler die Anmeldung gehört
+          try { sessionStorage.setItem('rh-sso', JSON.stringify({ spieler: Speicher.benutzer.aktiv, server: onlineServer })); } catch (e) { /* dann ohne */ }
+          Online.ssoStarten(onlineServer);
+        });
+      } else {
+        box.appendChild(neu('p', `Mit einem Code nimmt ${u.name} an der Bestenliste der Klasse/Gruppe und der Welt teil. Online sichtbar sind nur Spitzname und Bild – nie ein Foto. Jeder Code gilt nur einmal.`, 'hinweis'));
+        const code = feld('Code', '', 'RH-XXXX-XXXX');
+        code.autocapitalize = 'characters';
+        const name = feld('Spitzname', u.name);
+        name.maxLength = 16;
+        box.appendChild(neu('p', 'Bild für die Bestenliste:', 'hinweis'));
+        const bild = bildWahl(eigenesBild);
+        knopf(knopfZeile(), '🌍 Verbinden', 'gruen', async () => {
+          if (!code.value.trim()) throw new Error('Bitte den Code eingeben.');
+          Online.verbinden(d, await Online.einloesen(onlineServer, code.value, name.value.trim(), bild()));
+          await fertig('codes');
+        });
+      }
+      serverWahl();
+      box.appendChild(meldung);
+    }
+  }
+
+  // Rückkehr von der Microsoft-Anmeldung: /#sso=<Übergabe> bzw. /#sso-fehler=<Text>
+  async function ssoRueckkehr() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (!h.has('sso') && !h.has('sso-fehler')) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    let m = null;
+    try { m = JSON.parse(sessionStorage.getItem('rh-sso')); sessionStorage.removeItem('rh-sso'); } catch (e) { m = null; }
+    if (!m || !Speicher.benutzer.liste.some((x) => x.id === m.spieler)) {
+      alert('Bitte zuerst einen Spieler wählen und dann im Eltern-Bereich nochmal mit Microsoft anmelden.');
+      return;
+    }
+    onlineServer = m.server || '';
+    benutzerStarten(m.spieler);
+    if (h.has('sso-fehler')) {
+      onlineHinweis = `❌ ${h.get('sso-fehler')}`;
+    } else if (!d.online) {
+      try {
+        const { verbindung, j } = await Online.ssoEinloesen(onlineServer, h.get('sso'));
+        Online.verbinden(d, verbindung, j.neu ? null : j);
+        d.online.art = 'bgbb';
         Speicher.speichern();
-        onlineZeigen();
-      });
-    }
-    const z = knopfZeile();
-    if (o.status === 'ok') {
-      knopf(z, '📤 Jetzt senden', 'blau', async () => {
+        sterneAnzeigen();
         await Online.senden(Speicher.benutzer.aktiv);
-        onlineZeigen();
-      });
+        onlineHinweis = '✅ Angemeldet';
+      } catch (err) {
+        onlineHinweis = `❌ ${err.message}`;
+      }
     }
-    knopf(z, 'Trennen', 'grau', async () => {
-      if (!confirm('Online-Verbindung trennen? Zum Wiederverbinden braucht es einen neuen Code.')) return;
-      d.online = null;
-      Speicher.speichern();
-      onlineZeigen();
-    });
-    box.appendChild(meldung);
+    elternOeffnen();
   }
 
   // ---------- Spieler ----------
@@ -1063,6 +1200,8 @@
     Online.senden(id);
   }
   window.addEventListener('online', () => { if (d) Online.senden(Speicher.benutzer.aktiv); });
+  // Sterne/Rekorde können von einem anderen Gerät mit demselben Konto kommen
+  Online.beiAenderung = (id) => { if (d && id === Speicher.benutzer.aktiv) sterneAnzeigen(); };
 
   function tonAnzeigen() {
     Ton.an = d.settings.ton !== false;
@@ -1137,6 +1276,7 @@
 
   // ---------- Los ----------
   benutzerZeigen();
+  ssoRueckkehr();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
