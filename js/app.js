@@ -429,11 +429,17 @@
   }
 
   // --- Auswertung ---
-  // Leistung der Runde: Sekunden pro Aufgabe (Aufgaben, kleiner = besser) bzw. netto richtige pro Minute.
+  // Zeit-Modus: je 4 Fehler ein Punkt weniger (ein Viertel pro Fehler, nur ganze Punkte),
+  // damit wildes Drücken nichts bringt, ein Vertipper aber nicht gleich kostet.
+  const FEHLER_PRO_PUNKT = 4;
+  function abzug(falsch) { return Math.floor(falsch / FEHLER_PRO_PUNKT); }
+  function zeitPunkte() { return R.richtig - abzug(R.falsch); }
+
+  // Leistung der Runde: Sekunden pro Aufgabe (Aufgaben, kleiner = besser) bzw. Punkte pro Minute.
   // null = Runde zählt nicht (weniger als die Hälfte richtig / netto nichts).
   function leistung() {
     if (istAufgaben(R.s)) return R.richtig < R.s.anzahl / 2 ? null : (R.zeit / 1000 + R.falsch * e.strafe) / R.s.anzahl;
-    const netto = (R.richtig - R.falsch) / (R.dauer / 60);
+    const netto = zeitPunkte() / (R.dauer / 60);
     return netto > 0 ? netto : null;
   }
 
@@ -516,7 +522,7 @@
       rekWert = Math.round(R.zeit / 1000 + R.falsch * e.strafe);
       if (key && R.richtig >= s.anzahl / 2 && (!alt || rekWert < alt.wert)) neuerRekord = true;
     } else {
-      rekWert = R.richtig - R.falsch;
+      rekWert = zeitPunkte();
       if (key && rekWert > 0 && (!alt || rekWert > alt.wert)) neuerRekord = true;
     }
     if (neuerRekord) {
@@ -557,6 +563,7 @@
       + kachel('✅', R.richtig, 'richtig', 'richtig')
       + kachel('❌', R.falsch, 'falsch', 'falsch')
       + '</div>'
+      + (istAufgaben(s) ? '' : punkteRechnung())
       + `<div class="erg-konto"><span class="gewinn">+${gewinn} ⭐</span>`
       + (faktor !== 1 && st > 0 ? `<small>${st} ⭐ × ${faktorText}</small>` : '')
       + `<span class="stand">Konto: ${d.sterne} ⭐</span></div>`;
@@ -581,6 +588,17 @@
       }).join('') + '</div>'
       : '';
     zeige('ergebnis');
+  }
+
+  // So kommen die Punkte im Zeit-Modus zustande, z. B. „22 richtig − 1 für 6 Fehler = 21 Punkte“
+  function punkteRechnung() {
+    const a = abzug(R.falsch);
+    const p = zeitPunkte();
+    const punkte = `${String(p).replace('-', '−')} ${p === 1 ? 'Punkt' : 'Punkte'}`;
+    const rechnung = a
+      ? `${R.richtig} richtig − ${a} für ${R.falsch} Fehler = ${punkte}`
+      : `${punkte}${R.falsch ? ` – ${R.falsch} Fehler kosten noch nichts` : ''}`;
+    return `<div class="erg-punkte"><b>${rechnung}</b><small>Je ${FEHLER_PRO_PUNKT} Fehler gibt es 1 Punkt weniger.</small></div>`;
   }
 
   $('#nochmal-runde').addEventListener('click', rundeStarten);
