@@ -35,6 +35,7 @@ const q = {
     JOIN spieler s ON s.id = k.spieler_id LEFT JOIN gruppen g ON g.id = s.gruppe_id WHERE k.hash = ?`),
   spielerPerId: db.prepare('SELECT s.*, g.name AS gruppe FROM spieler s LEFT JOIN gruppen g ON g.id = s.gruppe_id WHERE s.id = ?'),
   spielerPerName: db.prepare('SELECT * FROM spieler WHERE benutzername = ? COLLATE NOCASE'),
+  konten: db.prepare('SELECT benutzername, emoji FROM spieler WHERE benutzername IS NOT NULL AND pw_hash IS NOT NULL AND gesperrt = 0 ORDER BY benutzername COLLATE NOCASE'),
   spielerPerOid: db.prepare('SELECT * FROM spieler WHERE ms_oid = ?'),
   spielerEmail: db.prepare('UPDATE spieler SET email = ? WHERE id = ?'),
   spielerAendern: db.prepare('UPDATE spieler SET name = ?, emoji = ? WHERE id = ?'),
@@ -146,6 +147,12 @@ async function kontoAnlegen(req, res) {
   });
   if (!ergebnis) return H.fehler(res, 409, `Den Benutzernamen „${benutzer}" gibt es schon`);
   H.json(res, 200, ergebnis);
+}
+
+// Piazzi: alle Konten für „Wer rechnet?" – nur Benutzername und Bild, wie in der Bestenliste
+function kontenListe(req, res) {
+  if (!H.erlaubt(`konten:${H.ip(req)}`, 120, 3600e3)) return H.fehler(res, 429, 'Zu viele Anfragen');
+  H.json(res, 200, { konten: q.konten.all() });
 }
 
 async function anmelden(req, res) {
@@ -345,6 +352,7 @@ async function api(req, res, url) {
   if (E.ANMELDUNG === 'codes' && r === 'POST /api/einloesen') return einloesen(req, res);
   if (E.ANMELDUNG === 'piazzi' && r === 'POST /api/konto') return kontoAnlegen(req, res);
   if (E.ANMELDUNG === 'piazzi' && r === 'POST /api/anmelden') return anmelden(req, res);
+  if (E.ANMELDUNG === 'piazzi' && r === 'GET /api/konten') return kontenListe(req, res);
   if (E.ANMELDUNG === 'bgbb' && r === 'GET /api/sso/start') return ssoStart(req, res);
   if (E.ANMELDUNG === 'bgbb' && r === 'GET /api/sso/rueckruf') return ssoRueckruf(req, res, url);
   if (E.ANMELDUNG === 'bgbb' && r === 'POST /api/sso/einloesen') return ssoEinloesen(req, res);

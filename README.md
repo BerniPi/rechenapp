@@ -70,7 +70,9 @@ Lokal ohne Docker (Node 24): `ADMIN_PASSWORT=test HINTER_PROXY=0 node server/ser
 
 Derselbe Code kann drei Arten der Anmeldung; gewählt wird mit `ANMELDUNG` in der Env-Datei. Die App fragt den Server und zeigt im Eltern-Bereich die passende Anmeldung.
 
-Bei `piazzi` und `bgbb` ist das Konto **Pflicht**, wenn die App vom Server selbst ausgeliefert wird: statt „Neuer Spieler" kommt gleich Anmelden/Registrieren, Name und Bild übernimmt der Spieler vom Konto. Ältere Spieler auf dem Gerät ohne Konto müssen sich erst anmelden. Wer sich im Eltern-Bereich abmeldet, landet wieder bei der Anmeldung.
+Bei `piazzi` und `bgbb` fragt die App, wenn sie vom Server selbst ausgeliefert wird, nach „Neuer Spieler" gleich nach einem Konto (Registrieren oder Anmelden). Spielen geht auch ohne („Später"). Verbundene Spieler haben ein 🌍 am Bild neben dem Namen; ohne Konto gibt es auf dem Startbildschirm „Konto anlegen oder anmelden".
+
+Bei `piazzi` zeigt „Wer rechnet?" außerdem alle Konten des Servers (Benutzername und Bild, öffentlich abrufbar unter `/api/konten`). Wer ein Konto antippt, das noch nicht auf dem Gerät ist, gibt einmal das Passwort ein; danach ist es ein normaler Spieler auf dem Gerät.
 
 | `ANMELDUNG` | Wer darf? | Anmeldung |
 |---|---|---|

@@ -490,6 +490,17 @@ button {
   color: var(--blau);
 }
 .wer span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wer { position: relative; }
+/* 🌍 am Bild neben dem Namen: dieser Spieler hat ein Online-Konto */
+.konto-abzeichen {
+  position: absolute; left: 30px; bottom: 2px;
+  width: 20px; height: 20px; line-height: 20px;
+  border-radius: 50%;
+  background: var(--karte);
+  font-size: 13px;
+  text-align: center;
+}
+.benutzer-karte .konto-name { font-size: 14px; font-weight: 700; color: var(--leise); overflow-wrap: anywhere; }
 .wer:active { transform: translateY(3px); }
 .kopf .rechts { display: flex; align-items: center; gap: 8px; }
 

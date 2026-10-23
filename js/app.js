@@ -8,6 +8,7 @@
   // ---------- Allgemein ----------
   function zeige(id) {
     imAnmelden = id === 'anmeldung';
+    if (id === 'start') kontoTagZeigen();
     $$('.screen').forEach((s) => s.classList.toggle('aktiv', s.id === id));
     window.scrollTo(0, 0);
   }
@@ -911,11 +912,11 @@
   let onlineReiter = 'neu'; // piazzi: 'neu' oder 'anmelden'
   let onlineHinweis = '';  // Meldung, die beim nächsten Zeichnen erscheint (z. B. nach der Microsoft-Anmeldung)
   let onlineLauf = 0;
-  // Bietet der Server (dieselbe Adresse wie die App) Konten an, wird ohne Konto nicht gespielt: 'piazzi' | 'bgbb' | null.
-  // Gemerkt, damit es auch offline gilt.
-  const PFLICHT = 'rechenheld-pflicht';
-  let pflicht = null;
-  try { pflicht = localStorage.getItem(PFLICHT); } catch (err) { pflicht = null; }
+  // Bietet der Server (dieselbe Adresse wie die App) Konten an: 'piazzi' | 'bgbb' | null.
+  // Dann wird nach „Neuer Spieler" gleich ein Konto angeboten. Gemerkt, damit es auch offline gilt.
+  const KONTEN = 'rechenheld-konten';
+  let konten = null;
+  try { konten = localStorage.getItem(KONTEN); } catch (err) { konten = null; }
   let imAnmelden = false;  // die Online-Box steht gerade auf dem Anmelde-Bildschirm statt im Eltern-Bereich
   const onlineBox = () => $(imAnmelden ? '#anmeldung-box' : '#online-box');
   const verbunden = () => !!(d && d.online && d.online.status === 'ok');
@@ -1043,7 +1044,6 @@
         if (konto && Online.wartet(d)) await Online.senden(Speicher.benutzer.aktiv);
         await Online.abmelden(d);
         Speicher.speichern();
-        if (pflicht) { benutzerStarten(Speicher.benutzer.aktiv); return; }
         onlineZeigen();
       });
       box.appendChild(meldung);
@@ -1066,7 +1066,7 @@
       }
 
       if (info.anmeldung === 'piazzi') {
-        box.appendChild(neu('p', `${imAnmelden ? 'Zum Spielen braucht es ein Konto.' : `Mit einem Konto spielt ${u.name} bei der Bestenliste mit.`} Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Benutzername und Bild – nie ein Foto.`, 'hinweis'));
+        box.appendChild(neu('p', `Mit einem Konto spielt ${u.name} bei der Bestenliste mit. Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Benutzername und Bild – nie ein Foto.`, 'hinweis'));
         const reiter = knopfZeile();
         [['neu', '✨ Neues Konto'], ['anmelden', '🔑 Anmelden']].forEach(([wert, text]) => {
           const k = neu('button', text, `knopf klein ${onlineReiter === wert ? 'blau' : 'grau'}`);
@@ -1104,11 +1104,11 @@
           });
         }
       } else if (info.anmeldung === 'bgbb') {
-        box.appendChild(neu('p', `${imAnmelden ? `Zum Spielen braucht es das Schulkonto (@${info.domain}).` : `Mit dem Schulkonto (@${info.domain}) spielt ${u.name} bei der Bestenliste der Klasse und der Schule mit.`} Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Spitzname und Bild – nie ein Foto.`, 'hinweis'));
+        box.appendChild(neu('p', `Mit dem Schulkonto (@${info.domain}) spielt ${u.name} bei der Bestenliste der Klasse und der Schule mit. Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Spitzname und Bild – nie ein Foto.`, 'hinweis'));
         box.appendChild(neu('p', 'Ist das Konto schon auf einem anderen Gerät benutzt worden, ersetzt sein Sterne-Stand die Sterne auf diesem Gerät.', 'hinweis'));
         knopf(knopfZeile(), '🔑 Mit Microsoft anmelden', 'blau', async () => {
           // Nach der Rückkehr von Microsoft weiß die App so, zu welchem Spieler die Anmeldung gehört
-          try { sessionStorage.setItem('rh-sso', JSON.stringify({ spieler: Speicher.benutzer.aktiv, server: onlineServer })); } catch (e) { /* dann ohne */ }
+          try { sessionStorage.setItem('rh-sso', JSON.stringify({ spieler: Speicher.benutzer.aktiv, server: onlineServer, anmeldung: imAnmelden })); } catch (e) { /* dann ohne */ }
           Online.ssoStarten(onlineServer);
         });
       } else {
@@ -1158,45 +1158,110 @@
         onlineHinweis = `❌ ${err.message}`;
       }
     }
-    if (imAnmelden) { if (verbunden()) anmeldungFertig(); else onlineZeigen(); return; }
+    // Von der Anmelde-Seite gestartet: bei Erfolg weiter zum Spielen, sonst dorthin zurück
+    if (m.anmeldung) { if (!verbunden()) anmeldungZeigen(); return; }
     elternOeffnen();
   }
 
   // ---------- Anmelde-Bildschirm (Server mit Konten) ----------
-  // Neue Spieler entstehen dort als Platzhalter ohne Namen; Name und Bild kommen nach dem Anmelden vom Konto.
-  const platzhalter = (u) => !!u && u.name === '';
+  // Kommt gleich nach „Neuer Spieler" und über ➕ Konto neben dem Namen; ohne Konto spielen geht trotzdem.
+  let kontoWahl = null; // Piazzi: bestehendes Konto aus „Wer rechnet?", das zum ersten Mal auf dieses Gerät kommt
   function anmeldungZeigen() {
-    const andere = Speicher.benutzer.liste.some((x) => x.id !== Speicher.benutzer.aktiv);
-    $('#anmeldung-zurueck').classList.toggle('unsichtbar', !andere);
+    kontoWahl = null;
+    $('#anmeldung-spaeter').classList.remove('versteckt');
     zeige('anmeldung');
     onlineZeigen();
   }
   function anmeldungFertig() {
-    const u = Speicher.aktiverBenutzer();
-    if (platzhalter(u)) {
-      u.name = d.online.benutzername || d.online.name;
-      u.bild = { art: 'emoji', wert: d.online.emoji };
-      Speicher.benutzerSpeichern();
-    }
-    benutzerStarten(u.id);
+    if (kontoWahl) { kontoWahl = null; benutzerZeigen(); return; }
+    benutzerStarten(Speicher.benutzer.aktiv);
   }
-  $('#anmeldung-zurueck').addEventListener('click', () => {
-    const u = Speicher.aktiverBenutzer();
-    if (platzhalter(u) && !d.online) Speicher.benutzerLoeschen(u.id);
-    benutzerZeigen();
-  });
+  $('#anmeldung-zurueck').addEventListener('click', anmeldungFertig);
+  $('#anmeldung-spaeter').addEventListener('click', anmeldungFertig);
 
-  // Fragt den eigenen Server, ob er Konten verlangt; ändert sich das, gleich umschalten
-  function pflichtPruefen() {
+  // Nur beim ersten Mal auf dem Gerät: Passwort, dann wird daraus ein Spieler hier, der verbunden bleibt
+  function kontoWaehlen(k) {
+    kontoWahl = k;
+    onlineLauf++; // eine noch laufende Online-Box nicht mehr hierher zeichnen
+    $('#anmeldung-spaeter').classList.add('versteckt');
+    zeige('anmeldung');
+    const box = $('#anmeldung-box');
+    box.innerHTML = '';
+    const hinweis = document.createElement('p');
+    hinweis.className = 'online-status';
+    hinweis.textContent = `${k.emoji} ${k.benutzername}`;
+    const erklaerung = document.createElement('p');
+    erklaerung.className = 'hinweis';
+    erklaerung.textContent = 'Zum ersten Mal auf diesem Gerät – bitte das Passwort eingeben. Danach geht es hier ohne Passwort.';
+    const l = document.createElement('label');
+    l.textContent = 'Passwort';
+    const pw = document.createElement('input');
+    pw.type = 'password';
+    pw.className = 'text';
+    pw.autocomplete = 'current-password';
+    l.appendChild(pw);
+    const meldung = document.createElement('p');
+    meldung.className = 'hinweis online-meldung';
+    const zeile = document.createElement('div');
+    zeile.className = 'zeile';
+    const los = document.createElement('button');
+    los.className = 'knopf klein gruen';
+    los.textContent = '🔑 Anmelden';
+    zeile.appendChild(los);
+    box.append(hinweis, erklaerung, l, zeile, meldung);
+    const anmelden = async () => {
+      if (!pw.value) { meldung.textContent = '❌ Bitte das Passwort eingeben.'; return; }
+      los.disabled = true;
+      meldung.textContent = '';
+      try {
+        const { verbindung, j } = await Online.anmelden('', k.benutzername, pw.value);
+        if (kontoWahl !== k) return;
+        const u = Speicher.benutzerAnlegen(verbindung.benutzername || k.benutzername, { art: 'emoji', wert: verbindung.emoji || k.emoji });
+        d = Speicher.waehlen(u.id);
+        Online.verbinden(d, verbindung, j);
+        d.online.art = 'piazzi';
+        Speicher.speichern();
+        kontoWahl = null;
+        Ton.klick();
+        benutzerStarten(u.id);
+      } catch (err) {
+        meldung.textContent = `❌ ${err.message}`;
+      }
+      los.disabled = false;
+    };
+    los.addEventListener('click', anmelden);
+    pw.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') anmelden(); });
+    pw.focus();
+  }
+
+  // Neben dem Namen: 🌍 am Bild, wenn verbunden; sonst (wenn der Server Konten anbietet) ein Knopf zum Anlegen
+  function kontoTagZeigen() {
+    const o = d && d.online;
+    const wer = $('#wer');
+    let abz = wer.querySelector('.konto-abzeichen');
+    if (o && !abz) {
+      abz = document.createElement('span');
+      abz.className = 'konto-abzeichen';
+      wer.insertBefore(abz, wer.firstChild.nextSibling); // der Name bleibt das letzte span (Kürzen mit …)
+    }
+    if (abz && !o) abz.remove();
+    if (o) abz.textContent = o.status === 'ok' ? '🌍' : '⚠️';
+    wer.title = o ? `Spieler wechseln – Online-Konto ${o.benutzername || o.name}` : 'Spieler wechseln';
+    $('#konto-anlegen').classList.toggle('versteckt', !!o || !konten);
+  }
+  $('#konto-anlegen').addEventListener('click', () => { Ton.klick(); anmeldungZeigen(); });
+
+  // Fragt den eigenen Server, ob er Konten anbietet
+  function kontenPruefen() {
     Online.info('').then((info) => {
       const neu = info.anmeldung === 'codes' ? null : info.anmeldung;
-      if (neu === pflicht) return;
-      pflicht = neu;
-      try { if (pflicht) localStorage.setItem(PFLICHT, pflicht); else localStorage.removeItem(PFLICHT); } catch (err) { /* egal */ }
-      const aktiv = $('.screen.aktiv');
-      if (pflicht && aktiv && aktiv.id === 'neu') neuOeffnen();
-      else if (pflicht && aktiv && aktiv.id === 'start' && !verbunden()) anmeldungZeigen();
-      else if (!pflicht && imAnmelden) benutzerStarten(Speicher.benutzer.aktiv);
+      if (neu === konten) return;
+      konten = neu;
+      try { if (konten) localStorage.setItem(KONTEN, konten); else localStorage.removeItem(KONTEN); } catch (err) { /* egal */ }
+      if (d) kontoTagZeigen();
+      // Piazzi: bestehende Konten in „Wer rechnet?" zeigen
+      const aktiv = $('.screen.aktiv').id;
+      if (aktiv === 'benutzer' || (aktiv === 'neu' && !Speicher.benutzer.liste.length)) benutzerZeigen();
     }, () => { /* kein eigener Server oder offline: beim Gemerkten bleiben */ });
   }
 
@@ -1220,7 +1285,7 @@
   let loeschModus = false;
   function benutzerZeigen() {
     const liste = Speicher.benutzerLaden();
-    if (!liste.length) { neuOeffnen(); return; }
+    if (!liste.length && konten !== 'piazzi') { neuOeffnen(); return; }
     const box = $('#benutzer-liste');
     box.innerHTML = '';
     box.classList.toggle('loeschen', loeschModus);
@@ -1232,6 +1297,13 @@
       n.className = 'name';
       n.textContent = u.name;
       k.appendChild(n);
+      const o = (Speicher.datenVon(u.id) || {}).online;
+      if (o) {
+        const kn = document.createElement('span');
+        kn.className = 'konto-name';
+        kn.textContent = `🌍 ${o.benutzername || o.name}`;
+        k.appendChild(kn);
+      }
       if (loeschModus) {
         const x = document.createElement('span');
         x.className = 'weg';
@@ -1248,7 +1320,38 @@
       box.appendChild(k);
     });
     $('#benutzer-bearbeiten').textContent = loeschModus ? '✔️ Fertig mit Löschen' : '🗑️ Spieler löschen';
+    $('#benutzer-bearbeiten').classList.toggle('versteckt', !liste.length);
     zeige('benutzer');
+    if (konten === 'piazzi' && !loeschModus) kontenAnzeigen(box, liste);
+  }
+
+  // Piazzi: Konten, die noch nicht auf diesem Gerät sind, als eigene Karten dazu
+  let kontenLauf = 0;
+  function kontenAnzeigen(box, liste) {
+    const lauf = ++kontenLauf;
+    const hier = new Set(liste.map((u) => ((Speicher.datenVon(u.id) || {}).online || {}).benutzername)
+      .filter(Boolean).map((n) => n.toLowerCase()));
+    const aktuell = () => lauf === kontenLauf && $('.screen.aktiv').id === 'benutzer';
+    Online.konten('').then((alle) => {
+      if (!aktuell()) return;
+      const fremd = alle.filter((k) => !hier.has(k.benutzername.toLowerCase()));
+      if (!liste.length && !fremd.length) { neuOeffnen(); return; }
+      fremd.forEach((k) => {
+        const karte = document.createElement('button');
+        karte.className = 'benutzer-karte';
+        karte.appendChild(avatar({ bild: { art: 'emoji', wert: k.emoji } }));
+        const n = document.createElement('span');
+        n.className = 'name';
+        n.textContent = k.benutzername;
+        karte.appendChild(n);
+        const kn = document.createElement('span');
+        kn.className = 'konto-name';
+        kn.textContent = '🔑 Konto';
+        karte.appendChild(kn);
+        karte.addEventListener('click', () => { Ton.klick(); kontoWaehlen(k); });
+        box.appendChild(karte);
+      });
+    }, () => { if (aktuell() && !liste.length) neuOeffnen(); });
   }
 
   function benutzerStarten(id) {
@@ -1267,12 +1370,11 @@
     tonAnzeigen();
     // Liegengebliebenes nachschicken und Gruppe/Sperre auffrischen
     Online.senden(id);
-    if (pflicht && !verbunden()) { anmeldungZeigen(); return; }
     zeige('start');
   }
   window.addEventListener('online', () => { if (d) Online.senden(Speicher.benutzer.aktiv); });
   // Sterne/Rekorde können von einem anderen Gerät mit demselben Konto kommen
-  Online.beiAenderung = (id) => { if (d && id === Speicher.benutzer.aktiv) sterneAnzeigen(); };
+  Online.beiAenderung = (id) => { if (d && id === Speicher.benutzer.aktiv) { sterneAnzeigen(); kontoTagZeigen(); } };
 
   function tonAnzeigen() {
     Ton.an = d.settings.ton !== false;
@@ -1302,7 +1404,6 @@
   }
   function neuOeffnen() {
     neuBild = { art: 'emoji', wert: BILDER[Math.floor(Math.random() * BILDER.length)] };
-    if (pflicht) { benutzerStarten(Speicher.benutzerAnlegen('', neuBild).id); return; }
     $('#neu-name').value = '';
     $('#neu-hinweis').classList.toggle('versteckt', !Speicher.hatAlteDaten());
     $('#neu-zurueck').classList.toggle('unsichtbar', !Speicher.benutzer.liste.length);
@@ -1344,17 +1445,13 @@
     const u = Speicher.benutzerAnlegen(name, neuBild);
     Ton.klick();
     benutzerStarten(u.id);
+    if (konten) anmeldungZeigen();
   });
 
   // ---------- Los ----------
-  // Abgebrochene Anmeldungen aufräumen – außer der, die gerade von Microsoft zurückkommt
-  let ssoSpieler = null;
-  try { ssoSpieler = (JSON.parse(sessionStorage.getItem('rh-sso')) || {}).spieler; } catch (err) { ssoSpieler = null; }
-  Speicher.benutzerLaden().filter((u) => platzhalter(u) && u.id !== ssoSpieler && !(Speicher.datenVon(u.id) || {}).online)
-    .forEach((u) => Speicher.benutzerLoeschen(u.id));
   benutzerZeigen();
   ssoRueckkehr();
-  pflichtPruefen();
+  kontenPruefen();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

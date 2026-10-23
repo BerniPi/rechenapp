@@ -58,6 +58,10 @@ const Online = {
     };
   },
 
+  // Piazzi: alle Konten (Benutzername, Bild) für „Wer rechnet?"
+  async konten(server) {
+    return (await this.muss(server, 'GET', 'konten')).konten || [];
+  },
   async einloesen(server, code, name, emoji) {
     return this.verbindung(server, await this.muss(server, 'POST', 'einloesen', { body: { code, name, emoji } }), true);
   },
