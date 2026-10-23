@@ -57,7 +57,8 @@ const neuerSchluessel = () => crypto.randomBytes(32).toString('base64url');
 const neueId = () => crypto.randomBytes(9).toString('base64url');
 
 // Dieselbe Bilder-Liste wie in der App (js/app.js BILDER) – keine Fotos, keine beliebigen Zeichen.
-const EMOJIS = ['🚗', '✈️', '🐴', '🦄', '🚀', '🚒', '🚜', '🐶', '🐱', '🦁', '🐼', '🦊', '🐸', '🦖', '🐬', '🦋', '⚽', '🌈', '🙂'];
+const EMOJIS = ['🚗', '✈️', '🐴', '🦄', '🚀', '🚒', '🚜', '🐶', '🐱', '🦁', '🐼', '🦊', '🐸', '🦖', '🐬', '🦋', '⚽', '🌈', '🙂',
+  '🐰', '🐻', '🐨', '🐯', '🐮', '🐷', '🐵', '🐧', '🐢', '🐙', '🦈', '🐳', '🦒', '🐘', '🦓', '🦔', '🐝', '🐞', '🦜', '🦉', '🐲', '🦕', '🌻', '🍓', '🍕', '🍦', '🎈', '🌙', '🏀', '🎸', '🚂', '🚁', '⛵', '👑', '🧸', '🎨', '🤖', '👻'];
 
 function name(n) {
   const s = String(n || '').normalize('NFC').replace(/\s+/g, ' ').trim();

@@ -347,6 +347,13 @@ button {
 .eltern-inhalt input[type="checkbox"] { width: 28px; height: 28px; flex: none; accent-color: var(--blau, #3b6fe0); }
 .eltern-inhalt .zeile { display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 24px; }
 .hinweis { color: var(--leise); margin: 0; font-size: 15px; }
+.pin-inhalt { display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; text-align: center; }
+.pin-frage { font-size: 22px; font-weight: 800; margin: 20px 0 0; overflow-wrap: anywhere; }
+.pin-eingabe {
+  width: 180px; font: inherit; font-size: 36px; font-weight: 800; letter-spacing: 10px; text-align: center;
+  padding: 10px; border-radius: 14px; border: 3px solid var(--grau); background: var(--karte);
+}
+.pin-inhalt .aktionen { width: 100%; }
 .schwellen { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
 .verlauf { font-size: 15px; background: var(--karte); border-radius: 12px; padding: 8px; max-height: 360px; overflow: auto; }
 .verlauf table { width: 100%; border-collapse: collapse; }
@@ -578,3 +585,6 @@ button {
 .listen-tabs button { background: var(--karte); border-radius: 99px; padding: 6px 14px; font-weight: 800; font-size: 16px; box-shadow: var(--schatten); }
 .listen-tabs button.an { background: var(--blau); color: #fff; }
 .listen-info { text-align: center; color: var(--leise); font-size: 14px; margin: 6px 0 0; }
+.hs-listen { display: flex; flex-direction: column; gap: 18px; padding-bottom: 30px; }
+.hs-listen .bestenliste h3 { text-transform: none; letter-spacing: 0; }
+.hs-listen .bestenliste.meine h3 { color: var(--blau); }

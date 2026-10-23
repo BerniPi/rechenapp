@@ -56,6 +56,10 @@ const q = {
     WHERE r.key = ? AND s.gesperrt = 0`),
   listeGruppe: db.prepare(`SELECT s.id, s.name, s.emoji, r.wert, r.datum FROM rekorde r JOIN spieler s ON s.id = r.spieler_id
     WHERE r.key = ? AND s.gesperrt = 0 AND s.gruppe_id = ?`),
+  alleRekorde: db.prepare(`SELECT s.id, s.name, s.emoji, r.key, r.wert, r.datum FROM rekorde r JOIN spieler s ON s.id = r.spieler_id
+    WHERE s.gesperrt = 0`),
+  alleRekordeGruppe: db.prepare(`SELECT s.id, s.name, s.emoji, r.key, r.wert, r.datum FROM rekorde r JOIN spieler s ON s.id = r.spieler_id
+    WHERE s.gesperrt = 0 AND s.gruppe_id = ?`),
 };
 
 // Bearer-Schlüssel (eines Geräts) → Spieler; sonst Antwort 401/403 und null
@@ -304,6 +308,32 @@ function liste(req, res, url) {
   H.json(res, 200, { top, ich: i >= 0 ? zeile(alle[i], i) : null, gesamt: alle.length, gruppe: inGruppe ? s.gruppe : null });
 }
 
+// Highscore-Seite: alle Kategorien auf einmal, je die besten 5 und der eigene Platz
+function bestenlisten(req, res, url) {
+  const s = spielerAus(req, res);
+  if (!s) return;
+  if (!H.erlaubt(`liste:${s.id}`, 60, 60e3)) return H.fehler(res, 429, 'Zu viele Anfragen');
+  const inGruppe = url.searchParams.get('bereich') === 'gruppe';
+  if (inGruppe && !s.gruppe_id) return H.fehler(res, 400, 'Keine Gruppe');
+  const nachKey = new Map();
+  for (const x of inGruppe ? q.alleRekordeGruppe.all(s.gruppe_id) : q.alleRekorde.all()) {
+    if (!nachKey.has(x.key)) nachKey.set(x.key, []);
+    nachKey.get(x.key).push(x);
+  }
+  const zeile = (x, i) => ({ platz: i + 1, name: x.name, emoji: x.emoji, wert: x.wert, ich: x.id === s.id });
+  const listen = [];
+  for (const [key, alle] of nachKey) {
+    const k = H.rekordKey(key);
+    if (!k) continue;
+    const klein = H.kleinerBesser(k.art);
+    alle.sort((a, b) => (klein ? a.wert - b.wert : b.wert - a.wert) || a.datum - b.datum);
+    const i = alle.findIndex((x) => x.id === s.id);
+    listen.push({ key, top: alle.slice(0, 5).map(zeile), ich: i >= 0 ? zeile(alle[i], i) : null, gesamt: alle.length });
+  }
+  listen.sort((a, b) => b.gesamt - a.gesamt || a.key.localeCompare(b.key));
+  H.json(res, 200, { listen, gruppe: inGruppe ? s.gruppe : null });
+}
+
 async function ich(req, res) {
   const s = spielerAus(req, res);
   if (!s) return;
@@ -358,6 +388,7 @@ async function api(req, res, url) {
   if (E.ANMELDUNG === 'bgbb' && r === 'POST /api/sso/einloesen') return ssoEinloesen(req, res);
   if (r === 'POST /api/sync') return sync(req, res);
   if (r === 'GET /api/liste') return liste(req, res, url);
+  if (r === 'GET /api/bestenlisten') return bestenlisten(req, res, url);
   if (r === 'GET /api/ich' || r === 'PATCH /api/ich' || r === 'DELETE /api/ich') return ich(req, res);
   H.fehler(res, 404, 'Gibt es nicht');
 }

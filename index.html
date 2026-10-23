@@ -61,7 +61,7 @@
 <!-- ============ START ============ -->
 <section id="start" class="screen">
   <header class="kopf">
-    <button id="eltern-knopf" class="rund klein" title="Eltern (lange drücken)">⚙️</button>
+    <button id="eltern-knopf" class="rund klein" title="Eltern">⚙️</button>
     <button id="wer" class="wer" title="Spieler wechseln"></button>
     <div class="rechts">
       <button id="ton-knopf" class="rund klein" title="Ton aus" aria-label="Ton aus">🔊</button>
@@ -122,6 +122,7 @@
   <div class="aktionen">
     <button id="los" class="knopf gross gruen">Los geht's! 🚀</button>
     <button id="zu-spielen" class="knopf lila">🎮 Spiele</button>
+    <button id="zu-highscores" class="knopf blau versteckt">🏆 Bestenliste</button>
     <button id="konto-anlegen" class="knopf klein grau versteckt">🌍 Konto anlegen oder anmelden</button>
   </div>
 </section>
@@ -202,6 +203,36 @@
   </div>
 </section>
 
+<!-- ============ HIGHSCORES (vom Server) ============ -->
+<section id="highscores" class="screen">
+  <header class="kopf">
+    <button class="rund klein zurueck-start" title="Zurück">⬅</button>
+    <h1>Bestenliste</h1>
+    <div></div>
+  </header>
+  <div id="hs-tabs" class="listen-tabs"></div>
+  <p id="hs-info" class="listen-info"></p>
+  <div id="hs-listen" class="hs-listen"></div>
+</section>
+
+<!-- ============ ELTERN-PIN ============ -->
+<section id="pin" class="screen">
+  <header class="kopf">
+    <button class="rund klein zurueck-start" title="Zurück">⬅</button>
+    <h1>Eltern</h1>
+    <div></div>
+  </header>
+  <div class="pin-inhalt">
+    <p id="pin-frage" class="pin-frage"></p>
+    <input id="pin-eingabe" class="pin-eingabe" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+    <p id="pin-meldung" class="hinweis"></p>
+    <div class="aktionen">
+      <button id="pin-ok" class="knopf gross gruen">OK</button>
+      <button id="pin-vergessen" class="knopf klein grau">PIN vergessen?</button>
+    </div>
+  </div>
+</section>
+
 <!-- ============ ELTERN ============ -->
 <section id="eltern" class="screen">
   <header class="kopf">
@@ -221,6 +252,9 @@
 
     <h2>Online-Bestenliste</h2>
     <div id="online-box" class="online-box"></div>
+
+    <h2>Eltern-PIN</h2>
+    <div class="zeile"><button id="pin-aendern" class="knopf klein">🔒 PIN ändern</button></div>
 
     <h2>Sprache</h2>
     <label>Spracherkennung

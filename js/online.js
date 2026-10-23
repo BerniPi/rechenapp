@@ -207,6 +207,16 @@ const Online = {
     } catch (e) { return null; }
   },
 
+  // Alle Kategorien auf einmal (Highscore-Seite); null = gerade nicht erreichbar
+  async bestenlisten(d, bereich = 'welt') {
+    const o = d.online;
+    if (!o || o.status !== 'ok') return null;
+    try {
+      const r = await this.anfrage(o.server, 'GET', `bestenlisten?bereich=${bereich}`, { schluessel: o.schluessel });
+      return r.status === 200 ? r.j : null;
+    } catch (e) { return null; }
+  },
+
   async aendern(d, name, emoji) {
     const o = d.online;
     const j = await this.muss(o.server, 'PATCH', 'ich', { body: { name, emoji }, schluessel: o.schluessel });

@@ -144,16 +144,71 @@
     $('#rekord-info').textContent = text;
   }
 
-  // Eltern-Knopf: lange drücken
-  (() => {
-    const k = $('#eltern-knopf');
-    let t = null;
-    const weg = () => { clearTimeout(t); t = null; };
-    k.addEventListener('pointerdown', () => { t = setTimeout(() => { t = null; elternOeffnen(); }, 1500); });
-    k.addEventListener('pointerup', () => { if (t) { weg(); $('#rekord-info').textContent = 'Eltern-Bereich: Knopf lange drücken'; setTimeout(rekordInfo, 2000); } });
-    k.addEventListener('pointerleave', weg);
-    k.addEventListener('contextmenu', (ev) => ev.preventDefault());
-  })();
+  // Eltern-Knopf: geschützt mit einer 4-stelligen PIN (für das ganze Gerät).
+  // Beim ersten Mal wird sie festgelegt. Vergessen: eine Zahl in Worten eintippen – das lesen kleine Kinder noch nicht.
+  const PIN = 'rechenheld-pin';
+  let pinSchritt = null; // 'pruefen' | 'neu' | 'wiederholen' | 'vergessen'
+  let pinNeu = '';
+  let pinZahl = 0;
+  const pinGespeichert = () => { try { return localStorage.getItem(PIN); } catch (err) { return null; } };
+  function zahlInWorten(n) {
+    const E = ['', 'ein', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun'];
+    const ZEHNER = ['zehn', 'elf', 'zwölf', 'dreizehn', 'vierzehn', 'fünfzehn', 'sechzehn', 'siebzehn', 'achtzehn', 'neunzehn'];
+    const Z = ['', '', 'zwanzig', 'dreißig', 'vierzig', 'fünfzig', 'sechzig', 'siebzig', 'achtzig', 'neunzig'];
+    const r = n % 100;
+    const rest = r === 0 ? '' : r === 1 ? 'eins' : r < 10 ? E[r] : r < 20 ? ZEHNER[r - 10]
+      : `${r % 10 ? `${E[r % 10]}und` : ''}${Z[Math.floor(r / 10)]}`;
+    return `${E[Math.floor(n / 100)]}hundert${rest}`;
+  }
+  function pinZeigen(schritt, meldung = '') {
+    pinSchritt = schritt;
+    const ein = $('#pin-eingabe');
+    ein.value = '';
+    ein.type = schritt === 'vergessen' ? 'text' : 'password';
+    if (schritt === 'vergessen') pinZahl = 100 + Math.floor(Math.random() * 900);
+    $('#pin-frage').textContent = {
+      pruefen: '🔒 Eltern-PIN eingeben',
+      neu: '🔒 Neue Eltern-PIN (4 Ziffern) festlegen',
+      wiederholen: '🔒 PIN zur Sicherheit wiederholen',
+      vergessen: `Tippe diese Zahl in Ziffern: ${zahlInWorten(pinZahl)}`,
+    }[schritt];
+    ein.maxLength = schritt === 'vergessen' ? 3 : 4;
+    $('#pin-meldung').textContent = meldung;
+    $('#pin-vergessen').classList.toggle('versteckt', schritt !== 'pruefen');
+    zeige('pin');
+    ein.focus();
+  }
+  function pinOk() {
+    const v = $('#pin-eingabe').value.trim();
+    const falsch = (text) => { Ton.falsch(); pinZeigen(pinSchritt, text); };
+    if (pinSchritt === 'vergessen') {
+      if (Number(v) !== pinZahl) { falsch('❌ Stimmt nicht – hier ist eine neue Zahl.'); return; }
+      pinZeigen('neu');
+      return;
+    }
+    if (!/^\d{4}$/.test(v)) { falsch('Bitte genau 4 Ziffern.'); return; }
+    if (pinSchritt === 'pruefen') {
+      if (v !== pinGespeichert()) { falsch('❌ Falsche PIN'); return; }
+      Ton.klick();
+      elternOeffnen();
+    } else if (pinSchritt === 'neu') {
+      pinNeu = v;
+      pinZeigen('wiederholen');
+    } else if (v !== pinNeu) {
+      falsch('❌ Die PINs sind verschieden – bitte nochmal.');
+      pinSchritt = 'neu';
+      $('#pin-frage').textContent = '🔒 Neue Eltern-PIN (4 Ziffern) festlegen';
+    } else {
+      try { localStorage.setItem(PIN, v); } catch (err) { /* privat/voll */ }
+      Ton.klick();
+      elternOeffnen();
+    }
+  }
+  $('#eltern-knopf').addEventListener('click', () => { Ton.klick(); pinZeigen(pinGespeichert() ? 'pruefen' : 'neu'); });
+  $('#pin-ok').addEventListener('click', pinOk);
+  $('#pin-eingabe').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') pinOk(); });
+  $('#pin-vergessen').addEventListener('click', () => pinZeigen('vergessen'));
+  $('#pin-aendern').addEventListener('click', () => pinZeigen('neu'));
 
   $('#los').addEventListener('click', rundeStarten);
   $('#zu-spielen').addEventListener('click', spieleOeffnen);
@@ -641,20 +696,7 @@
     }
     const ol = document.createElement('ol');
     box.appendChild(ol);
-    const eintrag = (platz, u, name, wert, ich) => {
-      const li = document.createElement('li');
-      if (ich) li.className = 'ich';
-      const p = document.createElement('span');
-      p.className = 'platz';
-      p.textContent = ['🥇', '🥈', '🥉'][platz - 1] || `${platz}.`;
-      const n = document.createElement('span');
-      n.className = 'name';
-      n.textContent = name;
-      const w = document.createElement('span');
-      w.textContent = rekordWert(wert, s);
-      li.append(p, avatar(u, 'klein'), n, w);
-      ol.appendChild(li);
-    };
+    const eintrag = (platz, u, name, wert, ich) => listenEintrag(ol, platz, u, name, rekordWert(wert, s), ich);
 
     if (welche === 'geraet') {
       geraet.slice(0, 5).forEach((x, i) => eintrag(i + 1, x.benutzer, x.benutzer.name, x.wert, x.benutzer.id === Speicher.benutzer.aktiv));
@@ -675,6 +717,81 @@
       info.textContent = j.gesamt ? `${j.gesamt} ${j.gesamt === 1 ? 'Kind' : 'Kinder'} in dieser Liste` : 'Noch niemand in dieser Liste – sei der Erste!';
     });
   }
+
+  function listenEintrag(ol, platz, u, name, wertText, ich) {
+    const li = document.createElement('li');
+    if (ich) li.className = 'ich';
+    const p = document.createElement('span');
+    p.className = 'platz';
+    p.textContent = ['🥇', '🥈', '🥉'][platz - 1] || `${platz}.`;
+    const n = document.createElement('span');
+    n.className = 'name';
+    n.textContent = name;
+    const w = document.createElement('span');
+    w.textContent = wertText;
+    li.append(p, avatar(u, 'klein'), n, w);
+    ol.appendChild(li);
+  }
+
+  // ---------- Highscores: alle Kategorien vom Server ----------
+  // Kategorie = Rekord-Schlüssel „modus|art|ops|raum|E", z. B. „schrift|zehn|+-|20|"
+  const REKORD_ART = { zehn: '10 Aufgaben', a20: '20 Aufgaben', m1: '1 Minute', m5: '5 Minuten' };
+  function kategorieText(key) {
+    const [modus, art, ops, raum, ein] = key.split('|');
+    // Kein „·" als Trenner – das ist schon das Malzeichen
+    return `${modus === 'sprache' ? '🎤' : '⌨️'} ${REKORD_ART[art]}: ${[...ops].map((o) => OP_NAME[o]).join(' ')} bis ${raum}${ein ? ', Einsetzen' : ''}`;
+  }
+  const kategorieWert = (key, wert) => (['zehn', 'a20'].includes(key.split('|')[1]) ? fmt(wert) : `${wert} Punkte`);
+
+  let hsBereich = 'welt';
+  let hsLauf = 0;
+  function highscoresZeigen() {
+    const o = d.online;
+    const reiter = [['welt', '🌍 Welt']];
+    if (o.gruppe) reiter.unshift(['gruppe', `👥 ${o.gruppe}`]);
+    if (!reiter.some(([w]) => w === hsBereich)) hsBereich = 'welt';
+    const tabs = $('#hs-tabs');
+    tabs.innerHTML = '';
+    reiter.forEach(([w, text]) => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.classList.toggle('an', hsBereich === w);
+      b.addEventListener('click', () => { Ton.klick(); hsBereich = w; highscoresZeigen(); });
+      tabs.appendChild(b);
+    });
+    tabs.classList.toggle('versteckt', reiter.length < 2);
+    const box = $('#hs-listen');
+    box.innerHTML = '';
+    $('#hs-info').textContent = '⏳ wird geladen …';
+    zeige('highscores');
+    const lauf = ++hsLauf;
+    const daten = d;
+    Online.bestenlisten(daten, hsBereich).then((j) => {
+      if (lauf !== hsLauf || daten !== d) return;
+      if (!j) { $('#hs-info').textContent = 'Gerade keine Verbindung zur Bestenliste.'; return; }
+      // Die Kategorie der eigenen Einstellung zuerst
+      const meine = rekordSchluessel(d.settings);
+      const listen = [...j.listen].sort((a, b) => (b.key === meine) - (a.key === meine));
+      $('#hs-info').textContent = listen.length ? '' : 'Noch keine Rekorde – sei der Erste!';
+      const u = (x) => ({ bild: { art: 'emoji', wert: x.emoji } });
+      listen.forEach((l) => {
+        const block = document.createElement('div');
+        block.className = `bestenliste${l.key === meine ? ' meine' : ''}`;
+        const h = document.createElement('h3');
+        h.textContent = kategorieText(l.key);
+        const ol = document.createElement('ol');
+        block.append(h, ol);
+        l.top.forEach((x) => listenEintrag(ol, x.platz, u(x), x.name, kategorieWert(l.key, x.wert), x.ich));
+        if (l.ich && l.ich.platz > l.top.length) listenEintrag(ol, l.ich.platz, u(l.ich), l.ich.name, kategorieWert(l.key, l.ich.wert), true);
+        const info = document.createElement('p');
+        info.className = 'listen-info';
+        info.textContent = `${l.gesamt} ${l.gesamt === 1 ? 'Kind' : 'Kinder'}${l.key === meine ? ' · deine Einstellung' : ''}`;
+        block.appendChild(info);
+        box.appendChild(block);
+      });
+    });
+  }
+  $('#zu-highscores').addEventListener('click', () => { Ton.klick(); highscoresZeigen(); });
 
   // ---------- Spiele ----------
   function spieleOeffnen() {
@@ -1248,6 +1365,7 @@
     if (o) abz.textContent = o.status === 'ok' ? '🌍' : '⚠️';
     wer.title = o ? `Spieler wechseln – Online-Konto ${o.benutzername || o.name}` : 'Spieler wechseln';
     $('#konto-anlegen').classList.toggle('versteckt', !!o || !konten);
+    $('#zu-highscores').classList.toggle('versteckt', !(o && o.status === 'ok'));
   }
   $('#konto-anlegen').addEventListener('click', () => { Ton.klick(); anmeldungZeigen(); });
 
@@ -1266,7 +1384,8 @@
   }
 
   // ---------- Spieler ----------
-  const BILDER = ['🚗', '✈️', '🐴', '🦄', '🚀', '🚒', '🚜', '🐶', '🐱', '🦁', '🐼', '🦊', '🐸', '🦖', '🐬', '🦋', '⚽', '🌈'];
+  const BILDER = ['🚗', '✈️', '🐴', '🦄', '🚀', '🚒', '🚜', '🐶', '🐱', '🦁', '🐼', '🦊', '🐸', '🦖', '🐬', '🦋', '⚽', '🌈',
+    '🐰', '🐻', '🐨', '🐯', '🐮', '🐷', '🐵', '🐧', '🐢', '🐙', '🦈', '🐳', '🦒', '🐘', '🦓', '🦔', '🐝', '🐞', '🦜', '🦉', '🐲', '🦕', '🌻', '🍓', '🍕', '🍦', '🎈', '🌙', '🏀', '🎸', '🚂', '🚁', '⛵', '👑', '🧸', '🎨', '🤖', '👻'];
 
   function avatar(u, klasse = '') {
     const el = document.createElement('span');

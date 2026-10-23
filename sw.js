@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar.
 // Bei jeder Änderung an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'rechenheld-20';
+const VERSION = 'rechenheld-22';
 // Sprachmodell, Vosk-Bibliothek und Stimm-Schnipsel, bleibt über Updates erhalten.
 // Werden Dateien darin ausgetauscht (z. B. audio/jonas neu erzeugt), Namen erhöhen.
 const GROSS = 'rechenheld-gross-1';

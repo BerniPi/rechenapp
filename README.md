@@ -8,7 +8,7 @@ Rechen-Trainer für die Volksschule als Web-App (PWA) – ohne Build-Schritt, re
 - **Spieler**: Beim Start Spieler wählen, anlegen (Name + Foto oder Bild) oder löschen. Alles wird pro Spieler gespeichert; die Bestenliste vergleicht alle Spieler auf dem Gerät.
 - Rechenarten + − · : (mischbar), Zahlenraum 10/20/50/100, Einsetzaufgaben.
 - 1–5 Sterne pro Runde → Sterne sind Währung für Minispiele: Flattervogel, Apfelschlange, Farbblöcke, Tierturm, Schrauben, Ausparken.
-- **Eltern-Bereich**: Zahnrad oben links **lange drücken** – Sterne-Schwellen, Spielpreis (mind. 10 ⭐ für genau eine Runde), Verlauf.
+- **Eltern-Bereich**: Zahnrad oben links, geschützt mit einer **Eltern-PIN** (beim ersten Mal festlegen; vergessen → eine Zahl in Worten eintippen) – Sterne-Schwellen, Spielpreis (mind. 10 ⭐ für genau eine Runde), Verlauf.
 
 ## Lokal starten
 
@@ -56,7 +56,7 @@ docker compose -f server/docker-compose.yml up -d --build
 
 Der Container hört nur auf `127.0.0.1:8080`; im Reverse-Proxy z. B. `https://rechnen.example.at` → `http://127.0.0.1:8080` eintragen (HTTPS macht der Proxy). Wer `/admin` zusätzlich schützen will, kann es im Proxy auf Heim-IP/VPN beschränken.
 
-- **Gruppen** (z. B. Klassen 1a, 1b): auf der Admin-Seite anlegen; beim Erzeugen eines Codes die Gruppe wählen – das Kind landet beim Einlösen darin. Jede Gruppe hat in der App ihre eigene Bestenliste (Reiter 👥 1a neben 🏠 Hier und 🌍 Welt). Spieler lassen sich später in eine andere Gruppe verschieben.
+- **Gruppen** (z. B. Klassen 1a, 1b): auf der Admin-Seite anlegen; beim Erzeugen eines Codes die Gruppe wählen – das Kind landet beim Einlösen darin. Jede Gruppe hat in der App ihre eigene Bestenliste (Reiter 👥 1a neben 🏠 Hier und 🌍 Welt). Verbundene Spieler sehen auf dem Startbildschirm außerdem „🏆 Bestenliste": alle Kategorien mit Rekorden vom Server, je die besten 5 und der eigene Platz. Spieler lassen sich später in eine andere Gruppe verschieben.
 - **Admin-Seite** `https://…/admin`: Gruppen verwalten, Codes erzeugen (mit Gruppe und Notiz, für wen), Codes widerrufen, Spieler umbenennen/sperren/löschen, Rekorde ansehen, Aktivität (Rechenrunden gesamt/7 Tage/heute, Minispiele, letzte Runden, Runden pro Tag). Die Anmeldung gilt 12 Stunden.
 - **Code einlösen**: In der App Spieler wählen → Eltern-Bereich → „Online-Bestenliste" → Code, Spitzname und Bild. Jeder Code gilt **einmal** und verbindet genau einen Spieler; der Spieler bekommt dafür einen dauerhaften geheimen Schlüssel.
 - Online sichtbar sind nur Spitzname und Emoji – nie Fotos. Die Liste sehen nur verbundene Spieler.
