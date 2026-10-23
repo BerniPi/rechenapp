@@ -7,6 +7,7 @@
 
   // ---------- Allgemein ----------
   function zeige(id) {
+    imAnmelden = id === 'anmeldung';
     $$('.screen').forEach((s) => s.classList.toggle('aktiv', s.id === id));
     window.scrollTo(0, 0);
   }
@@ -910,9 +911,17 @@
   let onlineReiter = 'neu'; // piazzi: 'neu' oder 'anmelden'
   let onlineHinweis = '';  // Meldung, die beim nächsten Zeichnen erscheint (z. B. nach der Microsoft-Anmeldung)
   let onlineLauf = 0;
+  // Bietet der Server (dieselbe Adresse wie die App) Konten an, wird ohne Konto nicht gespielt: 'piazzi' | 'bgbb' | null.
+  // Gemerkt, damit es auch offline gilt.
+  const PFLICHT = 'rechenheld-pflicht';
+  let pflicht = null;
+  try { pflicht = localStorage.getItem(PFLICHT); } catch (err) { pflicht = null; }
+  let imAnmelden = false;  // die Online-Box steht gerade auf dem Anmelde-Bildschirm statt im Eltern-Bereich
+  const onlineBox = () => $(imAnmelden ? '#anmeldung-box' : '#online-box');
+  const verbunden = () => !!(d && d.online && d.online.status === 'ok');
 
   function onlineZeigen() {
-    const box = $('#online-box');
+    const box = onlineBox();
     box.innerHTML = '';
     const u = Speicher.aktiverBenutzer();
     const o = d.online;
@@ -971,9 +980,12 @@
       Speicher.speichern();
       sterneAnzeigen();
       await Online.senden(Speicher.benutzer.aktiv);
+      if (imAnmelden) { anmeldungFertig(); return; }
       onlineZeigen();
     };
     const serverWahl = () => {
+      // Auf dem Anmelde-Bildschirm gilt immer der eigene Server – dort nur nochmal versuchen
+      if (imAnmelden) { knopf(knopfZeile(), '🔄 Nochmal versuchen', 'grau', async () => onlineZeigen()); return; }
       const mehr = neu('details', null, 'online-mehr');
       mehr.appendChild(neu('summary', 'Server-Adresse'));
       box.appendChild(mehr);
@@ -1031,6 +1043,7 @@
         if (konto && Online.wartet(d)) await Online.senden(Speicher.benutzer.aktiv);
         await Online.abmelden(d);
         Speicher.speichern();
+        if (pflicht) { benutzerStarten(Speicher.benutzer.aktiv); return; }
         onlineZeigen();
       });
       box.appendChild(meldung);
@@ -1043,7 +1056,7 @@
     Online.info(onlineServer).then((info) => formular(info, null), (err) => formular(null, err));
 
     function formular(info, err) {
-      if (lauf !== onlineLauf || d.online || $('#online-box') !== box) return;
+      if (lauf !== onlineLauf || d.online || onlineBox() !== box) return;
       box.innerHTML = '';
       if (!info) {
         box.appendChild(neu('p', `❌ ${err.message}`, 'hinweis'));
@@ -1053,7 +1066,7 @@
       }
 
       if (info.anmeldung === 'piazzi') {
-        box.appendChild(neu('p', `Mit einem Konto spielt ${u.name} bei der Bestenliste mit. Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Benutzername und Bild – nie ein Foto.`, 'hinweis'));
+        box.appendChild(neu('p', `${imAnmelden ? 'Zum Spielen braucht es ein Konto.' : `Mit einem Konto spielt ${u.name} bei der Bestenliste mit.`} Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Benutzername und Bild – nie ein Foto.`, 'hinweis'));
         const reiter = knopfZeile();
         [['neu', '✨ Neues Konto'], ['anmelden', '🔑 Anmelden']].forEach(([wert, text]) => {
           const k = neu('button', text, `knopf klein ${onlineReiter === wert ? 'blau' : 'grau'}`);
@@ -1091,7 +1104,7 @@
           });
         }
       } else if (info.anmeldung === 'bgbb') {
-        box.appendChild(neu('p', `Mit dem Schulkonto (@${info.domain}) spielt ${u.name} bei der Bestenliste der Klasse und der Schule mit. Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Spitzname und Bild – nie ein Foto.`, 'hinweis'));
+        box.appendChild(neu('p', `${imAnmelden ? `Zum Spielen braucht es das Schulkonto (@${info.domain}).` : `Mit dem Schulkonto (@${info.domain}) spielt ${u.name} bei der Bestenliste der Klasse und der Schule mit.`} Sterne und Rekorde gibt es dann auf jedem Gerät, auf dem das Konto angemeldet ist. Online sichtbar sind nur Spitzname und Bild – nie ein Foto.`, 'hinweis'));
         box.appendChild(neu('p', 'Ist das Konto schon auf einem anderen Gerät benutzt worden, ersetzt sein Sterne-Stand die Sterne auf diesem Gerät.', 'hinweis'));
         knopf(knopfZeile(), '🔑 Mit Microsoft anmelden', 'blau', async () => {
           // Nach der Rückkehr von Microsoft weiß die App so, zu welchem Spieler die Anmeldung gehört
@@ -1112,7 +1125,7 @@
           await fertig('codes');
         });
       }
-      serverWahl();
+      if (!imAnmelden) serverWahl();
       box.appendChild(meldung);
     }
   }
@@ -1145,7 +1158,46 @@
         onlineHinweis = `❌ ${err.message}`;
       }
     }
+    if (imAnmelden) { if (verbunden()) anmeldungFertig(); else onlineZeigen(); return; }
     elternOeffnen();
+  }
+
+  // ---------- Anmelde-Bildschirm (Server mit Konten) ----------
+  // Neue Spieler entstehen dort als Platzhalter ohne Namen; Name und Bild kommen nach dem Anmelden vom Konto.
+  const platzhalter = (u) => !!u && u.name === '';
+  function anmeldungZeigen() {
+    const andere = Speicher.benutzer.liste.some((x) => x.id !== Speicher.benutzer.aktiv);
+    $('#anmeldung-zurueck').classList.toggle('unsichtbar', !andere);
+    zeige('anmeldung');
+    onlineZeigen();
+  }
+  function anmeldungFertig() {
+    const u = Speicher.aktiverBenutzer();
+    if (platzhalter(u)) {
+      u.name = d.online.benutzername || d.online.name;
+      u.bild = { art: 'emoji', wert: d.online.emoji };
+      Speicher.benutzerSpeichern();
+    }
+    benutzerStarten(u.id);
+  }
+  $('#anmeldung-zurueck').addEventListener('click', () => {
+    const u = Speicher.aktiverBenutzer();
+    if (platzhalter(u) && !d.online) Speicher.benutzerLoeschen(u.id);
+    benutzerZeigen();
+  });
+
+  // Fragt den eigenen Server, ob er Konten verlangt; ändert sich das, gleich umschalten
+  function pflichtPruefen() {
+    Online.info('').then((info) => {
+      const neu = info.anmeldung === 'codes' ? null : info.anmeldung;
+      if (neu === pflicht) return;
+      pflicht = neu;
+      try { if (pflicht) localStorage.setItem(PFLICHT, pflicht); else localStorage.removeItem(PFLICHT); } catch (err) { /* egal */ }
+      const aktiv = $('.screen.aktiv');
+      if (pflicht && aktiv && aktiv.id === 'neu') neuOeffnen();
+      else if (pflicht && aktiv && aktiv.id === 'start' && !verbunden()) anmeldungZeigen();
+      else if (!pflicht && imAnmelden) benutzerStarten(Speicher.benutzer.aktiv);
+    }, () => { /* kein eigener Server oder offline: beim Gemerkten bleiben */ });
   }
 
   // ---------- Spieler ----------
@@ -1213,9 +1265,10 @@
     chipsAnzeigen();
     sterneAnzeigen();
     tonAnzeigen();
-    zeige('start');
     // Liegengebliebenes nachschicken und Gruppe/Sperre auffrischen
     Online.senden(id);
+    if (pflicht && !verbunden()) { anmeldungZeigen(); return; }
+    zeige('start');
   }
   window.addEventListener('online', () => { if (d) Online.senden(Speicher.benutzer.aktiv); });
   // Sterne/Rekorde können von einem anderen Gerät mit demselben Konto kommen
@@ -1249,6 +1302,7 @@
   }
   function neuOeffnen() {
     neuBild = { art: 'emoji', wert: BILDER[Math.floor(Math.random() * BILDER.length)] };
+    if (pflicht) { benutzerStarten(Speicher.benutzerAnlegen('', neuBild).id); return; }
     $('#neu-name').value = '';
     $('#neu-hinweis').classList.toggle('versteckt', !Speicher.hatAlteDaten());
     $('#neu-zurueck').classList.toggle('unsichtbar', !Speicher.benutzer.liste.length);
@@ -1293,8 +1347,14 @@
   });
 
   // ---------- Los ----------
+  // Abgebrochene Anmeldungen aufräumen – außer der, die gerade von Microsoft zurückkommt
+  let ssoSpieler = null;
+  try { ssoSpieler = (JSON.parse(sessionStorage.getItem('rh-sso')) || {}).spieler; } catch (err) { ssoSpieler = null; }
+  Speicher.benutzerLaden().filter((u) => platzhalter(u) && u.id !== ssoSpieler && !(Speicher.datenVon(u.id) || {}).online)
+    .forEach((u) => Speicher.benutzerLoeschen(u.id));
   benutzerZeigen();
   ssoRueckkehr();
+  pflichtPruefen();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

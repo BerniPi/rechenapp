@@ -70,6 +70,8 @@ Lokal ohne Docker (Node 24): `ADMIN_PASSWORT=test HINTER_PROXY=0 node server/ser
 
 Derselbe Code kann drei Arten der Anmeldung; gewählt wird mit `ANMELDUNG` in der Env-Datei. Die App fragt den Server und zeigt im Eltern-Bereich die passende Anmeldung.
 
+Bei `piazzi` und `bgbb` ist das Konto **Pflicht**, wenn die App vom Server selbst ausgeliefert wird: statt „Neuer Spieler" kommt gleich Anmelden/Registrieren, Name und Bild übernimmt der Spieler vom Konto. Ältere Spieler auf dem Gerät ohne Konto müssen sich erst anmelden. Wer sich im Eltern-Bereich abmeldet, landet wieder bei der Anmeldung.
+
 | `ANMELDUNG` | Wer darf? | Anmeldung |
 |---|---|---|
 | `codes` (Standard) | wer einen Code bekommt | Einmal-Code, wie oben beschrieben |
