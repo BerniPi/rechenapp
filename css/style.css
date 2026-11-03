@@ -354,7 +354,6 @@ button {
   padding: 10px; border-radius: 14px; border: 3px solid var(--grau); background: var(--karte);
 }
 .pin-inhalt .aktionen { width: 100%; }
-.schwellen { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
 .verlauf { font-size: 15px; background: var(--karte); border-radius: 12px; padding: 8px; max-height: 360px; overflow: auto; }
 .verlauf table { width: 100%; border-collapse: collapse; }
 .verlauf td, .verlauf th { padding: 5px 6px; border-bottom: 1px solid #e3e8f3; text-align: left; white-space: nowrap; }

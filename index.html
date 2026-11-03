@@ -274,28 +274,23 @@
     <h2>Minispiele</h2>
     <label>Preis pro Spielrunde (Sterne, normal 10) <input type="number" min="1" max="50" data-eltern="preis"></label>
 
-    <h2>Sterne ans Tempo anpassen</h2>
-    <label>Sterne am eigenen Tempo messen <input type="checkbox" id="anpassen"></label>
-    <p class="hinweis">Nach 3 Runden einer Aufgabenart zählt der eigene Schnitt: gleich schnell = 3 ⭐, deutlich schneller = 5 ⭐. Besser werden hebt den Schnitt schnell, schlechter werden senkt ihn nur langsam. Die Werte unten bleiben als Rahmen und gelten für die ersten 3 Runden.</p>
-    <button id="tempo-loeschen" class="knopf klein">Schnitt neu messen</button>
-
-    <h2>Sterne bei „Aufgaben" (Sekunden pro Aufgabe)</h2>
-    <p class="hinweis">Jede falsche Antwort zählt als +<span data-zeige="strafe"></span> s. Je 3 Fehler auf 10 Aufgaben gibt es einen Stern weniger, unter der Hälfte richtig gar keinen. 10 Aufgaben = Sterne ×1, 20 Aufgaben = ×2 usw.</p>
-    <div class="schwellen">
-      <label>5 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="0"> s</label>
-      <label>4 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="1"> s</label>
-      <label>3 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="2"> s</label>
-      <label>2 ⭐ bis <input type="number" min="1" step="0.5" data-schwelle="zehn" data-i="3"> s</label>
-    </div>
-
-    <h2>Sterne bei „Zeit" (Punkte pro Minute)</h2>
-    <p class="hinweis">Jede richtige Antwort gibt 1 Punkt, je 4 falsche Antworten 1 Punkt weniger. Das gilt auch für den Rekord. Beim Sprechen gilt automatisch 60 % davon. 1 Minute = Sterne ×1, 5 Minuten = ×2, 10 Minuten = ×3,25.</p>
-    <div class="schwellen">
-      <label>5 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="0"></label>
-      <label>4 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="1"></label>
-      <label>3 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="2"></label>
-      <label>2 ⭐ ab <input type="number" min="1" data-schwelle="minute" data-i="3"></label>
-    </div>
+    <h2>Sterne</h2>
+    <p class="hinweis">Jede Aufgabe hat eine Zielzeit, in der man sie „im Kopf hat": 3 s bis 20 ohne Zehnerübergang, 4 s mit Übergang, 5 s bzw. 7 s bis 100, 4 s für Mal, 5 s für Geteilt. Einsetzen +2 s, Sprechen +1,5 s. Die Zielzeit der Runde ist die Summe.</p>
+    <ul class="hinweis">
+      <li>5 ⭐ alles richtig und höchstens Zielzeit</li>
+      <li>4 ⭐ höchstens 1 Fehler (je 20 Aufgaben) und höchstens 1,4 × Zielzeit</li>
+      <li>3 ⭐ 90 % richtig und höchstens doppelte Zielzeit</li>
+      <li>2 ⭐ 80 % richtig</li>
+      <li>1 ⭐ die Hälfte richtig – darunter zählt die Runde nicht</li>
+    </ul>
+    <p class="hinweis">10 Aufgaben bzw. 1 Minute = Sterne ×1, 20 Aufgaben = ×2, 5 Minuten = ×2. Für den Rekord zählt jede falsche Antwort +<span data-zeige="strafe"></span> s (Aufgaben) bzw. je 4 falsche 1 Punkt weniger (Zeit).</p>
+    <label>Tempo
+      <select id="tempo">
+        <option value="gemuetlich">gemütlich (Zielzeit × 1,5)</option>
+        <option value="normal">normal</option>
+        <option value="flott">flott (Zielzeit × 0,8)</option>
+      </select>
+    </label>
 
     <h2>Verlauf</h2>
     <div id="verlauf" class="verlauf"></div>

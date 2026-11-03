@@ -46,6 +46,35 @@ pruefe('keine direkte Wiederholung', () => {
   assert(new Set(l).size === 10, l.join(' '));
 });
 
+// ---- Zielzeit und Sterne ----
+pruefe('Zielzeit je Aufgabe', () => {
+  const z = (a, op, b, c, luecke = 'c', sp = false) => A.zielzeit({ a, op, b, c, luecke }, sp);
+  assert.strictEqual(z(3, '+', 4, 7), 3);
+  assert.strictEqual(z(12, '+', 5, 17), 3);    // bis 20 ohne Übergang
+  assert.strictEqual(z(7, '+', 8, 15), 4);     // Zehnerübergang
+  assert.strictEqual(z(15, '-', 7, 8), 4);
+  assert.strictEqual(z(34, '+', 25, 59), 5);
+  assert.strictEqual(z(47, '+', 38, 85), 7);
+  assert.strictEqual(z(62, '-', 27, 35), 7);
+  assert.strictEqual(z(6, '*', 7, 42), 4);
+  assert.strictEqual(z(42, '/', 6, 7), 5);
+  assert.strictEqual(z(3, '+', 4, 7, 'a'), 5); // Einsetzen
+  assert.strictEqual(z(3, '+', 4, 7, 'c', true), 4.5); // Sprechen
+});
+pruefe('Sterne nach Genauigkeit und Tempo', () => {
+  const st = (gestellt, falsch, zeit, ziel = 30) => A.sterne({ gestellt, falsch, zeit, ziel });
+  assert.strictEqual(st(10, 0, 30), 5);
+  assert.strictEqual(st(10, 0, 31), 4);
+  assert.strictEqual(st(10, 1, 20), 4);
+  assert.strictEqual(st(10, 1, 50), 3);
+  assert.strictEqual(st(10, 0, 70), 2);        // fehlerfrei, aber sehr langsam
+  assert.strictEqual(st(10, 2, 20), 2);
+  assert.strictEqual(st(10, 4, 20), 1);
+  assert.strictEqual(st(10, 6, 20), 0);        // weniger als die Hälfte richtig
+  assert.strictEqual(st(40, 2, 30), 4);        // 2 Fehler bei 40 Aufgaben erlaubt
+  assert.strictEqual(st(0, 0, 60), 0);
+});
+
 // ---- Zahlwörter ----
 const FAELLE = {
   'sieben': 7, 'siebzehn': 17, 'dreiundvierzig': 43, 'drei und vierzig': 43, 'hundert': 100,

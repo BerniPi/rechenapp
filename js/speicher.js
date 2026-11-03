@@ -13,13 +13,10 @@ const Speicher = {
       rekorde: {},
       verlauf: [],
       spielstand: {},
-      tempo: {},                 // persönlicher Schnitt je Aufgabenart: { wert, n }
       online: null,              // Online-Bestenliste, siehe js/online.js
       eltern: {
-        anpassen: true,          // Sterne am eigenen Tempo messen
-        zehn: [4, 6, 9, 14],     // Sekunden pro Aufgabe für 5/4/3/2 Sterne
-        minute: [20, 14, 9, 5],  // richtige pro Minute für 5/4/3/2 Sterne
-        strafe: 3,               // Strafsekunden pro falscher Antwort
+        tempo: 'normal',         // Zielzeit für Sterne: 'gemuetlich' (×1,5), 'normal', 'flott' (×0,8)
+        strafe: 3,               // Strafsekunden pro falscher Antwort (nur Rekord)
         preis: 10,               // Sterne pro Spielrunde (Eltern können 1–50 einstellen)
         erkennung: 'vosk',       // 'vosk' oder 'google'
       },
@@ -87,9 +84,12 @@ const Speicher = {
       settings: { ...std.settings, ...(d.settings || {}) },
       eltern: { ...std.eltern, ...(d.eltern || {}) },
       spielstand: { ...(d.spielstand || {}) },
-      tempo: { ...(d.tempo || {}) },
     };
     delete this.data.eltern.spielMinuten;
+    // Sterne früher nach eigenem Schnitt bzw. festen Schwellen, jetzt nach Zielzeit pro Aufgabe
+    delete this.data.tempo;
+    ['anpassen', 'zehn', 'minute'].forEach((k) => delete this.data.eltern[k]);
+    if (!['gemuetlich', 'normal', 'flott'].includes(this.data.eltern.tempo)) this.data.eltern.tempo = 'normal';
     // alte feste Spielarten
     const st = this.data.settings;
     if (st.art === 'zehn') { st.art = 'aufgaben'; st.anzahl = 10; }

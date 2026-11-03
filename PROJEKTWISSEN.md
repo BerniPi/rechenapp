@@ -48,7 +48,7 @@ Einstieg: `index.html` lädt der Reihe nach `speicher → online → aufgaben �
 | `js/app.js` | gesamte UI in einer IIFE: Bildschirme, Rechenrunde, Auswertung/Sterne, Rekorde, Spiele-Auswahl, Eltern-Bereich + PIN, Online-UI, Anmelde-Bildschirm, Spielerwahl. Abschnitte mit `// ---------- … ----------` |
 | `js/speicher.js` | `Speicher`: localStorage je Spieler, Standardwerte (`standard()`), Migrationen alter Daten in `laden()` |
 | `js/online.js` | `Online`: Server-Anfragen, Verbinden (Code/Konto/SSO), Warteschlange für offline, `senden()` = `POST /api/sync` |
-| `js/aufgaben.js` | `Aufgaben`: Generator `erzeuger({ops, raum, einsetzen})`, `alsText`, `alsSatz` (auch in Node nutzbar) |
+| `js/aufgaben.js` | `Aufgaben`: Generator `erzeuger({ops, raum, einsetzen})`, `alsText`, `alsSatz`, `zielzeit(auf, sprechen)`, `sterne({gestellt, falsch, zeit, ziel})` (auch in Node nutzbar) |
 | `js/sprache.js` | `Zahlwort` (Parser Wörter→Zahl, inkl. Verhörer „nein“→9), `Jonas` (Ersatz-Stimme aus Schnipseln), `Sprache` (Vorlesen/Erkennen) |
 | `js/vosk-erkennung.js` | Offline-Erkennung, Grammatik nur Zahlwörter 0–100 |
 | `js/ton.js` | Töne per WebAudio |
@@ -61,7 +61,7 @@ Einstieg: `index.html` lädt der Reihe nach `speicher → online → aufgaben �
 | Schlüssel | Inhalt |
 |---|---|
 | `rechenheld-benutzer` | `{ liste: [{ id, name, bild: {art:'emoji'\|'foto', wert} }], aktiv }` |
-| `rechenheld-v1:<id>` | Daten eines Spielers: `settings`, `sterne`, `rekorde`, `verlauf`, `spielstand`, `tempo`, `online`, `eltern` |
+| `rechenheld-v1:<id>` | Daten eines Spielers: `settings`, `sterne`, `rekorde`, `verlauf`, `spielstand`, `online`, `eltern` |
 | `rechenheld-v1` | Altdaten vor Mehrspieler → gehen an den ersten neu angelegten Spieler |
 | `rechenheld-pin` | Eltern-PIN (4 Ziffern, für das ganze Gerät) |
 
@@ -120,8 +120,8 @@ Auth: `Authorization: Bearer <schluessel>`; gespeichert wird nur `sha256` in Tab
 - Rekorde nur für feste Längen: `zehn` (10 Aufgaben), `a20` (20 Aufgaben) → kleinere Zeit besser; `m1`, `m5` (1/5 Minuten) → mehr Punkte besser. Server-Grenzen in `rekordWert()`.
 - **Emoji-Liste** existiert doppelt: `server/hilfe.js` `EMOJIS` und `js/app.js` `BILDER`. Neue Bilder in beiden eintragen, sonst lehnt der Server sie ab.
 - Zeit-Modus: Punkte = richtig − ⌊falsch / 4⌋ (`FEHLER_PRO_PUNKT`).
-- Aufgaben-Modus: Leistung = (Zeit + falsch × Strafsekunden) / Anzahl; weniger als die Hälfte richtig → Runde zählt nicht (0 Sterne). Je 3 Fehler auf 10 Aufgaben ein Stern weniger (min. 1).
-- Sterne 1–5: nach festen Schwellen (`eltern.zehn`, `eltern.minute`, Sprechmodus × 0,6) oder ab 3 Runden nach eigenem Tempo (`tempo`, Schlüssel immer mit Art `zehn`/`m1`, in Grenzen `tempoRahmen()`).
+- Aufgaben-Modus Rekord: Zeit + falsch × `eltern.strafe` Sekunden.
+- **Sterne 1–5** (`Aufgaben.sterne`): Genauigkeit zuerst, dann Zeit ÷ Zielzeit. Zielzeit der Runde = Summe `Aufgaben.zielzeit` der beantworteten Aufgaben × Tempo-Faktor (`eltern.tempo`: gemuetlich 1,5 / normal 1 / flott 0,8). Zeit-Modus rechnet mit der ganzen Rundendauer. 5 ⭐ fehlerfrei ≤ 1×, 4 ⭐ ≤ max(1, n/20) Fehler ≤ 1,4×, 3 ⭐ ≥ 90 % ≤ 2×, 2 ⭐ ≥ 80 %, 1 ⭐ ≥ 50 %, sonst 0. Kein Anpassen ans eigene Tempo (gab es früher, wurde verworfen: Fortschritt war unsichtbar). Alte Felder `tempo`, `eltern.anpassen/zehn/minute` entfernt `Speicher.laden()`.
 - Spielpreis `eltern.preis` (Standard 10, mind. 1); genau eine Runde à 60 s pro Kauf.
 - **Sterne-Abgleich:** Änderungen nur als Buchung über `Online.merkeSterne(d, delta, grund)`, nie `d.sterne` allein ändern, wenn verbunden. Kontostand kommt vom Server. Neues Konto: Gerätesterne werden Startguthaben (`grund: 'start'`); Anmelden an bestehendem Konto ersetzt die Gerätesterne.
 - `client_id` macht Runden und Buchungen idempotent (`INSERT OR IGNORE`) → Wiederholtes Senden aus der Warteschlange ist unschädlich. `/sync` überspringt Ungültiges, statt abzubrechen.

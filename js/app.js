@@ -120,8 +120,6 @@
     const art = rekordArt(s);
     return art ? schluessel(s, art) : null;
   }
-  // Der persönliche Schnitt ist ein Tempo und gilt für jede Länge.
-  function tempoSchluessel(s) { return schluessel(s, istAufgaben(s) ? 'zehn' : 'm1'); }
   function rekordWert(wert, s) { return istAufgaben(s) ? fmt(wert) : `${wert} Punkte`; }
   function rekordText(r, s) {
     if (!r) return '';
@@ -492,77 +490,37 @@
   function abzug(falsch) { return Math.floor(falsch / FEHLER_PRO_PUNKT); }
   function zeitPunkte() { return R.richtig - abzug(R.falsch); }
 
-  // Leistung der Runde: Sekunden pro Aufgabe (Aufgaben, kleiner = besser) bzw. Punkte pro Minute.
-  // null = Runde zählt nicht (weniger als die Hälfte richtig / netto nichts).
-  function leistung() {
-    if (istAufgaben(R.s)) return R.richtig < R.s.anzahl / 2 ? null : (R.zeit / 1000 + R.falsch * e.strafe) / R.s.anzahl;
-    const netto = zeitPunkte() / (R.dauer / 60);
-    return netto > 0 ? netto : null;
+  const TEMPO_FAKTOR = { gemuetlich: 1.5, normal: 1, flott: 0.8 };
+
+  // Zielzeit der Runde in Sekunden: Summe der Zielzeiten der beantworteten Aufgaben.
+  function rundenZiel(s) {
+    const f = TEMPO_FAKTOR[e.tempo] || 1;
+    return R.liste.reduce((sum, x) => sum + Aufgaben.zielzeit(x.auf, s.modus === 'sprache'), 0) * f;
   }
 
-  // Persönlicher Schnitt, begrenzt durch die festen Schwellen, damit absichtlich
-  // langsames Spielen die Latte nicht beliebig senkt.
-  function tempoRahmen(s) {
-    if (istAufgaben(s)) return [e.zehn[0] * 0.75, e.zehn[3] * 1.5];
-    const f = s.modus === 'sprache' ? 0.6 : 1;
-    return [e.minute[3] * f * 0.6, e.minute[0] * f * 1.25];
+  // Aufgaben-Modus: gemessene Zeit; Zeit-Modus: die ganze Rundendauer.
+  function sterneBerechnen(s, ziel) {
+    return Aufgaben.sterne({
+      gestellt: istAufgaben(s) ? s.anzahl : R.liste.length,
+      falsch: R.falsch,
+      zeit: istAufgaben(s) ? R.zeit / 1000 : R.dauer,
+      ziel,
+    });
   }
 
-  function tempoAktualisieren(s, wert) {
-    const key = tempoSchluessel(s);
-    const t = d.tempo[key] || { wert, n: 0 };
-    if (t.n < 3) {
-      t.wert = (t.wert * t.n + wert) / (t.n + 1);
-    } else {
-      // Besser werden zählt schnell, schlechter werden nur langsam.
-      const besser = istAufgaben(s) ? wert < t.wert : wert > t.wert;
-      t.wert += (wert - t.wert) * (besser ? 0.5 : 0.1);
-    }
-    const [lo, hi] = tempoRahmen(s);
-    t.wert = Math.min(hi, Math.max(lo, t.wert));
-    t.n += 1;
-    d.tempo[key] = t;
-  }
-
-  function sterneBerechnen(wert) {
-    if (wert === null) return 0;
-    const s = R.s;
-    const t = d.tempo[tempoSchluessel(s)];
-    let st;
-    if (e.anpassen && t && t.n >= 3) {
-      // Verhältnis > 1 heißt: besser als der eigene Schnitt
-      const v = istAufgaben(s) ? t.wert / wert : wert / t.wert;
-      st = v >= 1.2 ? 5 : v >= 1.08 ? 4 : v >= 0.92 ? 3 : v >= 0.8 ? 2 : 1;
-    } else if (istAufgaben(s)) {
-      const th = e.zehn;
-      st = wert <= th[0] ? 5 : wert <= th[1] ? 4 : wert <= th[2] ? 3 : wert <= th[3] ? 2 : 1;
-    } else {
-      const f = s.modus === 'sprache' ? 0.6 : 1;
-      const th = e.minute.map((x) => x * f);
-      st = wert >= th[0] ? 5 : wert >= th[1] ? 4 : wert >= th[2] ? 3 : wert >= th[3] ? 2 : 1;
-    }
-    // je 3 Fehler auf 10 Aufgaben ein Stern weniger
-    if (istAufgaben(s)) st = Math.max(1, st - Math.floor((R.falsch * 10) / s.anzahl / 3));
-    return st;
-  }
-
-  function tempoText(s) {
-    const t = d.tempo[tempoSchluessel(s)];
-    if (!e.anpassen || !t) return '';
-    if (t.n < 3) return `📈 Noch ${3 - t.n} Runde${t.n === 2 ? '' : 'n'}, dann zählt dein eigenes Tempo`;
-    const w = istAufgaben(s)
-      ? `${t.wert.toFixed(1).replace('.', ',')} s pro Aufgabe`
-      : `${t.wert.toFixed(1).replace('.', ',')} pro Minute`;
-    return `📈 Dein Schnitt: ${w}`;
+  function zielText(s, ziel) {
+    if (!ziel) return '';
+    if (istAufgaben(s)) return `🎯 Für 5 ⭐: alles richtig in ${fmt(ziel)}`;
+    const n = Math.max(1, Math.floor(R.dauer / (ziel / R.liste.length)));
+    return `🎯 Für 5 ⭐: ${n} Aufgaben ohne Fehler`;
   }
 
   function rundeEnde() {
     if (!R || !R.aktiv) return;
     rundeAufraeumen();
     const s = R.s;
-    const wert = leistung();
-    const st = sterneBerechnen(wert);
-    if (wert !== null) tempoAktualisieren(s, wert);
+    const ziel = rundenZiel(s);
+    const st = sterneBerechnen(s, ziel);
     // Längere Runden geben mehr Sterne: 10 Aufgaben bzw. 1 Minute = ×1, 5 Minuten = ×2.
     const faktor = istAufgaben(s) ? s.anzahl / 10 : 1 + (s.minuten - 1) / 4;
     const gewinn = st > 0 ? Math.max(1, Math.round(st * faktor)) : 0;
@@ -629,7 +587,7 @@
       : neuerRekord ? (alt ? '🏆 Neuer Rekord!' : '🏆 Erster Rekord!')
         : key ? rekordText(d.rekorde[key], s) : '';
     rek.classList.toggle('neu', neuerRekord);
-    $('#erg-tempo').textContent = tempoText(s);
+    $('#erg-tempo').textContent = zielText(s, ziel);
     bestenlisteZeigen(s, gesendet);
     if (neuerRekord) setTimeout(() => Ton.jubel(), 450 + st * 320 + 200);
 
@@ -919,12 +877,11 @@
   function elternOeffnen() {
     sterneAnzeigen();
     $$('[data-eltern]').forEach((inp) => { inp.value = e[inp.dataset.eltern]; });
-    $$('[data-schwelle]').forEach((inp) => { inp.value = e[inp.dataset.schwelle][Number(inp.dataset.i)]; });
     $$('[data-zeige]').forEach((el) => { el.textContent = e[el.dataset.zeige]; });
     verlaufZeigen();
     onlineZeigen();
     $('#erkennung').value = e.erkennung;
-    $('#anpassen').checked = e.anpassen;
+    $('#tempo').value = e.tempo;
     stimmeInfo();
     zeige('eltern');
   }
@@ -946,13 +903,8 @@
     Sprache.setzeMotor(e.erkennung);
   });
 
-  $('#anpassen').addEventListener('change', () => {
-    e.anpassen = $('#anpassen').checked;
-    Speicher.speichern();
-  });
-  $('#tempo-loeschen').addEventListener('click', () => {
-    if (!confirm('Den persönlichen Schnitt löschen? Er wird dann in den nächsten 3 Runden neu gemessen.')) return;
-    d.tempo = {};
+  $('#tempo').addEventListener('change', () => {
+    e.tempo = $('#tempo').value;
     Speicher.speichern();
   });
 
@@ -984,11 +936,6 @@
     const v = Number(inp.value);
     if (Number.isFinite(v) && v >= Number(inp.min)) { e[inp.dataset.eltern] = v; Speicher.speichern(); }
     inp.value = e[inp.dataset.eltern];
-  }));
-  $$('[data-schwelle]').forEach((inp) => inp.addEventListener('change', () => {
-    const v = Number(inp.value);
-    if (Number.isFinite(v) && v > 0) { e[inp.dataset.schwelle][Number(inp.dataset.i)] = v; Speicher.speichern(); }
-    inp.value = e[inp.dataset.schwelle][Number(inp.dataset.i)];
   }));
   $$('[data-sterne]').forEach((b) => b.addEventListener('click', () => {
     const vorher = d.sterne;

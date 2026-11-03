@@ -76,6 +76,37 @@ const Aufgaben = (() => {
     };
   }
 
+  // Zielzeit in Sekunden, in der ein Kind die Aufgabe "automatisiert" löst (inkl. Antworten).
+  // Hängt nur von der Aufgabe ab, nicht vom Kind: Zehnerübergang und großer Zahlenraum dauern länger.
+  function zielzeit(auf, sprechen) {
+    const { a, op, b, c } = auf;
+    let t;
+    if (op === '*') t = 4;
+    else if (op === '/') t = 5;
+    else {
+      const gross = Math.max(a, b, c);
+      const ueber = op === '+' ? (a % 10) + (b % 10) >= 10 : (a % 10) < (b % 10);
+      t = gross <= 10 ? 3 : gross <= 20 ? (ueber ? 4 : 3) : (ueber ? 7 : 5);
+    }
+    if (auf.luecke !== 'c') t += 2;
+    if (sprechen) t += 1.5; // Vorlesen/Erkennen braucht pro Aufgabe etwa gleich lang
+    return t;
+  }
+
+  // Sterne einer Runde: Genauigkeit zuerst, dann Tempo im Verhältnis zur Zielzeit.
+  // gestellt = beantwortete Aufgaben, zeit/ziel in Sekunden. 0 = Runde zählt nicht.
+  function sterne({ gestellt, falsch, zeit, ziel }) {
+    if (!gestellt || !ziel) return 0;
+    const quote = (gestellt - falsch) / gestellt;
+    const v = zeit / ziel;
+    if (quote < 0.5) return 0;
+    if (falsch === 0 && v <= 1) return 5;
+    if (falsch <= Math.max(1, Math.floor(gestellt / 20)) && v <= 1.4) return 4;
+    if (quote >= 0.9 && v <= 2) return 3;
+    if (quote >= 0.8) return 2;
+    return 1;
+  }
+
   // Für die Anzeige: Liste der drei Zahlen, die Lücke als null.
   function teile(auf) {
     return {
@@ -100,7 +131,7 @@ const Aufgaben = (() => {
     return `${a} ${WORT[auf.op]} ${b} ergibt ${auf.c}?`;
   }
 
-  return { erzeuger, neu, teile, alsText, alsSatz, ZEICHEN };
+  return { erzeuger, neu, teile, alsText, alsSatz, zielzeit, sterne, ZEICHEN };
 })();
 
 if (typeof module !== 'undefined') module.exports = Aufgaben;
