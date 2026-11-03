@@ -1,6 +1,8 @@
-// Aufgaben-Generator für die Volksschule.
-// Eine Aufgabe: { a, op, b, c, luecke: 'a'|'b'|'c', loesung, key }
+// Aufgaben für die Volksschule, geordnet als Katalog von Übungen.
+// Eine Aufgabe: { a, op, b, c, luecke: 'a'|'b'|'c', loesung, uebung, key }
 //   a op b = c, wobei an der Stelle "luecke" die gesuchte Zahl steht.
+// Neue Übungen (negative Zahlen, Brüche, Klapustri) kommen als weitere Einträge in UEBUNGEN dazu.
+// Die id einer Übung nie ändern – Rekorde und Bestenlisten hängen daran.
 const Aufgaben = (() => {
   const ZEICHEN = { '+': '+', '-': '−', '*': '·', '/': ':' };
   const WORT = { '+': 'plus', '-': 'minus', '*': 'mal', '/': 'durch' };
@@ -8,66 +10,105 @@ const Aufgaben = (() => {
   const zufall = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
   const selten = (p) => Math.random() < p;
 
-  // Paare (x, y) mit Faktoren 2..10 und Produkt <= raum; Faktor 1 nur selten.
-  function malPaar(raum) {
-    const mitEins = selten(0.08);
-    const paare = [];
-    const min = mitEins ? 1 : 2;
-    for (let x = min; x <= 10; x++) {
-      for (let y = min; y <= 10; y++) {
-        if (x * y <= raum && (!mitEins || x === 1 || y === 1)) paare.push([x, y]);
-      }
+  // Zehnerübergang: Einer zusammen über 10 bzw. Einer reichen beim Abziehen nicht.
+  const uebergang = (op, a, b) => (op === '+' ? (a % 10) + (b % 10) >= 10 : (a % 10) < (b % 10));
+
+  // Plus: Ergebnis in [lo, hi]; Minus: erste Zahl in [lo, hi]. ueber: true/false/undefined (egal).
+  // Rechnungen mit 0 nur selten und nur, wenn mitNull.
+  function plusMinus(op, lo, hi, ueber, mitNull) {
+    for (let i = 0; i < 500; i++) {
+      let a; let b; let c;
+      if (op === '+') { c = zufall(lo, hi); a = zufall(0, c); b = c - a; } else { a = zufall(lo, hi); b = zufall(0, a); c = a - b; }
+      if ((a === 0 || b === 0 || c === 0) && !(mitNull && selten(0.15))) continue;
+      if (ueber !== undefined && uebergang(op, a, b) !== ueber) continue;
+      return [a, op, b, c];
     }
-    return paare[zufall(0, paare.length - 1)];
+    throw new Error(`Keine Aufgabe ${op} ${lo}-${hi}`);
   }
 
-  function rechnung(op, raum) {
-    switch (op) {
-      case '+': {
-        if (selten(0.04)) { const a = zufall(1, raum); return selten(0.5) ? [a, 0, a] : [0, a, a]; }
-        const a = zufall(1, raum - 1);
-        const b = zufall(1, raum - a);
-        return [a, b, a + b];
-      }
-      case '-': {
-        const a = zufall(2, raum);
-        if (selten(0.05)) return [a, a, 0];
-        if (selten(0.03)) return [a, 0, a];
-        const b = zufall(1, a - 1);
-        return [a, b, a - b];
-      }
-      case '*': {
-        const [x, y] = malPaar(raum);
-        return [x, y, x * y];
-      }
-      case '/': {
-        const [x, y] = malPaar(raum);
-        return [x * y, x, y]; // (x*y) : x = y
-      }
-    }
-    throw new Error('Unbekannte Rechenart ' + op);
+  // Einmaleins: Faktoren 2..10 (1 nur selten), reihen = erlaubte Reihen für einen der Faktoren.
+  function malPaar(reihen) {
+    const min = selten(0.08) ? 1 : 2;
+    const x = reihen ? reihen[zufall(0, reihen.length - 1)] : zufall(min, 10);
+    const y = zufall(min, 10);
+    return selten(0.5) ? [x, y] : [y, x];
   }
 
-  function neu(op, raum, einsetzen) {
-    const [a, b, c] = rechnung(op, raum);
+  function zehner() {
+    if (selten(0.5)) { const c = zufall(2, 10) * 10; const a = zufall(1, c / 10 - 1) * 10; return [a, '+', c - a, c]; }
+    const a = zufall(2, 10) * 10; const b = zufall(1, a / 10 - 1) * 10;
+    return [a, '-', b, a - b];
+  }
+
+  // ziel = Zielzeit in Sekunden für eine Aufgabe, in der man sie "im Kopf hat" (für die Sterne).
+  const UEBUNGEN = [
+    { id: 'plus10', gruppe: '1. Klasse', name: 'Plus bis 10', beispiel: '3 + 4', ziel: 3, erzeuge: () => plusMinus('+', 2, 10, undefined, true) },
+    { id: 'minus10', gruppe: '1. Klasse', name: 'Minus bis 10', beispiel: '7 − 3', ziel: 3, erzeuge: () => plusMinus('-', 2, 10, undefined, true) },
+    { id: 'plus20', gruppe: '1. Klasse', name: 'Plus bis 20', beispiel: '12 + 5', ziel: 3, erzeuge: () => plusMinus('+', 11, 20, false) },
+    { id: 'plus20u', gruppe: '1. Klasse', name: 'Plus bis 20 mit Übergang', beispiel: '7 + 8', ziel: 4, erzeuge: () => plusMinus('+', 11, 20, true) },
+    { id: 'minus20', gruppe: '1. Klasse', name: 'Minus bis 20', beispiel: '17 − 4', ziel: 3, erzeuge: () => plusMinus('-', 11, 20, false) },
+    { id: 'minus20u', gruppe: '1. Klasse', name: 'Minus bis 20 mit Übergang', beispiel: '15 − 7', ziel: 4, erzeuge: () => plusMinus('-', 11, 20, true) },
+    { id: 'zehner', gruppe: '2. Klasse', name: 'Zehner plus und minus', beispiel: '30 + 40', ziel: 3, erzeuge: zehner },
+    { id: 'plus100', gruppe: '2. Klasse', name: 'Plus bis 100', beispiel: '34 + 25', ziel: 5, erzeuge: () => plusMinus('+', 21, 100, false) },
+    { id: 'plus100u', gruppe: '2. Klasse', name: 'Plus bis 100 mit Übergang', beispiel: '47 + 38', ziel: 7, erzeuge: () => plusMinus('+', 21, 100, true) },
+    { id: 'minus100', gruppe: '2. Klasse', name: 'Minus bis 100', beispiel: '68 − 23', ziel: 5, erzeuge: () => plusMinus('-', 21, 100, false) },
+    { id: 'minus100u', gruppe: '2. Klasse', name: 'Minus bis 100 mit Übergang', beispiel: '62 − 27', ziel: 7, erzeuge: () => plusMinus('-', 21, 100, true) },
+    { id: 'mal2510', gruppe: '2. Klasse', name: 'Einmaleins 2, 5, 10', beispiel: '5 · 7', ziel: 3, erzeuge: () => { const [x, y] = malPaar([2, 5, 10]); return [x, '*', y, x * y]; } },
+    { id: 'mal', gruppe: '2. Klasse', name: 'Einmaleins', beispiel: '6 · 7', ziel: 4, erzeuge: () => { const [x, y] = malPaar(); return [x, '*', y, x * y]; } },
+    { id: 'geteilt', gruppe: '2. Klasse', name: 'Geteilt im Einmaleins', beispiel: '42 : 6', ziel: 5, erzeuge: () => { const [x, y] = malPaar(); return [x * y, '/', x, y]; } },
+  ];
+  const NACH_ID = Object.fromEntries(UEBUNGEN.map((u) => [u.id, u]));
+
+  // Übungen als Teil des Rekord-Schlüssels: sortiert, ohne Doppelte, mit Komma.
+  const uebungenTeil = (ids) => [...new Set(ids)].sort().join(',');
+  function uebungenGueltig(teil) {
+    const ids = String(teil || '').split(',');
+    return ids.length > 0 && ids.every((id) => NACH_ID[id]) && uebungenTeil(ids) === teil;
+  }
+  const uebungenText = (teil) => String(teil).split(',').map((id) => (NACH_ID[id] ? NACH_ID[id].name : id)).join(', ');
+
+  // Früher: Rechenarten (+-*/) × Zahlenraum (10/20/50/100) → passende Übungen
+  function alteUebungen(ops, raum) {
+    const ids = [];
+    for (const op of ops) {
+      if (op === '*') ids.push('mal');
+      else if (op === '/') ids.push('geteilt');
+      else {
+        const w = op === '+' ? 'plus' : 'minus';
+        if (Number(raum) <= 10) ids.push(`${w}10`);
+        else if (Number(raum) <= 20) ids.push(`${w}20`, `${w}20u`);
+        else ids.push(`${w}100`, `${w}100u`);
+      }
+    }
+    return [...new Set(ids)];
+  }
+  // Alter Rekord-Schlüssel "modus|art|ops|raum|E" → neuer "modus|art|uebungen|E", sonst null
+  function alterSchluessel(key) {
+    const m = /^(schrift|sprache)\|(zehn|a20|m1|m5)\|([*+\-/]{1,4})\|(10|20|50|100)\|(E?)$/.exec(String(key || ''));
+    return m ? `${m[1]}|${m[2]}|${uebungenTeil(alteUebungen([...m[3]], m[4]))}|${m[5]}` : null;
+  }
+
+  function neu(uebung, einsetzen) {
+    const [a, op, b, c] = NACH_ID[uebung].erzeuge();
     let luecke = 'c';
     if (einsetzen && selten(0.5)) luecke = selten(0.5) ? 'a' : 'b';
-    // "0 · __" wäre mehrdeutig; kommt mit den Paaren oben nicht vor, sicherheitshalber:
-    if (op === '*' && luecke !== 'c' && (a === 0 || b === 0)) luecke = 'c';
+    // "0 · __" oder "__ + 0 = …" mit 0 wäre mehrdeutig bzw. trivial – dann lieber das Ergebnis fragen
+    if (luecke !== 'c' && (a === 0 || b === 0)) luecke = 'c';
     const loesung = { a, b, c }[luecke];
-    return { a, op, b, c, luecke, loesung, key: `${a}${op}${b}${luecke}` };
+    return { a, op, b, c, luecke, loesung, uebung, key: `${a}${op}${b}${luecke}` };
   }
 
   // Liefert eine Funktion, die bei jedem Aufruf die nächste Aufgabe erzeugt,
   // ohne kurz hintereinander dieselbe Aufgabe zu wiederholen.
-  function erzeuger({ ops, raum, einsetzen }) {
+  function erzeuger({ uebungen, einsetzen }) {
+    const ids = uebungen.filter((id) => NACH_ID[id]);
+    if (!ids.length) ids.push('plus10');
     const zuletzt = [];
     const merken = 8;
     return () => {
       let auf;
       for (let i = 0; i < 60; i++) {
-        const op = ops[zufall(0, ops.length - 1)];
-        auf = neu(op, raum, einsetzen);
+        auf = neu(ids[zufall(0, ids.length - 1)], einsetzen);
         if (!zuletzt.includes(auf.key)) break;
       }
       zuletzt.push(auf.key);
@@ -76,22 +117,14 @@ const Aufgaben = (() => {
     };
   }
 
-  // Zielzeit in Sekunden, in der ein Kind die Aufgabe "automatisiert" löst (inkl. Antworten).
-  // Hängt nur von der Aufgabe ab, nicht vom Kind: Zehnerübergang und großer Zahlenraum dauern länger.
+  // Zielzeit in Sekunden für eine Aufgabe (inkl. Antworten). Hängt nur von der Übung ab, nicht vom Kind.
   function zielzeit(auf, sprechen) {
-    const { a, op, b, c } = auf;
-    let t;
-    if (op === '*') t = 4;
-    else if (op === '/') t = 5;
-    else {
-      const gross = Math.max(a, b, c);
-      const ueber = op === '+' ? (a % 10) + (b % 10) >= 10 : (a % 10) < (b % 10);
-      t = gross <= 10 ? 3 : gross <= 20 ? (ueber ? 4 : 3) : (ueber ? 7 : 5);
-    }
+    let t = NACH_ID[auf.uebung] ? NACH_ID[auf.uebung].ziel : 5;
     if (auf.luecke !== 'c') t += 2;
     if (sprechen) t += 1.5; // Vorlesen/Erkennen braucht pro Aufgabe etwa gleich lang
     return t;
   }
+
 
   // Sterne einer Runde: Genauigkeit zuerst, dann Tempo im Verhältnis zur Zielzeit.
   // gestellt = beantwortete Aufgaben, zeit/ziel in Sekunden. 0 = Runde zählt nicht.
@@ -131,7 +164,10 @@ const Aufgaben = (() => {
     return `${a} ${WORT[auf.op]} ${b} ergibt ${auf.c}?`;
   }
 
-  return { erzeuger, neu, teile, alsText, alsSatz, zielzeit, sterne, ZEICHEN };
+  return {
+    UEBUNGEN, NACH_ID, erzeuger, neu, teile, alsText, alsSatz, zielzeit, sterne, ZEICHEN,
+    uebungenTeil, uebungenGueltig, uebungenText, alteUebungen, alterSchluessel,
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = Aufgaben;

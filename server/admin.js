@@ -122,7 +122,7 @@ async function codesErzeugen(req, res) {
 
 function spielerRunden(res, id) {
   if (!q.einSpieler.get(id)) return H.fehler(res, 404, 'Spieler gibt es nicht');
-  const runden = q.runden.all(id);
+  const runden = q.runden.all(id).map((x) => ({ ...x, text: x.uebungen ? H.Aufgaben.uebungenText(x.uebungen) : '' }));
   // Runden pro Tag der letzten 30 Tage
   const start = heuteBeginn() - 29 * 864e5;
   const tage = {};
@@ -239,7 +239,7 @@ async function adminApi(req, res, url) {
   if (r === 'GET /klassen') return H.json(res, 200, { zuordnungen: q.zuordnungen.all() });
   if (r === 'POST /klassen') return klassenImport(req, res);
   if (r === 'DELETE /klassen') return H.json(res, 200, { geloescht: q.zuordnungenWeg.run().changes });
-  if (r === 'GET /rekorde') return H.json(res, 200, { rekorde: q.rekorde.all() });
+  if (r === 'GET /rekorde') return H.json(res, 200, { rekorde: q.rekorde.all().map((x) => ({ ...x, text: H.kategorieText(x.key) })) });
   if (r === 'POST /gruppen') return gruppeSpeichern(req, res, null);
   let m = /^(PATCH|DELETE) \/gruppen\/(\d+)$/.exec(r);
   if (m && m[1] === 'PATCH') return gruppeSpeichern(req, res, Number(m[2]));

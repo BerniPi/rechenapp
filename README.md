@@ -6,7 +6,7 @@ Rechen-Trainer für die Volksschule als Web-App (PWA) – ohne Build-Schritt, re
 - **Sprechen**: Aufgabe wird vorgelesen, das Kind sagt das Ergebnis. Erkennung wahlweise mit **Vosk** (offline im Browser, nur Zahlwörter 0–100 erlaubt – Standard) oder der Google-Erkennung von Chrome (braucht Internet). Umschalten im Eltern-Bereich. Mikrofon braucht HTTPS.
 - **Spielarten**: Aufgaben auf Zeit (5–50 Aufgaben) oder Zeit-Challenge (1–10 Minuten). Rekorde gibt es bei 10/20 Aufgaben und 1/5 Minuten.
 - **Spieler**: Beim Start Spieler wählen, anlegen (Name + Foto oder Bild) oder löschen. Alles wird pro Spieler gespeichert; die Bestenliste vergleicht alle Spieler auf dem Gerät.
-- Rechenarten + − · : (mischbar), Zahlenraum 10/20/50/100, Einsetzaufgaben.
+- Übungen nach Klassen: 1. Klasse Plus/Minus bis 10 und bis 20 (ohne/mit Zehnerübergang), 2. Klasse Zehner, Plus/Minus bis 100 (ohne/mit Übergang), Einmaleins (2, 5, 10 bzw. alle), Geteilt. Mehrere Übungen sind mischbar, dazu Einsetzaufgaben.
 - 1–5 Sterne pro Runde, fair für jede Aufgabenart: jede Aufgabe hat eine Zielzeit (z. B. 3 s für 3 + 4, 7 s für 47 + 38). 5 ⭐ = alles richtig in der Zielzeit, weniger Sterne bei Fehlern oder langsamerem Tempo → Sterne sind Währung für Minispiele: Flattervogel, Apfelschlange, Farbblöcke, Tierturm, Schrauben, Ausparken.
 - **Eltern-Bereich**: Zahnrad oben links, geschützt mit einer **Eltern-PIN** (beim ersten Mal festlegen; vergessen → eine Zahl in Worten eintippen) – Tempo für die Sterne (gemütlich/normal/flott), Spielpreis (mind. 10 ⭐ für genau eine Runde), Verlauf.
 

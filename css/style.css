@@ -126,6 +126,10 @@ button {
   border: 3px solid transparent;
 }
 .chips.gross button { font-size: 36px; font-weight: 900; min-width: 64px; }
+.uebungen h3 { margin: 10px 0 6px 4px; font-size: 15px; color: var(--leise); }
+.uebungen h3:first-child { margin-top: 0; }
+.uebung-chips button { font-size: 17px; flex-basis: 150px; }
+.uebung-chips button small { display: block; font-size: 14px; font-weight: 600; opacity: .7; margin-top: 2px; }
 .chips button.an {
   background: var(--blau);
   color: #fff;

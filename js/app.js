@@ -39,13 +39,22 @@
   }
 
   // ---------- Startbildschirm ----------
+  // Übungen nach Klassen gruppiert; mehrere wählbar, dann gemischt.
+  (function uebungenBauen() {
+    const gruppen = [...new Set(Aufgaben.UEBUNGEN.map((u) => u.gruppe))];
+    $('#uebungen').innerHTML = gruppen.map((g) => `<h3>${g}</h3><div class="chips uebung-chips" data-feld="uebungen">`
+      + Aufgaben.UEBUNGEN.filter((u) => u.gruppe === g)
+        .map((u) => `<button data-wert="${u.id}">${u.name}<small>${u.beispiel}</small></button>`).join('')
+      + '</div>').join('');
+  }());
+
   function chipsAnzeigen() {
     const s = d.settings;
     $$('.chips').forEach((ch) => {
       const feld = ch.dataset.feld;
       ch.querySelectorAll('button').forEach((b) => {
         const v = b.dataset.wert;
-        const an = feld === 'ops' ? s.ops.includes(v) : String(s[feld]) === v;
+        const an = feld === 'uebungen' ? s.uebungen.includes(v) : String(s[feld]) === v;
         b.classList.toggle('an', an);
       });
     });
@@ -98,9 +107,9 @@
       Ton.klick();
       const feld = ch.dataset.feld;
       let v = b.dataset.wert;
-      if (feld === 'ops') {
-        const ops = d.settings.ops;
-        if (ops.includes(v)) { if (ops.length > 1) ops.splice(ops.indexOf(v), 1); } else ops.push(v);
+      if (feld === 'uebungen') {
+        const l = d.settings.uebungen;
+        if (l.includes(v)) { if (l.length > 1) l.splice(l.indexOf(v), 1); } else l.push(v);
       } else {
         if ('zahl' in ch.dataset) v = Number(v);
         if ('bool' in ch.dataset) v = v === 'true';
@@ -113,7 +122,7 @@
 
   function schluessel(s, art) {
     const ein = s.einsetzen ? 'E' : '';
-    return `${s.modus}|${art}|${[...s.ops].sort().join('')}|${s.raum}|${ein}`;
+    return `${s.modus}|${art}|${Aufgaben.uebungenTeil(s.uebungen)}|${ein}`;
   }
   // null = für diese Länge gibt es keinen Rekord
   function rekordSchluessel(s) {
@@ -221,7 +230,7 @@
   async function rundeStarten() {
     if (laedt) return;
     Ton.init();
-    const s = { ...d.settings, ops: [...d.settings.ops] };
+    const s = { ...d.settings, uebungen: [...d.settings.uebungen] };
     if (s.modus === 'sprache') {
       if (!Sprache.kannHoeren) {
         alert('Dieser Browser kann leider keine Sprache erkennen. Bitte Chrome verwenden – jetzt geht es mit Tippen weiter.');
@@ -549,7 +558,7 @@
 
     const eintrag = {
       t: Date.now(), modus: s.modus, art: s.art, anzahl: s.anzahl, minuten: s.minuten,
-      ops: s.ops.join(''), raum: s.raum,
+      uebungen: Aufgaben.uebungenTeil(s.uebungen),
       einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch,
       zeit: Math.round((istAufgaben(s) ? R.zeit / 1000 : R.dauer)), sterne: gewinn,
     };
@@ -557,7 +566,7 @@
     d.verlauf = d.verlauf.slice(0, 300);
     Online.merkeRunde(d, {
       typ: 'rechnen', t: eintrag.t, modus: s.modus, art: s.art, laenge: istAufgaben(s) ? s.anzahl : s.minuten,
-      ops: eintrag.ops, raum: s.raum, einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch, zeit: eintrag.zeit, sterne: gewinn,
+      uebungen: eintrag.uebungen, einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch, zeit: eintrag.zeit, sterne: gewinn,
     });
     Speicher.speichern();
     sterneAnzeigen();
@@ -692,12 +701,11 @@
   }
 
   // ---------- Highscores: alle Kategorien vom Server ----------
-  // Kategorie = Rekord-Schlüssel „modus|art|ops|raum|E", z. B. „schrift|zehn|+-|20|"
+  // Kategorie = Rekord-Schlüssel „modus|art|uebungen|E", z. B. „schrift|zehn|plus20,plus20u|"
   const REKORD_ART = { zehn: '10 Aufgaben', a20: '20 Aufgaben', m1: '1 Minute', m5: '5 Minuten' };
   function kategorieText(key) {
-    const [modus, art, ops, raum, ein] = key.split('|');
-    // Kein „·" als Trenner – das ist schon das Malzeichen
-    return `${modus === 'sprache' ? '🎤' : '⌨️'} ${REKORD_ART[art]}: ${[...ops].map((o) => OP_NAME[o]).join(' ')} bis ${raum}${ein ? ', Einsetzen' : ''}`;
+    const [modus, art, uebungen, ein] = (Aufgaben.alterSchluessel(key) || key).split('|');
+    return `${modus === 'sprache' ? '🎤' : '⌨️'} ${REKORD_ART[art]}: ${Aufgaben.uebungenText(uebungen)}${ein ? ', Einsetzen' : ''}`;
   }
   const kategorieWert = (key, wert) => (['zehn', 'a20'].includes(key.split('|')[1]) ? fmt(wert) : `${wert} Punkte`);
 
@@ -961,10 +969,10 @@
     const zeilen = v.slice(0, 100).map((x) => {
       const dt = new Date(x.t);
       const datum = `${dt.getDate()}.${dt.getMonth() + 1}. ${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`;
-      const ops = [...x.ops].map((o) => OP_NAME[o]).join(' ');
+      const was = x.uebungen ? Aufgaben.uebungenText(x.uebungen) : `${[...x.ops].map((o) => OP_NAME[o]).join(' ')} bis ${x.raum}`;
       const art = ART_NAME[x.art] || laengeText(x);
       return `<tr><td>${datum}</td><td>${x.modus === 'sprache' ? '🎤' : '⌨️'} ${art}</td>`
-        + `<td>${ops} bis ${x.raum}${x.einsetzen ? ' (E)' : ''}</td>`
+        + `<td>${was}${x.einsetzen ? ' (E)' : ''}</td>`
         + `<td>✅${x.richtig} ❌${x.falsch}</td><td>${x.art === 'zehn' || x.art === 'aufgaben' ? fmt(x.zeit) : ''}</td><td>+${x.sterne}⭐</td></tr>`;
     }).join('');
     $('#verlauf').innerHTML = `<table><tr><th>Wann</th><th>Art</th><th>Rechnungen</th><th>Ergebnis</th><th>Zeit</th><th>Sterne</th></tr>${zeilen}</table>`;

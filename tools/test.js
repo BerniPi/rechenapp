@@ -9,11 +9,22 @@ let fehler = 0;
 const pruefe = (name, f) => { try { f(); console.log('ok  ', name); } catch (e) { fehler++; console.log('FAIL', name, '-', e.message); } };
 
 // ---- Aufgaben ----
-for (const raum of [10, 20, 50, 100]) {
-  for (const ops of [['+'], ['-'], ['*'], ['/'], ['+', '-', '*', '/']]) {
+// Grenzen je Übung: höchste Zahl, Zehnerübergang (true/false/undefined)
+const GRENZE = {
+  plus10: [10], minus10: [10], plus20: [20, false], plus20u: [20, true], minus20: [20, false], minus20u: [20, true],
+  zehner: [100], plus100: [100, false], plus100u: [100, true], minus100: [100, false], minus100u: [100, true],
+  mal2510: [100], mal: [100], geteilt: [100],
+};
+const ueber = (op, a, b) => (op === '+' ? (a % 10) + (b % 10) >= 10 : (a % 10) < (b % 10));
+pruefe('Jede Übung hat Grenzen im Test', () => {
+  A.UEBUNGEN.forEach((u) => assert(GRENZE[u.id], `Test fehlt für ${u.id}`));
+});
+for (const u of A.UEBUNGEN) {
+  for (const uebungen of [[u.id]]) {
+    const [raum, ueb] = GRENZE[u.id] || [100];
     for (const einsetzen of [false, true]) {
-      pruefe(`Aufgaben ${ops.join('')} bis ${raum}${einsetzen ? ' E' : ''}`, () => {
-        const gen = A.erzeuger({ ops, raum, einsetzen });
+      pruefe(`Aufgaben ${u.id}${einsetzen ? ' E' : ''}`, () => {
+        const gen = A.erzeuger({ uebungen, einsetzen });
         for (let i = 0; i < 10000; i++) {
           const t = gen();
           const { a, b, c, op } = t;
@@ -23,6 +34,10 @@ for (const raum of [10, 20, 50, 100]) {
           if (op === '*') assert(a * b === c && c <= raum && a <= 10 && b <= 10, A.alsText(t, true));
           if (op === '/') assert(b > 0 && b * c === a && a <= raum, A.alsText(t, true));
           if (!einsetzen) assert(t.luecke === 'c');
+          assert.strictEqual(t.uebung, u.id);
+          if (ueb !== undefined) assert.strictEqual(ueber(op, a, b), ueb, `Übergang: ${A.alsText(t, true)}`);
+          if (u.id === 'zehner') assert(a % 10 === 0 && b % 10 === 0, A.alsText(t, true));
+          if (u.id === 'mal2510') assert([2, 5, 10].includes(a) || [2, 5, 10].includes(b), A.alsText(t, true));
           assert(t.loesung === t[t.luecke]);
           // Eindeutigkeit der Lücke: keine andere Zahl 0..raum erfüllt die Gleichung
           if (t.luecke !== 'c') {
@@ -41,25 +56,37 @@ for (const raum of [10, 20, 50, 100]) {
   }
 }
 pruefe('keine direkte Wiederholung', () => {
-  const gen = A.erzeuger({ ops: ['+'], raum: 20, einsetzen: false });
+  const gen = A.erzeuger({ uebungen: ['plus20', 'plus20u'], einsetzen: false });
   const l = Array.from({ length: 10 }, gen).map((t) => t.key);
   assert(new Set(l).size === 10, l.join(' '));
 });
 
 // ---- Zielzeit und Sterne ----
 pruefe('Zielzeit je Aufgabe', () => {
-  const z = (a, op, b, c, luecke = 'c', sp = false) => A.zielzeit({ a, op, b, c, luecke }, sp);
-  assert.strictEqual(z(3, '+', 4, 7), 3);
-  assert.strictEqual(z(12, '+', 5, 17), 3);    // bis 20 ohne Übergang
-  assert.strictEqual(z(7, '+', 8, 15), 4);     // Zehnerübergang
-  assert.strictEqual(z(15, '-', 7, 8), 4);
-  assert.strictEqual(z(34, '+', 25, 59), 5);
-  assert.strictEqual(z(47, '+', 38, 85), 7);
-  assert.strictEqual(z(62, '-', 27, 35), 7);
-  assert.strictEqual(z(6, '*', 7, 42), 4);
-  assert.strictEqual(z(42, '/', 6, 7), 5);
-  assert.strictEqual(z(3, '+', 4, 7, 'a'), 5); // Einsetzen
-  assert.strictEqual(z(3, '+', 4, 7, 'c', true), 4.5); // Sprechen
+  const z = (uebung, luecke = 'c', sp = false) => A.zielzeit({ uebung, luecke }, sp);
+  assert.strictEqual(z('plus10'), 3);
+  assert.strictEqual(z('plus20'), 3);
+  assert.strictEqual(z('plus20u'), 4);
+  assert.strictEqual(z('minus100'), 5);
+  assert.strictEqual(z('plus100u'), 7);
+  assert.strictEqual(z('mal'), 4);
+  assert.strictEqual(z('geteilt'), 5);
+  assert.strictEqual(z('plus10', 'a'), 5);       // Einsetzen
+  assert.strictEqual(z('plus10', 'c', true), 4.5); // Sprechen
+});
+pruefe('Übungen im Rekord-Schlüssel und alte Schlüssel', () => {
+  assert.strictEqual(A.uebungenTeil(['plus20u', 'plus20', 'plus20']), 'plus20,plus20u');
+  assert(A.uebungenGueltig('plus20,plus20u'));
+  assert(!A.uebungenGueltig('plus20u,plus20'));   // unsortiert
+  assert(!A.uebungenGueltig('plus20,plus20'));    // doppelt
+  assert(!A.uebungenGueltig('quatsch'));
+  assert(!A.uebungenGueltig(''));
+  assert.strictEqual(A.alterSchluessel('schrift|zehn|+|10|'), 'schrift|zehn|plus10|');
+  assert.strictEqual(A.alterSchluessel('sprache|m1|*+-|50|E'), 'sprache|m1|mal,minus100,minus100u,plus100,plus100u|E');
+  assert.strictEqual(A.alterSchluessel('schrift|zehn|plus10|'), null);
+  const ids = A.UEBUNGEN.map((u) => u.id);
+  assert.strictEqual(new Set(ids).size, ids.length, 'ids doppelt');
+  ids.forEach((id) => assert(/^[a-z0-9]{2,12}$/.test(id), `id ${id}`));
 });
 pruefe('Sterne nach Genauigkeit und Tempo', () => {
   const st = (gestellt, falsch, zeit, ziel = 30) => A.sterne({ gestellt, falsch, zeit, ziel });
@@ -111,7 +138,7 @@ pruefe('Jonas zerlegt Vorlese-Sätze', () => {
   assert.strictEqual(Jonas.zerlegen('Hallo Welt'), null);
 });
 pruefe('Jonas hat Schnipsel für alle Aufgaben', () => {
-  const gen = A.erzeuger({ ops: ['+', '-', '*', '/'], raum: 100, einsetzen: true });
+  const gen = A.erzeuger({ uebungen: A.UEBUNGEN.map((u) => u.id), einsetzen: true });
   for (let i = 0; i < 20000; i++) {
     const namen = Jonas.zerlegen(A.alsSatz(gen()));
     assert.ok(namen);

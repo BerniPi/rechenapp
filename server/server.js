@@ -50,8 +50,8 @@ const q = {
   buchung: db.prepare('INSERT OR IGNORE INTO sterne_buchungen (spieler_id, client_id, delta, datum, grund) VALUES (?, ?, ?, ?, ?)'),
   sterne: db.prepare('SELECT COALESCE(SUM(delta), 0) AS n FROM sterne_buchungen WHERE spieler_id = ?'),
   runde: db.prepare(`INSERT OR IGNORE INTO runden
-    (spieler_id, client_id, datum, typ, modus, art, laenge, ops, raum, einsetzen, richtig, falsch, zeit, sterne, spiel)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+    (spieler_id, client_id, datum, typ, modus, art, laenge, ops, raum, einsetzen, richtig, falsch, zeit, sterne, spiel, uebungen)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
   liste: db.prepare(`SELECT s.id, s.name, s.emoji, r.wert, r.datum FROM rekorde r JOIN spieler s ON s.id = r.spieler_id
     WHERE r.key = ? AND s.gesperrt = 0`),
   listeGruppe: db.prepare(`SELECT s.id, s.name, s.emoji, r.wert, r.datum FROM rekorde r JOIN spieler s ON s.id = r.spieler_id
@@ -236,15 +236,21 @@ function rundeWerte(s, r) {
   const t = H.datum(r.t);
   if (r.typ === 'spiel') {
     if (typeof r.spiel !== 'string' || !/^[a-z0-9_-]{1,20}$/.test(r.spiel)) return null;
-    return [s.id, r.clientId, t, 'spiel', null, null, null, null, null, null, null, null, null, null, r.spiel];
+    return [s.id, r.clientId, t, 'spiel', null, null, null, null, null, null, null, null, null, null, r.spiel, null];
   }
   if (r.typ !== 'rechnen') return null;
   if (!['schrift', 'sprache'].includes(r.modus) || !['aufgaben', 'zeit'].includes(r.art)) return null;
-  if (typeof r.ops !== 'string' || !/^[*+\-/]{1,4}$/.test(r.ops) || ![10, 20, 50, 100].includes(r.raum)) return null;
+  // Neue App: uebungen; ältere App-Versionen schicken noch ops + raum
+  let uebungen = null;
+  if (typeof r.uebungen === 'string' && H.Aufgaben.uebungenGueltig(r.uebungen)) uebungen = r.uebungen;
+  else if (typeof r.ops === 'string' && /^[*+\-/]{1,4}$/.test(r.ops) && [10, 20, 50, 100].includes(r.raum)) {
+    uebungen = H.Aufgaben.uebungenTeil(H.Aufgaben.alteUebungen([...r.ops], r.raum));
+  }
+  if (!uebungen) return null;
   const werte = [zahl(r.laenge, 60), zahl(r.richtig, 1000), zahl(r.falsch, 1000), zahl(r.zeit, 36000), zahl(r.sterne, 100)];
   if (werte.includes(null)) return null;
   const [laenge, richtig, falsch, zeit, sterne] = werte;
-  return [s.id, r.clientId, t, 'rechnen', r.modus, r.art, laenge, r.ops, r.raum, r.einsetzen ? 1 : 0, richtig, falsch, zeit, sterne, null];
+  return [s.id, r.clientId, t, 'rechnen', r.modus, r.art, laenge, null, null, r.einsetzen ? 1 : 0, richtig, falsch, zeit, sterne, null, uebungen];
 }
 
 // Sterne-Buchung prüfen → Werte für die Tabelle, sonst null

@@ -8,7 +8,7 @@ const Speicher = {
   standard() {
     return {
       // art: 'aufgaben' (anzahl Aufgaben auf Zeit) oder 'zeit' (minuten lang so viele wie möglich)
-      settings: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, ops: ['+'], raum: 20, einsetzen: false, ton: true },
+      settings: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, uebungen: ['plus10'], einsetzen: false, ton: true },
       sterne: 0,
       rekorde: {},
       verlauf: [],
@@ -95,7 +95,32 @@ const Speicher = {
     if (st.art === 'zehn') { st.art = 'aufgaben'; st.anzahl = 10; }
     if (st.art === 'm1' || st.art === 'm5') { st.minuten = st.art === 'm5' ? 5 : 1; st.art = 'zeit'; }
     if (!(this.data.eltern.preis >= 1)) this.data.eltern.preis = 10;
+    this.uebungenUmstellen(this.data);
     return this.data;
+  },
+
+  // Früher Rechenarten × Zahlenraum, jetzt Übungen: Einstellung und Rekord-Schlüssel umstellen.
+  uebungenUmstellen(d) {
+    const st = d.settings;
+    if (st.ops) {
+      st.uebungen = Aufgaben.alteUebungen(st.ops, st.raum);
+      delete st.ops; delete st.raum;
+    }
+    st.uebungen = (st.uebungen || []).filter((id) => Aufgaben.NACH_ID[id]);
+    if (!st.uebungen.length) st.uebungen = ['plus10'];
+    const umstellen = (rek, klein) => {
+      Object.keys(rek).forEach((k) => {
+        const neu = Aufgaben.alterSchluessel(k);
+        if (!neu) return;
+        const r = rek[k];
+        delete rek[k];
+        const alt = rek[neu];
+        if (!alt || (klein(neu) ? r.wert < alt.wert : r.wert > alt.wert)) rek[neu] = r;
+      });
+    };
+    const klein = (k) => ['zehn', 'a20'].includes(k.split('|')[1]);
+    umstellen(d.rekorde, klein);
+    if (d.online && d.online.warte && d.online.warte.rekorde) umstellen(d.online.warte.rekorde, klein);
   },
 
   // Rekorde aller Spieler auf diesem Gerät für einen Rekord-Schlüssel.
@@ -104,6 +129,8 @@ const Speicher = {
       let r = null;
       try {
         const x = u.id === this.benutzer.aktiv ? this.data : JSON.parse(localStorage.getItem(this.key(u.id)));
+        // andere Spieler haben evtl. noch alte Rekord-Schlüssel (nur im Speicher umstellen)
+        if (x && x !== this.data && x.settings) { x.rekorde = x.rekorde || {}; this.uebungenUmstellen(x); }
         r = x && x.rekorde && x.rekorde[key];
       } catch (e) { r = null; }
       return r ? { benutzer: u, wert: r.wert, datum: r.datum } : null;

@@ -3,7 +3,6 @@
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
   const OP = { '+': '+', '-': '−', '*': '·', '/': ':' };
-  const ART = { zehn: '10 Aufgaben', a20: '20 Aufgaben', m1: '1 Minute', m5: '5 Minuten' };
   const SPIELE = { flappy: 'Flattervogel', snake: 'Apfelschlange', bloecke: 'Farbblöcke', tierturm: 'Tierturm', schrauben: 'Schrauben', unblock: 'Ausparken' };
   let daten = { spieler: [], codes: [], gruppen: [] };
   let offen = null; // Spieler in der Detailansicht
@@ -269,7 +268,7 @@
         return;
       }
       const art = `${x.modus === 'sprache' ? '🎤' : '⌨️'} ${x.art === 'aufgaben' ? `${x.laenge} Aufgaben` : `${x.laenge} Min`}`;
-      const ops = `${[...x.ops].map((o) => OP[o]).join(' ')} bis ${x.raum}${x.einsetzen ? ' (E)' : ''}`;
+      const ops = `${x.text || [...(x.ops || '')].map((o) => OP[o]).join(' ')}${x.einsetzen ? ' (E)' : ''}`;
       tb.appendChild(zeile([wann(x.datum), art, ops, zahl(x.richtig), zahl(x.falsch),
         { text: x.art === 'aufgaben' ? fmt(x.zeit) : '', klasse: 'zahl' }, zahl(x.sterne)]));
     });
@@ -402,10 +401,6 @@
   }));
 
   // ---------- Bestenliste ----------
-  function keyText(k) {
-    const [modus, art, ops, raum, e] = k.split('|');
-    return `${modus === 'sprache' ? '🎤' : '⌨️'} ${ART[art] || art} · ${[...ops].map((o) => OP[o]).join(' ')} bis ${raum}${e ? ' · Einsetzen' : ''}`;
-  }
   async function rekordeLaden() {
     const r = await api('GET', 'rekorde');
     const gruppen = {};
@@ -419,7 +414,7 @@
       const klein = art === 'zehn' || art === 'a20';
       const liste = gruppen[key].sort((a, b) => (klein ? a.wert - b.wert : b.wert - a.wert) || a.datum - b.datum);
       const karte = el('div', null, 'karte');
-      karte.appendChild(el('h3', keyText(key)));
+      karte.appendChild(el('h3', gruppen[key][0].text || key));
       const ol = el('ol', null, 'rangliste');
       liste.forEach((x) => {
         const li = el('li', null, x.gesperrt ? 'gesperrt' : '');

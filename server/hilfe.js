@@ -1,5 +1,7 @@
 // Kleine Helfer für den Server: Antworten, Anfrage-Body, Hashes, Prüfungen, Rate-Limit.
 const crypto = require('node:crypto');
+// Übungs-Katalog der App (im Docker-Image nach /app/js kopiert)
+const Aufgaben = require('../js/aufgaben.js');
 
 const SICHER = {
   'X-Content-Type-Options': 'nosniff',
@@ -127,14 +129,21 @@ function klassenCsv(text, domain) {
   return { zeilen, fehler };
 }
 
-// Rekord-Schlüssel wie rekordSchluessel() in js/app.js: modus|art|ops|raum|E
-const KEY = /^(schrift|sprache)\|(zehn|a20|m1|m5)\|([*+\-/]{1,4})\|(10|20|50|100)\|(E?)$/;
+// Rekord-Schlüssel wie schluessel() in js/app.js: modus|art|uebungen|E (uebungen sortiert, mit Komma).
+// Alte Schlüssel modus|art|ops|raum|E (ältere App-Versionen) werden umgestellt.
+const KEY = /^(schrift|sprache)\|(zehn|a20|m1|m5)\|([a-z0-9,]{1,300})\|(E?)$/;
 function rekordKey(k) {
-  const m = KEY.exec(String(k || ''));
-  if (!m) return null;
-  const ops = m[3];
-  if (new Set(ops).size !== ops.length || [...ops].sort().join('') !== ops) return null;
+  const m = KEY.exec(Aufgaben.alterSchluessel(k) || String(k || ''));
+  if (!m || !Aufgaben.uebungenGueltig(m[3])) return null;
   return { key: m[0], art: m[2] };
+}
+// Lesbarer Text für Admin-Seite
+const ART_TEXT = { zehn: '10 Aufgaben', a20: '20 Aufgaben', m1: '1 Minute', m5: '5 Minuten' };
+function kategorieText(key) {
+  const k = rekordKey(key);
+  if (!k) return String(key);
+  const [modus, art, uebungen, e] = k.key.split('|');
+  return `${modus === 'sprache' ? '🎤' : '⌨️'} ${ART_TEXT[art]} · ${Aufgaben.uebungenText(uebungen)}${e ? ' · Einsetzen' : ''}`;
 }
 // Bei Aufgaben zählt die kleinste Zeit, bei Zeit die meisten Punkte.
 const kleinerBesser = (art) => art === 'zehn' || art === 'a20';
@@ -181,6 +190,6 @@ function ip(req) {
 
 module.exports = {
   SICHER, json, fehler, body, sha, gleich, neuerCode, codeKern, neuerSchluessel, neueId,
-  EMOJIS, name, emoji, gruppenName, rekordKey, kleinerBesser, rekordWert, datum, erlaubt, ip,
+  Aufgaben, kategorieText, EMOJIS, name, emoji, gruppenName, rekordKey, kleinerBesser, rekordWert, datum, erlaubt, ip,
   benutzername, passwort, email, pwHash, pwPruefen, neuesPasswort, klassenCsv,
 };

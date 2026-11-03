@@ -74,6 +74,8 @@ spalte('spieler', 'benutzername', 'TEXT');
 spalte('spieler', 'pw_hash', 'TEXT');
 spalte('spieler', 'email', 'TEXT');
 spalte('spieler', 'ms_oid', 'TEXT');
+// Übungen statt Rechenarten × Zahlenraum (ops/raum bleiben für alte Runden)
+spalte('runden', 'uebungen', 'TEXT');
 
 db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS spieler_benutzername ON spieler(benutzername COLLATE NOCASE) WHERE benutzername IS NOT NULL;
@@ -129,5 +131,28 @@ function transaktion(fn) {
     throw e;
   }
 }
+
+// Früher Rechenarten × Zahlenraum, jetzt Übungen: alte Rekord-Schlüssel und Runden umstellen.
+// Fallen mehrere alte Schlüssel zusammen (z. B. bis 50 und bis 100), bleibt der bessere Wert.
+(function uebungenUmstellen() {
+  const H = require('./hilfe');
+  const alte = db.prepare('SELECT spieler_id, key, wert, datum FROM rekorde').all().filter((r) => H.Aufgaben.alterSchluessel(r.key));
+  const runden = db.prepare("SELECT id, ops, raum FROM runden WHERE typ = 'rechnen' AND uebungen IS NULL AND ops IS NOT NULL").all();
+  if (!alte.length && !runden.length) return;
+  const kleiner = db.prepare(`INSERT INTO rekorde (spieler_id, key, wert, datum) VALUES (?, ?, ?, ?)
+    ON CONFLICT (spieler_id, key) DO UPDATE SET wert = excluded.wert, datum = excluded.datum WHERE excluded.wert < rekorde.wert`);
+  const groesser = db.prepare(`INSERT INTO rekorde (spieler_id, key, wert, datum) VALUES (?, ?, ?, ?)
+    ON CONFLICT (spieler_id, key) DO UPDATE SET wert = excluded.wert, datum = excluded.datum WHERE excluded.wert > rekorde.wert`);
+  const weg = db.prepare('DELETE FROM rekorde WHERE spieler_id = ? AND key = ?');
+  const runde = db.prepare('UPDATE runden SET uebungen = ? WHERE id = ?');
+  transaktion(() => {
+    for (const r of alte) {
+      const k = H.rekordKey(r.key);
+      weg.run(r.spieler_id, r.key);
+      if (k) (H.kleinerBesser(k.art) ? kleiner : groesser).run(r.spieler_id, k.key, r.wert, r.datum);
+    }
+    for (const r of runden) runde.run(H.Aufgaben.uebungenTeil(H.Aufgaben.alteUebungen([...r.ops], r.raum)), r.id);
+  });
+}());
 
 module.exports = { db, transaktion };

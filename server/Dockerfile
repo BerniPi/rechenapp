@@ -4,6 +4,8 @@ RUN apk add --no-cache tzdata
 WORKDIR /app
 COPY server/*.js server/
 COPY server/admin server/admin
+# Übungs-Katalog, den der Server zum Prüfen der Rekord-Schlüssel braucht
+COPY js/aufgaben.js js/aufgaben.js
 # Die App selbst – so laufen App und API auf derselben Adresse
 COPY index.html manifest.json sw.js public/
 COPY css public/css
