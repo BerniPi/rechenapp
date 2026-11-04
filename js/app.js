@@ -278,6 +278,8 @@
       eingabe: '',
       aktiv: true,
       zeit: 0,          // gemessene Zeit in ms (Aufgaben-Modus)
+      vorlesen: 0,      // Vorlesezeit in ms, zählt nicht für die Sterne
+      vorlesenSeit: null,
       laufSeit: null,
       start: performance.now(),
       dauer: istAufgaben(s) ? 0 : s.minuten * 60,
@@ -378,7 +380,8 @@
 
   function bewerte(ok, gegeben) {
     if (!R || !R.aktiv) return;
-    R.liste.push({ auf: R.auf, gegeben, ok });
+    // gesprochen: zählt für den Sprech-Zuschlag der Zielzeit (nicht, wenn aufs Tippen ausgewichen wurde)
+    R.liste.push({ auf: R.auf, gegeben, ok, gesprochen: R.s.modus === 'sprache' && !R.tastatur });
     if (ok) { R.richtig++; Ton.richtig(); } else { R.falsch++; Ton.falsch(); }
     blitz(ok);
     if (R.punkte) {
@@ -412,15 +415,29 @@
     if (R && R.zuhoerer) { R.zuhoerer.stop(); R.zuhoerer = null; }
   }
 
+  // Vorlesen zählt in keinem Modus für die Sterne (im Aufgaben-Modus steht zusätzlich die Uhr).
+  // an = neues Vorlesen beginnt; ein noch offenes (z. B. bei „Nochmal") wird vorher abgeschlossen.
+  function vorlesenZaehlen(runde, an) {
+    const jetzt = performance.now();
+    if (runde.vorlesenSeit !== null) runde.vorlesen += jetzt - runde.vorlesenSeit;
+    runde.vorlesenSeit = an ? jetzt : null;
+    return runde.vorlesenSeit;
+  }
+
   async function frageVorlesen() {
     const auf = R.auf;
+    const runde = R;
+    const seit = vorlesenZaehlen(runde, true);
+    // nur das eigene Vorlesen abschließen, nicht ein inzwischen neu begonnenes
+    const vorbei = () => { if (runde.vorlesenSeit === seit) vorlesenZaehlen(runde, false); };
     zuhoerenStoppen();
     if (istAufgaben(R.s)) uhrLaeuft(false);
     mikroStatus('spricht');
     $('#gehoert').innerHTML = '&nbsp;';
     await new Promise((r) => setTimeout(r, 250)); // Ton ausklingen lassen
-    if (!R || !R.aktiv || R.auf !== auf) return;
+    if (!R || !R.aktiv || R.auf !== auf) { vorbei(); return; }
     await Sprache.vorlesen(Aufgaben.alsSatz(auf));
+    vorbei();
     if (!R || !R.aktiv || R.auf !== auf) return;
     uhrLaeuft(true);
     if (R.tastatur) { mikroStatus('aus'); $('#gehoert').textContent = R.hinweis; return; } // Mikro ging nicht – vorlesen, aber tippen
@@ -489,6 +506,7 @@
     Sprache.stopVorlesen();
     Sprache.ruhe();
     uhrLaeuft(false);
+    vorlesenZaehlen(R, false); // Runde endet mitten im Vorlesen
     wachHalten(false);
   }
 
@@ -502,17 +520,22 @@
   const TEMPO_FAKTOR = { gemuetlich: 1.5, normal: 1, flott: 0.8 };
 
   // Zielzeit der Runde in Sekunden: Summe der Zielzeiten der beantworteten Aufgaben.
-  function rundenZiel(s) {
+  function rundenZiel() {
     const f = TEMPO_FAKTOR[e.tempo] || 1;
-    return R.liste.reduce((sum, x) => sum + Aufgaben.zielzeit(x.auf, s.modus === 'sprache'), 0) * f;
+    return R.liste.reduce((sum, x) => sum + Aufgaben.zielzeit(x.auf, x.gesprochen), 0) * f;
   }
 
-  // Aufgaben-Modus: gemessene Zeit; Zeit-Modus: die ganze Rundendauer.
+  // Zeit für die Sterne in Sekunden, ohne Vorlesen: Aufgaben-Modus = gemessene Zeit
+  // (Uhr steht beim Vorlesen), Zeit-Modus = Rundendauer abzüglich Vorlesen.
+  function sterneZeit(s) {
+    return istAufgaben(s) ? R.zeit / 1000 : Math.max(0, R.dauer - R.vorlesen / 1000);
+  }
+
   function sterneBerechnen(s, ziel) {
     return Aufgaben.sterne({
       gestellt: istAufgaben(s) ? s.anzahl : R.liste.length,
       falsch: R.falsch,
-      zeit: istAufgaben(s) ? R.zeit / 1000 : R.dauer,
+      zeit: sterneZeit(s),
       ziel,
     });
   }
@@ -520,7 +543,7 @@
   function zielText(s, ziel) {
     if (!ziel) return '';
     if (istAufgaben(s)) return `🎯 Für 5 ⭐: alles richtig in ${fmt(ziel)}`;
-    const n = Math.max(1, Math.floor(R.dauer / (ziel / R.liste.length)));
+    const n = Math.max(1, Math.floor(sterneZeit(s) / (ziel / R.liste.length)));
     return `🎯 Für 5 ⭐: ${n} Aufgaben ohne Fehler`;
   }
 
@@ -528,7 +551,7 @@
     if (!R || !R.aktiv) return;
     rundeAufraeumen();
     const s = R.s;
-    const ziel = rundenZiel(s);
+    const ziel = rundenZiel();
     const st = sterneBerechnen(s, ziel);
     // Längere Runden geben mehr Sterne: 10 Aufgaben bzw. 1 Minute = ×1, 5 Minuten = ×2.
     const faktor = istAufgaben(s) ? s.anzahl / 10 : 1 + (s.minuten - 1) / 4;

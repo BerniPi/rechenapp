@@ -133,10 +133,11 @@ function transaktion(fn) {
 }
 
 // Früher Rechenarten × Zahlenraum, jetzt Übungen: alte Rekord-Schlüssel und Runden umstellen.
-// Fallen mehrere alte Schlüssel zusammen (z. B. bis 50 und bis 100), bleibt der bessere Wert.
+// Fallen alte Schlüssel zusammen, bleibt der bessere Wert. Nicht vergleichbare (Plus/Minus bis 50,
+// Mal/Geteilt unter 100) werden gelöscht – rekordKey() liefert für sie null.
 (function uebungenUmstellen() {
   const H = require('./hilfe');
-  const alte = db.prepare('SELECT spieler_id, key, wert, datum FROM rekorde').all().filter((r) => H.Aufgaben.alterSchluessel(r.key));
+  const alte = db.prepare('SELECT spieler_id, key, wert, datum FROM rekorde').all().filter((r) => H.Aufgaben.istAlterSchluessel(r.key));
   const runden = db.prepare("SELECT id, ops, raum FROM runden WHERE typ = 'rechnen' AND uebungen IS NULL AND ops IS NOT NULL").all();
   if (!alte.length && !runden.length) return;
   const kleiner = db.prepare(`INSERT INTO rekorde (spieler_id, key, wert, datum) VALUES (?, ?, ?, ?)

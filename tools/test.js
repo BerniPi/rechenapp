@@ -72,7 +72,7 @@ pruefe('Zielzeit je Aufgabe', () => {
   assert.strictEqual(z('mal'), 4);
   assert.strictEqual(z('geteilt'), 5);
   assert.strictEqual(z('plus10', 'a'), 5);       // Einsetzen
-  assert.strictEqual(z('plus10', 'c', true), 4.5); // Sprechen
+  assert.strictEqual(z('plus10', 'c', true), 4.5); // gesprochene Antwort
 });
 pruefe('Übungen im Rekord-Schlüssel und alte Schlüssel', () => {
   assert.strictEqual(A.uebungenTeil(['plus20u', 'plus20', 'plus20']), 'plus20,plus20u');
@@ -82,8 +82,26 @@ pruefe('Übungen im Rekord-Schlüssel und alte Schlüssel', () => {
   assert(!A.uebungenGueltig('quatsch'));
   assert(!A.uebungenGueltig(''));
   assert.strictEqual(A.alterSchluessel('schrift|zehn|+|10|'), 'schrift|zehn|plus10|');
-  assert.strictEqual(A.alterSchluessel('sprache|m1|*+-|50|E'), 'sprache|m1|mal,minus100,minus100u,plus100,plus100u|E');
+  assert.strictEqual(A.alterSchluessel('sprache|m1|*+-|100|E'), 'sprache|m1|mal,minus100,minus100u,plus100,plus100u|E');
+  assert.strictEqual(A.alterSchluessel('schrift|a20|-|20|'), 'schrift|a20|minus20,minus20u|');
+  // nicht vergleichbar: bis 50 und Mal/Geteilt unter 100 waren leichter → Rekord verfällt
+  assert.strictEqual(A.alterSchluessel('schrift|zehn|+|50|'), null);
+  assert.strictEqual(A.alterSchluessel('schrift|zehn|*|10|'), null);
+  assert.strictEqual(A.alterSchluessel('schrift|zehn|+/|20|'), null);
+  assert(A.istAlterSchluessel('schrift|zehn|*|10|'));
   assert.strictEqual(A.alterSchluessel('schrift|zehn|plus10|'), null);
+  assert(!A.istAlterSchluessel('schrift|zehn|plus10|'));
+  // Gerät: alte Schlüssel umstellen, nicht vergleichbare löschen, besserer Wert gewinnt
+  global.Aufgaben = A;
+  const S = require('../js/speicher.js');
+  const geraet = { settings: { ops: ['*'], raum: 10 }, rekorde: {
+    'schrift|zehn|*|10|': { wert: 9 }, 'schrift|zehn|*|100|': { wert: 30 }, 'schrift|zehn|mal|': { wert: 25 },
+    'schrift|m1|+|20|': { wert: 12 },
+  } };
+  S.uebungenUmstellen(geraet);
+  assert.deepStrictEqual(geraet.settings.uebungen, ['mal']);
+  assert.deepStrictEqual(Object.keys(geraet.rekorde).sort(), ['schrift|m1|plus20,plus20u|', 'schrift|zehn|mal|']);
+  assert.strictEqual(geraet.rekorde['schrift|zehn|mal|'].wert, 25);
   const ids = A.UEBUNGEN.map((u) => u.id);
   assert.strictEqual(new Set(ids).size, ids.length, 'ids doppelt');
   ids.forEach((id) => assert(/^[a-z0-9]{2,12}$/.test(id), `id ${id}`));

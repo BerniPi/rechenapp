@@ -82,10 +82,17 @@ const Aufgaben = (() => {
     }
     return [...new Set(ids)];
   }
-  // Alter Rekord-Schlüssel "modus|art|ops|raum|E" → neuer "modus|art|uebungen|E", sonst null
+  const ALT_KEY = /^(schrift|sprache)\|(zehn|a20|m1|m5)\|([*+\-/]{1,4})\|(10|20|50|100)\|(E?)$/;
+  const istAlterSchluessel = (key) => ALT_KEY.test(String(key || ''));
+  // Passen die alten Aufgaben zu den neuen Übungen? Plus/Minus bis 50 und Mal/Geteilt
+  // unter 100 (nur Produkte ≤ Zahlenraum) waren deutlich leichter – solche Rekorde verfallen.
+  const vergleichbar = (ops, raum) => [...ops].every((op) => ('*/'.includes(op) ? raum === 100 : raum !== 50));
+  // Alter Rekord-Schlüssel "modus|art|ops|raum|E" → neuer "modus|art|uebungen|E".
+  // null = kein alter Schlüssel oder nicht vergleichbar (dann den Rekord verwerfen, siehe istAlterSchluessel).
   function alterSchluessel(key) {
-    const m = /^(schrift|sprache)\|(zehn|a20|m1|m5)\|([*+\-/]{1,4})\|(10|20|50|100)\|(E?)$/.exec(String(key || ''));
-    return m ? `${m[1]}|${m[2]}|${uebungenTeil(alteUebungen([...m[3]], m[4]))}|${m[5]}` : null;
+    const m = ALT_KEY.exec(String(key || ''));
+    if (!m || !vergleichbar(m[3], Number(m[4]))) return null;
+    return `${m[1]}|${m[2]}|${uebungenTeil(alteUebungen([...m[3]], m[4]))}|${m[5]}`;
   }
 
   function neu(uebung, einsetzen) {
@@ -118,10 +125,11 @@ const Aufgaben = (() => {
   }
 
   // Zielzeit in Sekunden für eine Aufgabe (inkl. Antworten). Hängt nur von der Übung ab, nicht vom Kind.
-  function zielzeit(auf, sprechen) {
+  // gesprochen = Antwort kam übers Mikrofon. Das Vorlesen zählt in keinem Modus zur Zeit.
+  function zielzeit(auf, gesprochen) {
     let t = NACH_ID[auf.uebung] ? NACH_ID[auf.uebung].ziel : 5;
     if (auf.luecke !== 'c') t += 2;
-    if (sprechen) t += 1.5; // Vorlesen/Erkennen braucht pro Aufgabe etwa gleich lang
+    if (gesprochen) t += 1.5; // Aussprechen und Erkennen dauern länger als Tippen
     return t;
   }
 
@@ -166,7 +174,7 @@ const Aufgaben = (() => {
 
   return {
     UEBUNGEN, NACH_ID, erzeuger, neu, teile, alsText, alsSatz, zielzeit, sterne, ZEICHEN,
-    uebungenTeil, uebungenGueltig, uebungenText, alteUebungen, alterSchluessel,
+    uebungenTeil, uebungenGueltig, uebungenText, alteUebungen, alterSchluessel, istAlterSchluessel,
   };
 })();
 

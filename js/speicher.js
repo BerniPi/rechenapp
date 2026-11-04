@@ -110,10 +110,12 @@ const Speicher = {
     if (!st.uebungen.length) st.uebungen = ['plus10'];
     const umstellen = (rek, klein) => {
       Object.keys(rek).forEach((k) => {
-        const neu = Aufgaben.alterSchluessel(k);
-        if (!neu) return;
+        if (!Aufgaben.istAlterSchluessel(k)) return;
         const r = rek[k];
         delete rek[k];
+        // null = alte Aufgaben waren nicht vergleichbar → Rekord verfällt
+        const neu = Aufgaben.alterSchluessel(k);
+        if (!neu) return;
         const alt = rek[neu];
         if (!alt || (klein(neu) ? r.wert < alt.wert : r.wert > alt.wert)) rek[neu] = r;
       });
@@ -162,3 +164,5 @@ const Speicher = {
     this.speichern();
   },
 };
+
+if (typeof module !== 'undefined') module.exports = Speicher;
