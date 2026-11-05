@@ -421,24 +421,60 @@ pruefe('A1: Schnelleres Kind gewinnt bei gleicher Anzahl Richtiger', () => {
   assert.strictEqual(erg[1].platz, 2);
 });
 
-pruefe('A1: Duell-Entscheidungsaufgabe bei absolutem Gleichstand', () => {
-  const sp = {
-    teilnehmer: ['d1', 'd2'],
-    freilos: false,
-    stand: {
-      d1: { index: 10, richtig: 10, falsch: 0, fertigUm: 10000, letzterPunktUm: 10000 },
-      d2: { index: 10, richtig: 10, falsch: 0, fertigUm: 10000, letzterPunktUm: 10000 },
-    },
-  };
-  const ergVor = Turnier.wertungSpiel(sp, 'aufgaben', { strafe: 5 }, 1000, 30000);
-  assert(sp.entscheidung, 'Entscheidungsaufgabe muss angelegt werden');
-  assert(sp.entscheidung.aufgabe, 'Entscheidungsaufgabe muss vorhanden sein');
-  assert.strictEqual(sp.entscheidung.geloestVon, null);
+pruefe('A3: Duell mit Gleichstand wechselt in Phase entscheidung und Sieger kommt weiter', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Entscheidung-Test',
+    einstellungen: { format: 'ko', anzahl: 5 },
+  });
+  const k1 = Turnier.beitreten(code, { name: 'KindA', emoji: '🦊' });
+  const k2 = Turnier.beitreten(code, { name: 'KindB', emoji: '🐻' });
 
-  // d2 löst die Entscheidungsaufgabe zuerst
-  sp.entscheidung.geloestVon = 'd2';
-  const ergNach = Turnier.wertungSpiel(sp, 'aufgaben', { strafe: 5 }, 1000, 30000);
-  assert.strictEqual(ergNach[0].id, 'd2', 'd2 muss durch Entscheidung gewinnen');
+  Turnier.starten(t, leitung);
+  Turnier.rundeStarten(t, leitung, 1000);
+  Turnier.rundeAktivieren(t, 4000);
+
+  const spiel = t.runden[0].spiele[0];
+  assert.strictEqual(spiel.teilnehmer.length, 2);
+
+  // Beide Kinder antworten identisch zu identischen Zeitpunkten (5 Richtige, 0 Fehler)
+  spiel.aufgaben.forEach((aufg, i) => {
+    const tMs = 5000 + i * 1000;
+    antwortenUndSenden(t, k1.schluessel, { spiel: spiel.id, index: i, wert: aufg.loesung }, tMs);
+    antwortenUndSenden(t, k2.schluessel, { spiel: spiel.id, index: i, wert: aufg.loesung }, tMs);
+  });
+
+  // Durch den Gleichstand muss die Phase 'entscheidung' sein!
+  assert.strictEqual(t.phase, 'entscheidung', 'Phase muss nach Gleichstand entscheidung sein');
+  assert(spiel.entscheidung, 'Spiel muss Entscheidungsaufgabe haben');
+  assert(spiel.entscheidung.aufgabe, 'Entscheidungsaufgabe muss vorhanden sein');
+  assert.strictEqual(spiel.entscheidung.geloestVon, null);
+
+  // Kind A antwortet falsch
+  const rFalsch = Turnier.antworten(t, k1.schluessel, { spiel: spiel.id, wert: 9999 }, 11000);
+  assert.strictEqual(rFalsch.richtig, false);
+  assert.strictEqual(rFalsch.gesperrt, true);
+
+  // Kind A versucht sofort noch einmal während der 3s-Sperre
+  const rGesperrt = Turnier.antworten(t, k1.schluessel, { spiel: spiel.id, wert: spiel.entscheidung.aufgabe.loesung }, 12000);
+  assert.strictEqual(rGesperrt.ignoriert, true);
+  assert.strictEqual(rGesperrt.gesperrt, true);
+
+  // Kind B antwortet richtig auf die (neue) Aufgabe
+  const aufgNeu = spiel.entscheidung.aufgabe;
+  const rRichtig = Turnier.antworten(t, k2.schluessel, { spiel: spiel.id, wert: aufgNeu.loesung }, 15000);
+  assert.strictEqual(rRichtig.richtig, true);
+  assert.strictEqual(rRichtig.entscheidungGewonnen, true);
+
+  // Nun muss die Runde beendet sein und Kind B als Sieger feststehen
+  assert.strictEqual(t.phase, 'auswertung');
+  assert.strictEqual(spiel.ergebnis[0].id, k2.id, 'Kind B muss Duell gewonnen haben');
+  assert.strictEqual(spiel.ergebnis[1].id, k1.id, 'Kind A muss verloren haben');
+
+  // Nächste Runde beendet das Turnier (da Finale)
+  Turnier.naechste(t, leitung);
+  assert.strictEqual(t.phase, 'ende');
+  assert.strictEqual(t.teilnehmer.get(k2.id).platz, 1);
+  assert.strictEqual(t.teilnehmer.get(k1.id).platz, 2);
 });
 
 pruefe('A2: Zeit-Runde beendet sich zur Zeitgrenze und blockiert späte Antworten', () => {

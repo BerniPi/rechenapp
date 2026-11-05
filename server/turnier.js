@@ -268,8 +268,9 @@ function wertungSpiel(spiel, art, einstellungen = {}, rundenStart = null, runden
     if (!e1.nichtAngetreten && !e2.nichtAngetreten) {
       if (e1.wertung === e2.wertung && e1.richtig === e2.richtig && e1.falsch === e2.falsch) {
         // Falls bereits eine Entscheidung gelöst wurde:
-        if (spiel.entscheidung && spiel.entscheidung.geloestVon) {
-          if (spiel.entscheidung.geloestVon === e2.id) {
+        if (spiel.entscheidung && (spiel.entscheidung.geloestVon || spiel.entscheidung.losEntscheidung)) {
+          const siegerId = spiel.entscheidung.geloestVon || spiel.entscheidung.losEntscheidung;
+          if (siegerId === e2.id) {
             // e2 hat gewonnen
             ergebnisse.reverse();
           }
@@ -278,6 +279,9 @@ function wertungSpiel(spiel, art, einstellungen = {}, rundenStart = null, runden
           spiel.entscheidung = {
             aufgabe: aufgabenErzeugen(einstellungen, 1)[0],
             geloestVon: null,
+            losEntscheidung: null,
+            sperreBis: {},
+            erstelltUm: Date.now(),
           };
         }
       }
@@ -921,6 +925,15 @@ function rundeBeenden(t, leitungSchluessel, jetzt = Date.now()) {
     }
   });
 
+  // Offene Entscheidungsaufgaben prüfen
+  const offeneEntscheidungen = runde.spiele.filter(
+    (sp) => sp.entscheidung && !sp.entscheidung.geloestVon && !sp.entscheidung.losEntscheidung
+  );
+  if (offeneEntscheidungen.length > 0) {
+    t.phase = 'entscheidung';
+    return runde;
+  }
+
   // K.-o.-Ausscheiden markieren
   const format = t.einstellungen.format;
   const istKoRunde = format === 'ko' || t.inKoPhase;
@@ -1106,6 +1119,83 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
   const runde = t.runden[t.aktuelleRundeNr - 1];
   if (!runde) return { ignoriert: true, grund: 'Keine aktive Runde' };
 
+  if (t.phase === 'entscheidung') {
+    const tn = teilnehmerNachSchluessel(t, teilnehmerSchluessel);
+    if (!tn) {
+      const err = new Error('Teilnehmer nicht gefunden');
+      err.status = 401;
+      throw err;
+    }
+
+    const spiel = runde.spiele.find((sp) => sp.id === spielId);
+    if (!spiel || !spiel.teilnehmer.includes(tn.id)) {
+      const err = new Error('Spiel nicht gefunden');
+      err.status = 404;
+      throw err;
+    }
+
+    if (!spiel.entscheidung || spiel.entscheidung.geloestVon || spiel.entscheidung.losEntscheidung) {
+      return { ignoriert: true, grund: 'Keine offene Entscheidung' };
+    }
+
+    if (!spiel.entscheidung.sperreBis) spiel.entscheidung.sperreBis = {};
+    const sperreBis = spiel.entscheidung.sperreBis[tn.id] || 0;
+    if (jetzt < sperreBis) {
+      return {
+        ignoriert: true,
+        gesperrt: true,
+        sperreBis,
+        restSek: Math.ceil((sperreBis - jetzt) / 1000),
+      };
+    }
+
+    const istRichtig = Number(wert) === spiel.entscheidung.aufgabe.loesung;
+    if (istRichtig) {
+      spiel.entscheidung.geloestVon = tn.id;
+      spiel.ergebnis = wertungSpiel(spiel, t.einstellungen.art, t.einstellungen, runde.start, runde.dauerMs);
+
+      const nochOffen = runde.spiele.some(
+        (sp) => sp.entscheidung && !sp.entscheidung.geloestVon && !sp.entscheidung.losEntscheidung
+      );
+
+      if (!nochOffen) {
+        const format = t.einstellungen.format;
+        const istKoRunde = format === 'ko' || t.inKoPhase;
+        if (istKoRunde) {
+          runde.spiele.forEach((sp) => {
+            if (sp.ergebnis && sp.ergebnis.length >= 2 && sp.typ !== 'platz3') {
+              const verliererId = sp.ergebnis[1].id;
+              const istHalbfinale = runde.stufe === 'halbfinale' || runde.spiele.length === 2;
+              if (!(istHalbfinale && t.einstellungen.platz3)) {
+                const verliererTn = t.teilnehmer.get(verliererId);
+                if (verliererTn) verliererTn.aktiv = false;
+              }
+            }
+          });
+        }
+        t.phase = 'auswertung';
+      }
+
+      return {
+        richtig: true,
+        entscheidungGewonnen: true,
+        entscheidungBeendet: !nochOffen,
+        fertig: true,
+        naechste: null,
+      };
+    } else {
+      spiel.entscheidung.sperreBis[tn.id] = jetzt + 3000;
+      spiel.entscheidung.aufgabe = aufgabenErzeugen(t.einstellungen, 1)[0];
+      return {
+        richtig: false,
+        gesperrt: true,
+        sperreBis: jetzt + 3000,
+        naechste: aufgabenFuerKind(spiel.entscheidung.aufgabe),
+        aufgabeNeu: aufgabenFuerKind(spiel.entscheidung.aufgabe),
+      };
+    }
+  }
+
   if (t.phase !== 'laeuft') {
     return { ignoriert: true, grund: 'Runde läuft nicht' };
   }
@@ -1135,18 +1225,6 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
   // Bereits fertig?
   if (st.fertigUm) {
     return { fertig: true, richtig: null, naechste: null };
-  }
-
-  // Entscheidungsaufgabe aktiv?
-  if (spiel.entscheidung && !spiel.entscheidung.geloestVon) {
-    const istEntscheidungRichtig = Number(wert) === spiel.entscheidung.aufgabe.loesung;
-    if (istEntscheidungRichtig) {
-      spiel.entscheidung.geloestVon = tn.id;
-      // Sieger festlegen
-      spiel.ergebnis = wertungSpiel(spiel, t.einstellungen.art, t.einstellungen, runde.start, runde.dauerMs);
-      return { richtig: true, fertig: true, naechste: null, entscheidungGewonnen: true };
-    }
-    return { richtig: false, fertig: false, naechste: aufgabenFuerKind(spiel.entscheidung.aufgabe) };
   }
 
   // Index-Prüfung: doppelte oder veraltete Antworten ignorieren
@@ -1194,6 +1272,49 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
     rundeFertig,
     naechste: aufgabenFuerKind(naechsteAufg),
   };
+}
+
+// Timeout nach 60 Sekunden ohne gelöste Entscheidung: weniger Fehler gewinnt, sonst Los
+function entscheidungTimeoutAufloesen(t, jetzt = Date.now()) {
+  const runde = t.runden[t.aktuelleRundeNr - 1];
+  if (!runde) return null;
+
+  runde.spiele.forEach((sp) => {
+    if (sp.entscheidung && !sp.entscheidung.geloestVon && !sp.entscheidung.losEntscheidung) {
+      const [t1, t2] = sp.teilnehmer;
+      const st1 = (sp.stand && sp.stand[t1]) || { falsch: 0 };
+      const st2 = (sp.stand && sp.stand[t2]) || { falsch: 0 };
+      let siegerId = null;
+      if (st1.falsch < st2.falsch) {
+        siegerId = t1;
+      } else if (st2.falsch < st1.falsch) {
+        siegerId = t2;
+      } else {
+        siegerId = Math.random() < 0.5 ? t1 : t2;
+        sp.entscheidung.los = true;
+      }
+      sp.entscheidung.losEntscheidung = siegerId;
+      sp.ergebnis = wertungSpiel(sp, t.einstellungen.art, t.einstellungen, runde.start, runde.dauerMs);
+    }
+  });
+
+  const format = t.einstellungen.format;
+  const istKoRunde = format === 'ko' || t.inKoPhase;
+  if (istKoRunde) {
+    runde.spiele.forEach((sp) => {
+      if (sp.ergebnis && sp.ergebnis.length >= 2 && sp.typ !== 'platz3') {
+        const verliererId = sp.ergebnis[1].id;
+        const istHalbfinale = runde.stufe === 'halbfinale' || runde.spiele.length === 2;
+        if (!(istHalbfinale && t.einstellungen.platz3)) {
+          const verliererTn = t.teilnehmer.get(verliererId);
+          if (verliererTn) verliererTn.aktiv = false;
+        }
+      }
+    });
+  }
+
+  t.phase = 'auswertung';
+  return runde;
 }
 
 // Neues Turnier mit denselben Kindern anlegen (nach Ende)
@@ -1255,6 +1376,7 @@ module.exports = {
   naechste,
   abbrechen,
   antworten,
+  entscheidungTimeoutAufloesen,
   neuesTurnierGleicheKinder,
   // Pure Algorithmen und Helfer für Tests
   gruppenEinteilen,

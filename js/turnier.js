@@ -131,6 +131,28 @@
       aktuelleEingabe = '';
     });
 
+    eventSource.addEventListener('entscheidung', (ev) => {
+      const daten = JSON.parse(ev.data);
+      meinSpielId = daten.spiel;
+      meineAufgaben = [daten.aufgabe];
+      aufgabenIndex = 0;
+      aktuelleEingabe = '';
+      zeigeScreen('screen-rechnen');
+      const tastatur = $('#tastatur');
+      if (tastatur) tastatur.classList.remove('gesperrt');
+      $('#leiste-ich').textContent = '⚡ Entscheidung';
+      $('#leiste-gegner').textContent = 'Wer zuerst richtig hat!';
+      aufgabeZeigen();
+    });
+
+    eventSource.addEventListener('entscheidung_beamer', (ev) => {
+      const daten = JSON.parse(ev.data);
+      if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
+      aktuellerZustand.phase = 'entscheidung';
+      if (daten && daten.runde) aktuellerZustand.runde = daten.runde;
+      zustandAktualisieren(aktuellerZustand);
+    });
+
     eventSource.addEventListener('fortschritt', (ev) => {
       const daten = JSON.parse(ev.data);
       fortschrittAktualisieren(daten);
@@ -199,9 +221,18 @@
         }
         break;
       }
+      case 'entscheidung': {
+        zeigeScreen('screen-ergebnis');
+        ergebnisRendern(z.runde);
+        const btn = $('#btn-naechste-runde');
+        if (btn) btn.disabled = true;
+        break;
+      }
       case 'auswertung': {
         zeigeScreen('screen-ergebnis');
         ergebnisRendern(z.runde);
+        const btn = $('#btn-naechste-runde');
+        if (btn) btn.disabled = false;
         break;
       }
       case 'ende': {
@@ -600,6 +631,19 @@
           </div>
         `;
       });
+      if (sp.entscheidung) {
+        if (sp.entscheidung.geloestVon) {
+          const siegerTn = (sp.teilnehmer || []).find((t) => (typeof t === 'string' ? t === sp.entscheidung.geloestVon : t.id === sp.entscheidung.geloestVon));
+          const name = siegerTn ? (siegerTn.name || siegerTn.id) : sp.entscheidung.geloestVon;
+          html += `<div class="klein fett text-blau mt-1">⚡ Entschieden durch Zusatzaufgabe: ${escapeHtml(name)}</div>`;
+        } else if (sp.entscheidung.los) {
+          const siegerTn = (sp.teilnehmer || []).find((t) => (typeof t === 'string' ? t === sp.entscheidung.losEntscheidung : t.id === sp.entscheidung.losEntscheidung));
+          const name = siegerTn ? (siegerTn.name || siegerTn.id) : sp.entscheidung.losEntscheidung;
+          html += `<div class="klein fett text-blau mt-1">🎲 Entschieden durch Los: ${escapeHtml(name)}</div>`;
+        } else {
+          html += '<div class="klein fett text-blau mt-1">⚡ Entscheidung läuft …</div>';
+        }
+      }
       karte.innerHTML = html;
       raster.appendChild(karte);
     });
@@ -773,6 +817,27 @@
     if (lueckeElem) lueckeElem.textContent = aktuelleEingabe || '?';
   }
 
+  let sperreTimer = null;
+  function sperreAktivieren(sekunden) {
+    const tastatur = $('#tastatur');
+    if (tastatur) tastatur.classList.add('gesperrt');
+    const leisteIch = $('#leiste-ich');
+    let rest = sekunden;
+    if (leisteIch) leisteIch.textContent = `⏳ Sperre (${rest} s)`;
+    if (sperreTimer) clearInterval(sperreTimer);
+    sperreTimer = setInterval(() => {
+      rest--;
+      if (rest > 0) {
+        if (leisteIch) leisteIch.textContent = `⏳ Sperre (${rest} s)`;
+      } else {
+        clearInterval(sperreTimer);
+        sperreTimer = null;
+        if (tastatur) tastatur.classList.remove('gesperrt');
+        if (leisteIch) leisteIch.textContent = '⚡ Entscheidung';
+      }
+    }, 1000);
+  }
+
   async function antwortAbsenden(wert) {
     const index = aufgabenIndex;
     const karte = $('#aufgabe-karte');
@@ -797,8 +862,27 @@
       }
       const daten = await res.json();
 
+      if (daten.gesperrt) {
+        if (typeof Ton !== 'undefined') Ton.falsch();
+        karte.classList.add('nok');
+        sperreAktivieren(daten.restSek || 3);
+        if (daten.aufgabeNeu) {
+          meineAufgaben = [daten.aufgabeNeu];
+          aufgabenIndex = 0;
+        }
+        setTimeout(() => {
+          karte.classList.remove('nok');
+          aufgabeZeigen();
+          sendetGerade = false;
+        }, 300);
+        return;
+      }
+
       if (daten.ignoriert) {
-        if (typeof daten.aktuellerIndex === 'number') {
+        if (daten.fertig) {
+          zeigeScreen('screen-warten');
+          $('#warten-status').textContent = 'Du hast alle Aufgaben gelöst! Warte auf das Rundenende …';
+        } else if (typeof daten.aktuellerIndex === 'number') {
           aufgabenIndex = daten.aktuellerIndex;
           if (daten.naechste) {
             meineAufgaben[aufgabenIndex] = daten.naechste;

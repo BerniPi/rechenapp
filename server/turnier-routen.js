@@ -51,6 +51,7 @@ function timerLoeschen(code) {
   if (tObj) {
     if (tObj.countdownTimer) clearTimeout(tObj.countdownTimer);
     if (tObj.rundenTimer) clearTimeout(tObj.rundenTimer);
+    if (tObj.entscheidungTimer) clearTimeout(tObj.entscheidungTimer);
     timerMap.delete(code);
   }
 }
@@ -62,6 +63,44 @@ function rundenendeSenden(t, leitungSchluessel) {
   try {
     runde = Turnier.rundeBeenden(t, leitungSchluessel);
   } catch (err) {
+    return;
+  }
+
+  // Phase 'entscheidung': Duelle mit Gleichstand
+  if (t.phase === 'entscheidung') {
+    const eTimer = setTimeout(() => {
+      if (t.phase === 'entscheidung') {
+        Turnier.entscheidungTimeoutAufloesen(t);
+        rundenendeSenden(t);
+      }
+    }, 60000);
+    eTimer.unref();
+    timerMap.set(t.code, { entscheidungTimer: eTimer });
+
+    const pool = verbindungen.get(t.code);
+    if (pool) {
+      for (const c of pool) {
+        if (c.rolle === 'kind') {
+          const sp = runde.spiele.find(
+            (s) => s.teilnehmer.includes(c.teilnehmerId) && s.entscheidung && !s.entscheidung.geloestVon && !s.entscheidung.losEntscheidung
+          );
+          if (sp) {
+            sseSenden(c.res, 'entscheidung', {
+              spiel: sp.id,
+              aufgabe: Turnier.aufgabenFuerKind(sp.entscheidung.aufgabe),
+              nachricht: 'Entscheidung! Wer zuerst richtig rechnet, gewinnt',
+            });
+            continue;
+          }
+        }
+        const payload = {
+          phase: t.phase,
+          runde: rundeFuerAnzeige(t, c),
+          teilnehmer: teilnehmerListe(t),
+        };
+        sseSenden(c.res, 'entscheidung_beamer', payload);
+      }
+    }
     return;
   }
   const pool = verbindungen.get(t.code);
@@ -471,6 +510,9 @@ async function anfrage(req, res, url) {
           return H.json(res, 200, { ok: true, phase: t.phase });
         }
         case 'naechste': {
+          if (t.phase === 'entscheidung') {
+            return H.fehler(res, 409, 'Entscheidungsaufgabe läuft noch');
+          }
           Turnier.naechste(t, schluessel);
           const pool = verbindungen.get(t.code);
           if (pool) {
@@ -535,12 +577,29 @@ async function anfrage(req, res, url) {
     }
 
     const b = await H.body(req, 1024);
-    if (!b || b.spiel === undefined || b.index === undefined || b.wert === undefined) {
+    if (!b || b.spiel === undefined || b.wert === undefined) {
       return H.fehler(res, 400, 'Ungültige Antwortdaten');
     }
 
     try {
       const ergebnis = Turnier.antworten(t, schluessel, b);
+
+      if (t.phase === 'entscheidung' || ergebnis.entscheidungGewonnen || ergebnis.aufgabeNeu) {
+        if (ergebnis.richtig && ergebnis.entscheidungBeendet) {
+          rundenendeSenden(t);
+        } else if (!ergebnis.richtig && ergebnis.aufgabeNeu) {
+          const runde = t.runden[t.aktuelleRundeNr - 1];
+          const spiel = runde && runde.spiele.find((sp) => sp.id === b.spiel);
+          if (spiel) {
+            senden(t.code, 'entscheidung', {
+              spiel: b.spiel,
+              aufgabe: ergebnis.aufgabeNeu,
+              nachricht: 'Entscheidung! Wer zuerst richtig rechnet, gewinnt',
+            }, (c) => spiel.teilnehmer.includes(c.teilnehmerId));
+          }
+        }
+        return H.json(res, 200, ergebnis);
+      }
 
       // Fortschritt an Leitung, Zuschauer und Gegner im selben Spiel senden
       if (!ergebnis.ignoriert) {

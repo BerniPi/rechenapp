@@ -699,6 +699,11 @@
 }
 .tastatur .ok-knopf:active { background: #16a34a; }
 
+.tastatur.gesperrt {
+  pointer-events: none;
+  opacity: 0.35;
+}
+
 /* Druck-Stylesheet für die Siegerehrung der Lehrkraft */
 @media print {
   body { background: white !important; color: black !important; }
