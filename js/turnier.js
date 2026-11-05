@@ -670,6 +670,10 @@
   // -------------------------------------------------------------------
   function siegerehrungRendern(teilnehmer) {
     if (typeof Ton !== 'undefined') Ton.jubel();
+    const titelElem = $('#siegerehrung-titel');
+    if (titelElem) {
+      titelElem.textContent = (aktuellerZustand && aktuellerZustand.titel) || 'Rechen-Turnier';
+    }
     const sortiert = teilnehmer.slice().sort((a, b) => {
       const pA = Number.parseInt(a.platz) || 999;
       const pB = Number.parseInt(b.platz) || 999;
