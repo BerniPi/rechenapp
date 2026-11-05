@@ -12,13 +12,17 @@ const MAX_TEILNEHMER = 60;
 const INAKTIV_MS = 3 * 60 * 60 * 1000; // 3 Stunden inaktiv
 const MAX_ALTER_MS = 8 * 60 * 60 * 1000; // 8 Stunden absolut
 
+const PUNKTE_LIGA = [10, 8, 6, 5, 4, 3, 2, 1];
+const PUNKTE_GRUPPE = [5, 3, 2, 1];
+
 // 4-stelliger Turnier-Code aus H.ZEICHEN ohne verwechselbare Zeichen (0/O, 1/I)
+const ZEICHEN_CODE = H.ZEICHEN || '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function codeErzeugen() {
   for (let versuch = 0; versuch < 1000; versuch++) {
     const bytes = crypto.randomBytes(4);
     let code = '';
     for (let i = 0; i < 4; i++) {
-      code += H.ZEICHEN[bytes[i] % H.ZEICHEN.length];
+      code += ZEICHEN_CODE[bytes[i] % ZEICHEN_CODE.length];
     }
     if (!turniere.has(code)) return code;
   }
@@ -113,11 +117,11 @@ function setzListe(groesse) {
 }
 
 // K.-o.-Baum generieren
-// teilnehmer: geordnete oder gemischte IDs (Index 0 = Setzplatz 1)
+// teilnehmerIds: geordnete oder gemischte IDs (Index 0 = Setzplatz 1)
 function koBaumErstellen(teilnehmerIds, optionen = {}) {
   const k = teilnehmerIds.length;
   if (k < 2) {
-    return { groesse: k, rundenZahl: 0, duelle: [] };
+    return { groesse: k, rundenZahl: 0, duelleRunde1: [] };
   }
   let groesse = 2;
   while (groesse < k) groesse *= 2;
@@ -158,14 +162,16 @@ function koBaumErstellen(teilnehmerIds, optionen = {}) {
 }
 
 // Aufgaben für ein Spiel erzeugen
-function aufgabenErzeugen(einstellungen, anzahlExtra = 0) {
+function aufgabenErzeugen(einstellungen = {}, anzahlExtra = 0) {
   const gen = Aufgaben.erzeuger({
-    uebungen: einstellungen.uebungen,
-    einsetzen: einstellungen.einsetzen,
+    uebungen: (einstellungen && Array.isArray(einstellungen.uebungen) && einstellungen.uebungen.length > 0)
+      ? einstellungen.uebungen
+      : ['plus10', 'minus10', 'plus20'],
+    einsetzen: Boolean(einstellungen && einstellungen.einsetzen),
   });
-  const anzahl = einstellungen.art === 'zeit'
-    ? Math.max(30, Math.ceil(einstellungen.sekunden / 2) + 15)
-    : einstellungen.anzahl + anzahlExtra;
+  const anzahl = (einstellungen && einstellungen.art === 'zeit')
+    ? Math.max(40, Math.ceil((einstellungen.sekunden || 30) / 1.5) + 20)
+    : ((einstellungen && einstellungen.anzahl) || 10) + anzahlExtra;
 
   const liste = [];
   for (let i = 0; i < anzahl; i++) {
@@ -175,9 +181,11 @@ function aufgabenErzeugen(einstellungen, anzahlExtra = 0) {
 }
 
 // Wertung für ein Spiel ermitteln
-function wertungSpiel(spiel, art, einstellungen = {}) {
+function wertungSpiel(spiel, art, einstellungen = {}, rundenStart = null, rundenDauerMs = null) {
   const strafeSek = einstellungen.strafe ?? 5;
   const teilnehmer = spiel.teilnehmer || [];
+  const startMs = spiel.start || rundenStart || 0;
+  const standardDauerMs = spiel.dauerMs || rundenDauerMs || (art === 'zeit' ? (einstellungen.sekunden || 60) * 1000 : 30000);
 
   // Freilos
   if (spiel.freilos) {
@@ -195,13 +203,27 @@ function wertungSpiel(spiel, art, einstellungen = {}) {
     }];
   }
 
+  if (spiel.kampflos && spiel.sieger) {
+    const siegerId = spiel.sieger;
+    const verliererId = teilnehmer.find((id) => id !== siegerId) || teilnehmer[0];
+    return [
+      { id: siegerId, platz: 1, richtig: 0, falsch: 0, zeit: 0, punkte: 1, wertung: 1, freilos: false, nichtAngetreten: false, kampflos: true },
+      { id: verliererId, platz: 2, richtig: 0, falsch: 0, zeit: 0, punkte: 0, wertung: 0, freilos: false, nichtAngetreten: true, kampflos: true },
+    ];
+  }
+
   const ergebnisse = teilnehmer.map((id) => {
     const st = (spiel.stand && spiel.stand[id]) || {
       index: 0, richtig: 0, falsch: 0, fertigUm: null, letzterPunktUm: null,
     };
     const nichtAngetreten = st.index === 0;
-    const dauerMs = st.fertigUm && spiel.start ? st.fertigUm - spiel.start : (spiel.dauerMs || 0);
-    const dauerSek = Math.max(0, Math.round(dauerMs / 100) / 10);
+
+    // Echte gemessene Zeit von Rundenstart bis Fertigstellung
+    let dauerMs = standardDauerMs;
+    if (st.fertigUm && startMs) {
+      dauerMs = Math.max(100, st.fertigUm - startMs);
+    }
+    const dauerSek = Math.round(dauerMs / 10) / 100; // z. B. 5.23 s
 
     let wertung = 0;
     let punkte = 0;
@@ -209,13 +231,13 @@ function wertungSpiel(spiel, art, einstellungen = {}) {
     if (art === 'aufgaben') {
       // mehr richtig > weniger Zeit (inkl. Strafsekunden)
       const zeitMitStrafe = dauerSek + st.falsch * strafeSek;
-      wertung = st.richtig * 10000 - zeitMitStrafe;
+      wertung = st.richtig * 1000000 - zeitMitStrafe * 100;
     } else {
       // Zeit-Modus: Punkte = richtig - Math.floor(falsch / 4)
       punkte = Math.max(0, st.richtig - Math.floor(st.falsch / 4));
       // mehr Punkte > weniger Fehler > früherer letzter Punkt
-      const zeitBonus = st.letzterPunktUm && spiel.start ? Math.max(0, 100000 - (st.letzterPunktUm - spiel.start) / 100) : 0;
-      wertung = punkte * 1000000 - st.falsch * 1000 + zeitBonus;
+      const zeitBonus = st.letzterPunktUm && startMs ? Math.max(0, 100000 - (st.letzterPunktUm - startMs) / 10) : 0;
+      wertung = punkte * 10000000 - st.falsch * 10000 + zeitBonus;
     }
 
     return {
@@ -240,6 +262,28 @@ function wertungSpiel(spiel, art, einstellungen = {}) {
     return 0;
   });
 
+  // Duell-Entscheidungsaufgabe bei absolutem Gleichstand
+  if (teilnehmer.length === 2 && !spiel.freilos) {
+    const [e1, e2] = ergebnisse;
+    if (!e1.nichtAngetreten && !e2.nichtAngetreten) {
+      if (e1.wertung === e2.wertung && e1.richtig === e2.richtig && e1.falsch === e2.falsch) {
+        // Falls bereits eine Entscheidung gelöst wurde:
+        if (spiel.entscheidung && spiel.entscheidung.geloestVon) {
+          if (spiel.entscheidung.geloestVon === e2.id) {
+            // e2 hat gewonnen
+            ergebnisse.reverse();
+          }
+        } else if (!spiel.entscheidung) {
+          // Entscheidungsaufgabe anlegen
+          spiel.entscheidung = {
+            aufgabe: aufgabenErzeugen(einstellungen, 1)[0],
+            geloestVon: null,
+          };
+        }
+      }
+    }
+  }
+
   // Plätze vergeben (bei gleicher Wertung gleicher Platz)
   ergebnisse.forEach((e, idx) => {
     if (idx > 0 && e.wertung === ergebnisse[idx - 1].wertung && e.nichtAngetreten === ergebnisse[idx - 1].nichtAngetreten) {
@@ -254,11 +298,14 @@ function wertungSpiel(spiel, art, einstellungen = {}) {
 
 // Inaktive oder zu alte Turniere aufräumen
 function aufraeumen(jetzt = Date.now()) {
+  const geloescht = [];
   for (const [code, t] of turniere.entries()) {
     if (jetzt - t.zuletzt > INAKTIV_MS || jetzt - t.erstellt > MAX_ALTER_MS) {
       turniere.delete(code);
+      geloescht.push(code);
     }
   }
+  return geloescht;
 }
 
 // Neues Turnier anlegen
@@ -285,8 +332,8 @@ function anlegen({ titel = '', einstellungen = {} } = {}) {
     teilnehmer: new Map(),
     runden: [],
     baum: null,
+    gruppen: null,
     aktuelleRundeNr: 0,
-    entscheidung: null,
   };
 
   turniere.set(code, t);
@@ -370,6 +417,8 @@ function beitreten(code, { name, emoji }) {
     verbunden: true,
     aktiv: true,
     punkte: 0,
+    gesamtRichtig: 0,
+    gesamtZeit: 0,
     platz: null,
   };
 
@@ -391,6 +440,24 @@ function verlassen(code, teilnehmerSchluessel) {
   } else {
     tn.aktiv = false;
     tn.verbunden = false;
+    // Falls das Kind in der aktuellen Runde in einem K.-o.-Spiel ist:
+    const runde = t.runden[t.aktuelleRundeNr - 1];
+    if (runde && runde.spiele) {
+      runde.spiele.forEach((sp) => {
+        if (sp.teilnehmer && sp.teilnehmer.includes(tn.id) && sp.teilnehmer.length === 2) {
+          const gegnerId = sp.teilnehmer.find((id) => id !== tn.id);
+          const gegner = t.teilnehmer.get(gegnerId);
+          if (gegner && gegner.aktiv) {
+            sp.kampflos = true;
+            sp.sieger = gegnerId;
+            sp.ergebnis = [
+              { id: gegnerId, platz: 1, richtig: 0, falsch: 0, zeit: 0, punkte: 1, wertung: 1, freilos: false, nichtAngetreten: false, kampflos: true },
+              { id: tn.id, platz: 2, richtig: 0, falsch: 0, zeit: 0, punkte: 0, wertung: 0, freilos: false, nichtAngetreten: true, kampflos: true },
+            ];
+          }
+        }
+      });
+    }
   }
   return { id: tn.id };
 }
@@ -411,6 +478,24 @@ function entfernen(t, leitungSchluessel, teilnehmerId) {
   } else {
     tn.aktiv = false;
     tn.verbunden = false;
+    // Falls das Kind in der aktuellen Runde in einem K.-o.-Spiel ist:
+    const runde = t.runden[t.aktuelleRundeNr - 1];
+    if (runde && runde.spiele) {
+      runde.spiele.forEach((sp) => {
+        if (sp.teilnehmer && sp.teilnehmer.includes(teilnehmerId) && sp.teilnehmer.length === 2) {
+          const gegnerId = sp.teilnehmer.find((id) => id !== teilnehmerId);
+          const gegner = t.teilnehmer.get(gegnerId);
+          if (gegner && gegner.aktiv) {
+            sp.kampflos = true;
+            sp.sieger = gegnerId;
+            sp.ergebnis = [
+              { id: gegnerId, platz: 1, richtig: 0, falsch: 0, zeit: 0, punkte: 1, wertung: 1, freilos: false, nichtAngetreten: false, kampflos: true },
+              { id: teilnehmerId, platz: 2, richtig: 0, falsch: 0, zeit: 0, punkte: 0, wertung: 0, freilos: false, nichtAngetreten: true, kampflos: true },
+            ];
+          }
+        }
+      });
+    }
   }
   return tn;
 }
@@ -438,8 +523,8 @@ function rundePlanen(t) {
   const spiele = [];
   const format = t.einstellungen.format;
 
-  if (format === 'sprint') {
-    // Sprint: genau eine Runde, alle in einem Spiel
+  if (format === 'sprint' || format === 'liga') {
+    // Sprint / Liga: alle Teilnehmer in einem Spiel
     const aufgaben = aufgabenErzeugen(t.einstellungen);
     const teilnehmerIds = aktive.map((tn) => tn.id);
     const stand = {};
@@ -458,17 +543,73 @@ function rundePlanen(t) {
 
     t.runden.push({
       nr,
-      stufe: 'sprint',
+      stufe: format === 'liga' ? 'liga' : 'sprint',
       start: 0,
+      dauerMs: 0,
       ende: 0,
       spiele,
     });
-  } else if (format === 'ko') {
-    // K.-o.-Runde planen
-    if (nr === 1) {
-      // Runde 1: K.-o.-Baum anlegen
-      const gemischt = mischen(aktive.map((tn) => tn.id));
-      const baum = koBaumErstellen(gemischt, { platz3: t.einstellungen.platz3 });
+  } else if (format === 'gruppen_ko' && (!t.inKoPhase && nr <= t.einstellungen.gruppenRunden)) {
+    // Gruppenphase (Runde 1 bis gruppenRunden): feste Gruppen!
+    if (!t.gruppen) {
+      t.gruppen = gruppenEinteilen(aktive.map((tn) => tn.id), t.einstellungen.gruppenGroesse);
+    }
+    t.gruppen.forEach((gruppe, gIdx) => {
+      const aufgaben = aufgabenErzeugen(t.einstellungen);
+      const stand = {};
+      gruppe.forEach((id) => {
+        stand[id] = { index: 0, richtig: 0, falsch: 0, fertigUm: null, letzterPunktUm: null };
+      });
+      spiele.push({
+        id: `r${nr}g${gIdx + 1}`,
+        teilnehmer: gruppe,
+        freilos: false,
+        aufgaben,
+        stand,
+        ergebnis: null,
+        gruppeNr: gIdx + 1,
+      });
+    });
+
+    t.runden.push({
+      nr,
+      stufe: 'gruppe',
+      start: 0,
+      dauerMs: 0,
+      ende: 0,
+      spiele,
+    });
+  } else {
+    // K.-o.-Phase (entweder Format 'ko' oder nach Gruppenphase)
+    const istErsteKoRunde = !t.baum;
+
+    if (istErsteKoRunde) {
+      let setzReihenfolge;
+      if (format === 'gruppen_ko') {
+        // Gruppen-Aufsteiger ermitteln
+        t.inKoPhase = true;
+        const aufsteiger = [];
+        t.gruppen.forEach((gruppe) => {
+          const tnGruppe = gruppe.map((id) => t.teilnehmer.get(id));
+          tnGruppe.sort((a, b) => (b.punkte || 0) - (a.punkte || 0));
+          const weiter = tnGruppe.slice(0, t.einstellungen.weiterProGruppe);
+          aufsteiger.push(...weiter);
+        });
+
+        // Alle Nicht-Aufsteiger ausscheiden lassen
+        const aufsteigerIds = new Set(aufsteiger.map((tn) => tn.id));
+        t.teilnehmer.forEach((tn) => {
+          if (!aufsteigerIds.has(tn.id)) tn.aktiv = false;
+        });
+
+        // Sortieren nach Gruppenpunkten für K.-o.-Setzung
+        aufsteiger.sort((a, b) => (b.punkte || 0) - (a.punkte || 0));
+        setzReihenfolge = aufsteiger.map((tn) => tn.id);
+      } else {
+        setzReihenfolge = mischen(aktive.map((tn) => tn.id));
+      }
+
+      const baum = koBaumErstellen(setzReihenfolge, { platz3: t.einstellungen.platz3 });
       t.baum = baum;
 
       baum.duelleRunde1.forEach((d, idx) => {
@@ -479,37 +620,60 @@ function rundePlanen(t) {
           stand[id] = { index: 0, richtig: 0, falsch: 0, fertigUm: null, letzterPunktUm: null };
         });
 
+        const tn1 = d.t1 ? t.teilnehmer.get(d.t1) : null;
+        const tn2 = d.t2 ? t.teilnehmer.get(d.t2) : null;
+        let kampflos = false;
+        let sieger = d.sieger;
+        if (!d.freilos && tn1 && tn2) {
+          if (!tn1.aktiv && tn2.aktiv) {
+            kampflos = true;
+            sieger = tn2.id;
+          } else if (tn1.aktiv && !tn2.aktiv) {
+            kampflos = true;
+            sieger = tn1.id;
+          }
+        }
+
         spiele.push({
           id: `r${nr}s${idx + 1}`,
           teilnehmer: teilnehmerIds,
           freilos: d.freilos,
-          sieger: d.sieger,
+          kampflos,
+          sieger,
           aufgaben,
           stand,
-          ergebnis: d.freilos
-            ? wertungSpiel({ teilnehmer: teilnehmerIds, freilos: true, sieger: d.sieger }, t.einstellungen.art, t.einstellungen)
+          ergebnis: (d.freilos || kampflos)
+            ? wertungSpiel({ teilnehmer: teilnehmerIds, freilos: d.freilos, kampflos, sieger }, t.einstellungen.art, t.einstellungen)
             : null,
+          typ: 'ko',
         });
       });
 
+      let stufe;
+      if (baum.rundenZahl === 1) stufe = 'finale';
+      else if (baum.rundenZahl === 2) stufe = 'halbfinale';
+      else if (baum.rundenZahl === 3) stufe = 'viertelfinale';
+      else if (baum.rundenZahl === 4) stufe = 'achtelfinale';
+      else stufe = `ko_${nr}`;
+
       t.runden.push({
         nr,
-        stufe: baum.rundenZahl === 1 ? 'finale' : (baum.rundenZahl === 2 ? 'halbfinale' : `ko_${nr}`),
+        stufe,
         start: 0,
+        dauerMs: 0,
         ende: 0,
         spiele,
       });
     } else {
-      // Folge-Runde K.-o.: Sieger der vorherigen Runde paaren
+      // Folge-Runde K.-o.
       const vorRunde = t.runden[nr - 2];
       const siegerIds = [];
       vorRunde.spiele.forEach((sp) => {
-        if (sp.ergebnis && sp.ergebnis[0]) {
+        if (sp.ergebnis && sp.ergebnis[0] && sp.typ !== 'platz3') {
           siegerIds.push(sp.ergebnis[0].id);
         }
       });
 
-      // Spiel um Platz 3 (wenn aktiviert und Finale ansteht)
       const istFinale = siegerIds.length === 2;
       const istPlatz3Noetig = istFinale && t.einstellungen.platz3 && vorRunde.spiele.length === 2;
 
@@ -524,14 +688,31 @@ function rundePlanen(t) {
           stand[id] = { index: 0, richtig: 0, falsch: 0, fertigUm: null, letzterPunktUm: null };
         });
 
+        const tn1 = p1 ? t.teilnehmer.get(p1) : null;
+        const tn2 = p2 ? t.teilnehmer.get(p2) : null;
+        let kampflos = false;
+        let sieger = freilos ? p1 : null;
+        if (!freilos && tn1 && tn2) {
+          if (!tn1.aktiv && tn2.aktiv) {
+            kampflos = true;
+            sieger = tn2.id;
+          } else if (tn1.aktiv && !tn2.aktiv) {
+            kampflos = true;
+            sieger = tn1.id;
+          }
+        }
+
         spiele.push({
           id: `r${nr}s${spiele.length + 1}`,
           teilnehmer: teilnehmerIds,
           freilos,
-          sieger: freilos ? p1 : null,
+          kampflos,
+          sieger,
           aufgaben,
           stand,
-          ergebnis: null,
+          ergebnis: (freilos || kampflos)
+            ? wertungSpiel({ teilnehmer: teilnehmerIds, freilos, kampflos, sieger }, t.einstellungen.art, t.einstellungen)
+            : null,
           typ: istFinale ? 'finale' : 'ko',
         });
       }
@@ -540,7 +721,7 @@ function rundePlanen(t) {
       if (istPlatz3Noetig) {
         const verliererIds = [];
         vorRunde.spiele.forEach((sp) => {
-          if (sp.ergebnis && sp.ergebnis[1]) {
+          if (sp.ergebnis && sp.ergebnis[1] && sp.typ !== 'platz3') {
             verliererIds.push(sp.ergebnis[1].id);
           }
         });
@@ -562,41 +743,22 @@ function rundePlanen(t) {
         }
       }
 
+      let stufe;
+      if (istFinale) stufe = 'finale';
+      else if (siegerIds.length <= 4) stufe = 'halbfinale';
+      else if (siegerIds.length <= 8) stufe = 'viertelfinale';
+      else if (siegerIds.length <= 16) stufe = 'achtelfinale';
+      else stufe = `ko_${nr}`;
+
       t.runden.push({
         nr,
-        stufe: istFinale ? 'finale' : `ko_${nr}`,
+        stufe,
         start: 0,
+        dauerMs: 0,
         ende: 0,
         spiele,
       });
     }
-  } else if (format === 'gruppen_ko' || format === 'liga') {
-    // Gruppenphase / Liga
-    const gruppen = gruppenEinteilen(aktive.map((tn) => tn.id), t.einstellungen.gruppenGroesse);
-    gruppen.forEach((gruppe, gIdx) => {
-      const aufgaben = aufgabenErzeugen(t.einstellungen);
-      const stand = {};
-      gruppe.forEach((id) => {
-        stand[id] = { index: 0, richtig: 0, falsch: 0, fertigUm: null, letzterPunktUm: null };
-      });
-      spiele.push({
-        id: `r${nr}g${gIdx + 1}`,
-        teilnehmer: gruppe,
-        freilos: false,
-        aufgaben,
-        stand,
-        ergebnis: null,
-        gruppeNr: gIdx + 1,
-      });
-    });
-
-    t.runden.push({
-      nr,
-      stufe: format === 'liga' ? 'liga' : 'gruppe',
-      start: 0,
-      ende: 0,
-      spiele,
-    });
   }
 
   t.aktuelleRundeNr = nr;
@@ -635,9 +797,12 @@ function neuMischen(t, leitungSchluessel) {
   }
   t.zuletzt = Date.now();
 
-  // Aktuelle Runde verwerfen und neu anlegen
   t.runden.pop();
   t.aktuelleRundeNr--;
+  if (t.aktuelleRundeNr === 0) {
+    t.baum = null;
+    t.gruppen = null;
+  }
   rundePlanen(t);
   return t;
 }
@@ -658,12 +823,24 @@ function rundeStarten(t, leitungSchluessel, jetzt = Date.now()) {
 
   const runde = t.runden[t.aktuelleRundeNr - 1];
   const startUm = jetzt + 3000;
+  const dauerMs = t.einstellungen.art === 'zeit'
+    ? t.einstellungen.sekunden * 1000
+    : t.einstellungen.anzahl * 25 * 1000; // Kulanz-Timeout für Aufgabenmodus
+
   runde.start = startUm;
-  runde.dauerMs = t.einstellungen.art === 'zeit' ? t.einstellungen.sekunden * 1000 : 0;
+  runde.dauerMs = dauerMs;
+  runde.endeUm = startUm + dauerMs;
+
+  // Auch in den Spielen vermerken
+  runde.spiele.forEach((sp) => {
+    sp.start = startUm;
+    sp.dauerMs = dauerMs;
+  });
+
   t.phase = 'countdown';
   t.countdownBis = startUm;
 
-  return { startUm, rundeNr: runde.nr };
+  return { startUm, dauerMs, rundeNr: runde.nr };
 }
 
 // Countdown abgelaufen -> Status laeuft
@@ -680,7 +857,7 @@ function rundeAktivieren(t, jetzt = Date.now()) {
 function alleSpieleFertig(runde) {
   if (!runde || !runde.spiele) return false;
   return runde.spiele.every((sp) => {
-    if (sp.freilos) return true;
+    if (sp.freilos || sp.kampflos) return true;
     return sp.teilnehmer.every((id) => {
       const st = sp.stand && sp.stand[id];
       return st && Boolean(st.fertigUm);
@@ -704,22 +881,56 @@ function rundeBeenden(t, leitungSchluessel, jetzt = Date.now()) {
 
   const runde = t.runden[t.aktuelleRundeNr - 1];
   runde.ende = jetzt;
-  runde.dauerMs = Math.max(100, jetzt - (runde.start || jetzt));
+  const tatsaechlicheDauerMs = Math.max(100, jetzt - (runde.start || jetzt));
+  runde.dauerMs = Math.min(runde.dauerMs || tatsaechlicheDauerMs, tatsaechlicheDauerMs);
 
   // Spiele auswerten
   runde.spiele.forEach((sp) => {
+    sp.dauerMs = runde.dauerMs;
+    sp.start = runde.start;
     if (!sp.ergebnis) {
-      sp.ergebnis = wertungSpiel(sp, t.einstellungen.art, t.einstellungen);
+      sp.ergebnis = wertungSpiel(sp, t.einstellungen.art, t.einstellungen, runde.start, runde.dauerMs);
+    }
+
+    // Statistiken bei Teilnehmern aktualisieren
+    sp.ergebnis.forEach((erg) => {
+      const tn = t.teilnehmer.get(erg.id);
+      if (tn) {
+        tn.gesamtRichtig = (tn.gesamtRichtig || 0) + erg.richtig;
+        tn.gesamtZeit = (tn.gesamtZeit || 0) + erg.zeit;
+      }
+    });
+
+    // Punkte vergeben bei Liga oder Gruppenphase
+    if (runde.stufe === 'liga') {
+      sp.ergebnis.forEach((erg) => {
+        const tn = t.teilnehmer.get(erg.id);
+        if (tn) {
+          const punkte = PUNKTE_LIGA[erg.platz - 1] || 0;
+          tn.punkte = (tn.punkte || 0) + punkte;
+        }
+      });
+    } else if (runde.stufe === 'gruppe') {
+      sp.ergebnis.forEach((erg) => {
+        const tn = t.teilnehmer.get(erg.id);
+        if (tn) {
+          const punkte = PUNKTE_GRUPPE[erg.platz - 1] || 0;
+          tn.punkte = (tn.punkte || 0) + punkte;
+        }
+      });
     }
   });
 
-  // K.-o.-Verlierer markieren (außer im Spiel um Platz 3)
-  if (t.einstellungen.format === 'ko') {
+  // K.-o.-Ausscheiden markieren
+  const format = t.einstellungen.format;
+  const istKoRunde = format === 'ko' || t.inKoPhase;
+
+  if (istKoRunde) {
     runde.spiele.forEach((sp) => {
       if (sp.ergebnis && sp.ergebnis.length >= 2 && sp.typ !== 'platz3') {
         const verliererId = sp.ergebnis[1].id;
         const istHalbfinale = runde.stufe === 'halbfinale' || runde.spiele.length === 2;
-        // Im Halbfinale scheidet das Kind noch nicht komplett aus, wenn Spiel um Platz 3 ansteht
+        // Im Halbfinale scheidet das Kind erst nach dem Spiel um Platz 3 aus
         if (!(istHalbfinale && t.einstellungen.platz3)) {
           const tn = t.teilnehmer.get(verliererId);
           if (tn) tn.aktiv = false;
@@ -729,17 +940,6 @@ function rundeBeenden(t, leitungSchluessel, jetzt = Date.now()) {
   }
 
   t.phase = 'auswertung';
-
-  // Prüfen, ob das gesamte Turnier zu Ende ist
-  if (t.einstellungen.format === 'sprint') {
-    turnierAbschliessen(t);
-  } else if (t.einstellungen.format === 'ko') {
-    const aktive = Array.from(t.teilnehmer.values()).filter((tn) => tn.aktiv);
-    if (runde.stufe === 'finale' || runde.spiele.some((sp) => sp.typ === 'finale') || aktive.length <= 1) {
-      turnierAbschliessen(t);
-    }
-  }
-
   return runde;
 }
 
@@ -756,7 +956,19 @@ function turnierAbschliessen(t) {
         if (tn) tn.platz = erg.platz;
       });
     }
-  } else if (format === 'ko') {
+  } else if (format === 'liga') {
+    // Rangliste nach Punkten
+    const alle = Array.from(t.teilnehmer.values());
+    alle.sort((a, b) => {
+      if (b.punkte !== a.punkte) return b.punkte - a.punkte;
+      if (b.gesamtRichtig !== a.gesamtRichtig) return b.gesamtRichtig - a.gesamtRichtig;
+      return a.gesamtZeit - b.gesamtZeit;
+    });
+    alle.forEach((tn, idx) => {
+      tn.platz = idx + 1;
+    });
+  } else {
+    // K.-o. oder Gruppenphase -> K.-o.
     const letzteRunde = t.runden[t.runden.length - 1];
     const finaleSpiel = letzteRunde && letzteRunde.spiele.find((sp) => sp.typ === 'finale' || letzteRunde.stufe === 'finale');
     const platz3Spiel = letzteRunde && letzteRunde.spiele.find((sp) => sp.typ === 'platz3');
@@ -784,7 +996,6 @@ function turnierAbschliessen(t) {
     }
 
     // Platzierungen für früher ausgeschiedene Teilnehmer
-    // Rückwärts durch die Runden gehen
     let naechsterPlatz = (platz3Spiel ? 5 : 3);
     for (let rIdx = t.runden.length - 1; rIdx >= 0; rIdx--) {
       const r = t.runden[rIdx];
@@ -806,6 +1017,13 @@ function turnierAbschliessen(t) {
         naechsterPlatz += verliererDerRunde.length;
       }
     }
+
+    // Falls Kinder noch keinen Platz haben (z. B. in der Gruppenphase ausgeschieden)
+    t.teilnehmer.forEach((tn) => {
+      if (tn.platz === null) {
+        tn.platz = naechsterPlatz;
+      }
+    });
   }
 }
 
@@ -824,13 +1042,19 @@ function naechste(t, leitungSchluessel) {
   t.zuletzt = Date.now();
 
   const format = t.einstellungen.format;
+  const runde = t.runden[t.aktuelleRundeNr - 1];
+
   if (format === 'sprint' || t.phase === 'ende') {
     turnierAbschliessen(t);
     return t;
   }
 
+  if (format === 'liga' && runde.nr >= t.einstellungen.ligaRunden) {
+    turnierAbschliessen(t);
+    return t;
+  }
+
   // Für K.-o. prüfen, ob bereits Finale war
-  const runde = t.runden[t.aktuelleRundeNr - 1];
   if (runde.stufe === 'finale' || runde.spiele.some((sp) => sp.typ === 'finale')) {
     turnierAbschliessen(t);
     return t;
@@ -879,6 +1103,17 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
     rundeAktivieren(t, jetzt);
   }
 
+  const runde = t.runden[t.aktuelleRundeNr - 1];
+  if (!runde) return { ignoriert: true, grund: 'Keine aktive Runde' };
+
+  // Zeit abgelaufen?
+  if (runde.endeUm && jetzt >= runde.endeUm + 1000) {
+    if (t.phase === 'laeuft') {
+      rundeBeenden(t, null, runde.endeUm);
+    }
+    return { ignoriert: true, grund: 'Zeit um' };
+  }
+
   if (t.phase !== 'laeuft') {
     return { ignoriert: true, grund: 'Runde läuft nicht' };
   }
@@ -889,9 +1124,6 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
     err.status = 401;
     throw err;
   }
-
-  const runde = t.runden[t.aktuelleRundeNr - 1];
-  if (!runde) return { ignoriert: true };
 
   const spiel = runde.spiele.find((sp) => sp.id === spielId);
   if (!spiel || !spiel.teilnehmer.includes(tn.id)) {
@@ -908,6 +1140,18 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
     return { fertig: true, richtig: null, naechste: null };
   }
 
+  // Entscheidungsaufgabe aktiv?
+  if (spiel.entscheidung && !spiel.entscheidung.geloestVon) {
+    const istEntscheidungRichtig = Number(wert) === spiel.entscheidung.aufgabe.loesung;
+    if (istEntscheidungRichtig) {
+      spiel.entscheidung.geloestVon = tn.id;
+      // Sieger festlegen
+      spiel.ergebnis = wertungSpiel(spiel, t.einstellungen.art, t.einstellungen, runde.start, runde.dauerMs);
+      return { richtig: true, fertig: true, naechste: null, entscheidungGewonnen: true };
+    }
+    return { richtig: false, fertig: false, naechste: aufgabenFuerKind(spiel.entscheidung.aufgabe) };
+  }
+
   // Index-Prüfung: doppelte oder veraltete Antworten ignorieren
   const antwIndex = Number(index);
   if (antwIndex !== st.index) {
@@ -915,7 +1159,7 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
     return {
       ignoriert: true,
       aktuellerIndex: st.index,
-      naechste: aufgabeFuerKind(naechsteAufg),
+      naechste: aufgabenFuerKind(naechsteAufg),
     };
   }
 
@@ -954,7 +1198,7 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
     richtig: istRichtig,
     index: st.index,
     fertig: istFertig,
-    naechste: aufgabeFuerKind(naechsteAufg),
+    naechste: aufgabenFuerKind(naechsteAufg),
   };
 }
 
@@ -965,15 +1209,24 @@ function neuesTurnierGleicheKinder(t, leitungSchluessel) {
     err.status = 403;
     throw err;
   }
+  if (t.phase !== 'ende') {
+    const err = new Error("Befehl 'neues_turnier' nur in Phase 'ende' erlaubt");
+    err.status = 409;
+    throw err;
+  }
   t.zuletzt = Date.now();
   t.phase = 'lobby';
   t.offen = true;
   t.runden = [];
   t.baum = null;
+  t.gruppen = null;
+  t.inKoPhase = false;
   t.aktuelleRundeNr = 0;
   for (const tn of t.teilnehmer.values()) {
     tn.aktiv = true;
     tn.punkte = 0;
+    tn.gesamtRichtig = 0;
+    tn.gesamtZeit = 0;
     tn.platz = null;
   }
   return t;

@@ -384,42 +384,185 @@ pruefe('Turnier-Zustandsautomat und doppelte Antwort', () => {
 
   // Vorzeitiges Beenden durch Leitung
   Turnier.rundeBeenden(t, leitung, 3000);
-  assert.strictEqual(t.phase, 'ende'); // Sprint endet nach 1 Runde!
+  assert.strictEqual(t.phase, 'auswertung');
+  Turnier.naechste(t, leitung);
+  assert.strictEqual(t.phase, 'ende'); // Sprint endet nach naechste!
 
   // Antwort nach Rundenende wird ignoriert
   const rSpät = Turnier.antworten(t, k2.schluessel, { spiel: spielId, index: 0, wert: 5 }, 4000);
   assert.strictEqual(rSpät.ignoriert, true);
 });
 
-pruefe('Turnier durchspielen: KO-Turnier mit 5 Kindern', () => {
+pruefe('A1: Schnelleres Kind gewinnt bei gleicher Anzahl Richtiger', () => {
+  // k_langsam ist zuerst gelistet (Index 0), hat aber 100 s gebraucht.
+  // k_schnell ist an Index 1, hat 5 s gebraucht.
+  const sp = {
+    teilnehmer: ['k_langsam', 'k_schnell'],
+    freilos: false,
+    stand: {
+      k_langsam: { index: 10, richtig: 10, falsch: 0, fertigUm: 101000, letzterPunktUm: 101000 },
+      k_schnell: { index: 10, richtig: 10, falsch: 0, fertigUm: 6000, letzterPunktUm: 6000 },
+    },
+  };
+  // Rundenstart t=1000
+  const erg = Turnier.wertungSpiel(sp, 'aufgaben', { strafe: 5 }, 1000, 120000);
+  assert.strictEqual(erg[0].id, 'k_schnell', 'k_schnell muss gewinnen');
+  assert.strictEqual(erg[0].platz, 1);
+  assert.strictEqual(erg[1].id, 'k_langsam');
+  assert.strictEqual(erg[1].platz, 2);
+});
+
+pruefe('A1: Duell-Entscheidungsaufgabe bei absolutem Gleichstand', () => {
+  const sp = {
+    teilnehmer: ['d1', 'd2'],
+    freilos: false,
+    stand: {
+      d1: { index: 10, richtig: 10, falsch: 0, fertigUm: 10000, letzterPunktUm: 10000 },
+      d2: { index: 10, richtig: 10, falsch: 0, fertigUm: 10000, letzterPunktUm: 10000 },
+    },
+  };
+  const ergVor = Turnier.wertungSpiel(sp, 'aufgaben', { strafe: 5 }, 1000, 30000);
+  assert(sp.entscheidung, 'Entscheidungsaufgabe muss angelegt werden');
+  assert(sp.entscheidung.aufgabe, 'Entscheidungsaufgabe muss vorhanden sein');
+  assert.strictEqual(sp.entscheidung.geloestVon, null);
+
+  // d2 löst die Entscheidungsaufgabe zuerst
+  sp.entscheidung.geloestVon = 'd2';
+  const ergNach = Turnier.wertungSpiel(sp, 'aufgaben', { strafe: 5 }, 1000, 30000);
+  assert.strictEqual(ergNach[0].id, 'd2', 'd2 muss durch Entscheidung gewinnen');
+});
+
+pruefe('A2: Zeit-Runde beendet sich zur Zeitgrenze und blockiert späte Antworten', () => {
   const { code, leitung, turnier: t } = Turnier.anlegen({
-    titel: 'KO-Test',
-    einstellungen: { format: 'ko', anzahl: 5 },
+    titel: 'Zeit-Test',
+    einstellungen: { format: 'sprint', art: 'zeit', sekunden: 30 },
+  });
+  const k1 = Turnier.beitreten(code, { name: 'Kati', emoji: '🐱' });
+  const k2 = Turnier.beitreten(code, { name: 'Lars', emoji: '🦁' });
+
+  Turnier.starten(t, leitung);
+  Turnier.rundeStarten(t, leitung, 1000); // startUm = 4000, dauer = 30000, endeUm = 34000
+  Turnier.rundeAktivieren(t, 4000);
+  assert.strictEqual(t.phase, 'laeuft');
+
+  const spielId = t.runden[0].spiele[0].id;
+  const aufg0 = t.runden[0].spiele[0].aufgaben[0];
+
+  // Antwort während der Runde (t=10000) -> gezählt
+  const r1 = Turnier.antworten(t, k1.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 10000);
+  assert.strictEqual(r1.richtig, true);
+
+  // Antwort 10 Minuten nach dem Start (t=600000) -> abgelehnt
+  const rSpät = Turnier.antworten(t, k2.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 600000);
+  assert.strictEqual(rSpät.ignoriert, true);
+  assert.strictEqual(rSpät.grund, 'Zeit um');
+
+  // Prüfe automatische Beendigung durch Zeit
+  assert.strictEqual(t.phase, 'auswertung');
+});
+
+pruefe('A3: Liga mit 13 Kindern spielt 3 Runden und endet mit Rangliste', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Liga-Test',
+    einstellungen: { format: 'liga', ligaRunden: 3, anzahl: 5 },
   });
 
-  const kinder = ['Tim', 'Mia', 'Leo', 'Ida', 'Sam'].map((name, i) =>
-    Turnier.beitreten(code, { name, emoji: H.EMOJIS[i] })
+  const kinder = Array.from({ length: 13 }, (_, i) =>
+    Turnier.beitreten(code, { name: `Kind_${i + 1}`, emoji: H.EMOJIS[i] })
   );
 
   Turnier.starten(t, leitung);
   assert.strictEqual(t.phase, 'vorschau');
 
-  // Runden bis zum Ende durchspielen
-  let rundenZaehler = 0;
-  while (t.phase !== 'ende' && rundenZaehler < 10) {
-    rundenZaehler++;
+  // 3 Liga-Runden durchspielen
+  for (let r = 1; r <= 3; r++) {
     Turnier.rundeStarten(t, leitung, 1000);
     Turnier.rundeAktivieren(t, 4000);
     assert.strictEqual(t.phase, 'laeuft');
 
     const runde = t.runden[t.aktuelleRundeNr - 1];
-    // Alle Spiele der Runde beantworten
+    const spiel = runde.spiele[0];
+    assert.strictEqual(spiel.teilnehmer.length, 13, 'Alle 13 müssen im selben Sprint sein');
+
+    // Jedes Kind antwortet
+    spiel.teilnehmer.forEach((tnId, tIdx) => {
+      const tn = kinder.find((k) => k.id === tnId);
+      spiel.aufgaben.forEach((aufg, aIdx) => {
+        // Erste Kinder antworten schneller und richtig
+        const wert = aIdx === 0 && tIdx > 8 ? 9999 : aufg.loesung;
+        Turnier.antworten(t, tn.schluessel, { spiel: spiel.id, index: aIdx, wert }, 4100 + tIdx * 100 + aIdx * 10);
+      });
+    });
+
+    assert.strictEqual(t.phase, 'auswertung');
+    Turnier.naechste(t, leitung);
+  }
+
+  // Nach Runde 3 muss die Liga beendet sein
+  assert.strictEqual(t.phase, 'ende');
+  kinder.forEach((k) => {
+    const tn = t.teilnehmer.get(k.id);
+    assert(tn.platz !== null, `Kind ${tn.name} hat keinen Platz`);
+    assert(tn.punkte >= 0, `Kind ${tn.name} hat keine Punkte`);
+  });
+  const sieger = Array.from(t.teilnehmer.values()).find((tn) => tn.platz === 1);
+  assert(sieger, 'Sieger muss Platz 1 haben');
+});
+
+pruefe('A3: Gruppenphase mit 13 Kindern wechselt in KO-Baum bis zum Ende', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Gruppen-KO-Test',
+    einstellungen: { format: 'gruppen_ko', gruppenGroesse: 4, gruppenRunden: 2, weiterProGruppe: 2, anzahl: 5 },
+  });
+
+  const kinder = Array.from({ length: 13 }, (_, i) =>
+    Turnier.beitreten(code, { name: `Schueler_${i + 1}`, emoji: H.EMOJIS[i] })
+  );
+
+  Turnier.starten(t, leitung);
+  assert.strictEqual(t.phase, 'vorschau');
+
+  // Gruppenrunde 1 und 2 spielen
+  for (let r = 1; r <= 2; r++) {
+    Turnier.rundeStarten(t, leitung, 1000);
+    Turnier.rundeAktivieren(t, 4000);
+    assert.strictEqual(t.phase, 'laeuft');
+
+    const runde = t.runden[t.aktuelleRundeNr - 1];
+    assert.strictEqual(runde.stufe, 'gruppe');
+
+    runde.spiele.forEach((sp) => {
+      sp.teilnehmer.forEach((tnId, tIdx) => {
+        const tn = kinder.find((k) => k.id === tnId);
+        sp.aufgaben.forEach((aufg, aIdx) => {
+          Turnier.antworten(t, tn.schluessel, { spiel: sp.id, index: aIdx, wert: aufg.loesung }, 4100 + tIdx * 100 + aIdx * 10);
+        });
+      });
+    });
+
+    assert.strictEqual(t.phase, 'auswertung');
+    Turnier.naechste(t, leitung);
+  }
+
+  // Nach 2 Gruppenrunden muss Runde 3 in der KO-Phase sein!
+  const runde3 = t.runden[t.aktuelleRundeNr - 1];
+  assert(t.inKoPhase, 'Muss in KO-Phase sein');
+  assert(runde3.stufe !== 'gruppe', 'Runde 3 darf keine Gruppenrunde mehr sein');
+
+  // KO-Phase bis zum Ende durchspielen
+  let limit = 0;
+  while (t.phase !== 'ende' && limit < 10) {
+    limit++;
+    Turnier.rundeStarten(t, leitung, 1000);
+    Turnier.rundeAktivieren(t, 4000);
+
+    const runde = t.runden[t.aktuelleRundeNr - 1];
     runde.spiele.forEach((sp) => {
       if (sp.freilos) return;
-      sp.teilnehmer.forEach((tnId) => {
+      sp.teilnehmer.forEach((tnId, tIdx) => {
         const tn = kinder.find((k) => k.id === tnId);
-        sp.aufgaben.forEach((aufg, idx) => {
-          Turnier.antworten(t, tn.schluessel, { spiel: sp.id, index: idx, wert: aufg.loesung }, 4100 + idx * 500);
+        sp.aufgaben.forEach((aufg, aIdx) => {
+          Turnier.antworten(t, tn.schluessel, { spiel: sp.id, index: aIdx, wert: aufg.loesung }, 4100 + tIdx * 200 + aIdx * 10);
         });
       });
     });
@@ -430,13 +573,44 @@ pruefe('Turnier durchspielen: KO-Turnier mit 5 Kindern', () => {
   }
 
   assert.strictEqual(t.phase, 'ende');
-  // Am Ende hat jedes Kind einen Platz
   kinder.forEach((k) => {
     const tn = t.teilnehmer.get(k.id);
-    assert(tn.platz !== null, `Kind ${tn.name} hat keinen Platz`);
+    assert(tn.platz !== null, `Kind ${tn.name} muss am Ende einen Platz haben`);
   });
-  const sieger = Array.from(t.teilnehmer.values()).find((tn) => tn.platz === 1);
-  assert(sieger, 'Kein Sieger gefunden');
+});
+
+pruefe('B5: Neues Turnier nur in Phase ende erlaubt', () => {
+  const { leitung, turnier: t } = Turnier.anlegen({ titel: 'Test' });
+  assert.strictEqual(t.phase, 'lobby');
+  assert.throws(() => Turnier.neuesTurnierGleicheKinder(t, leitung), /nur in Phase 'ende'/);
+});
+
+pruefe('B6: Kampflos-Sieg bei verlassenen/ausgeschiedenen Teilnehmern in KO', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Kampflos-Test',
+    einstellungen: { format: 'ko', anzahl: 5 },
+  });
+  const k1 = Turnier.beitreten(code, { name: 'Aktiv1', emoji: '🦊' });
+  const k2 = Turnier.beitreten(code, { name: 'Aktiv2', emoji: '🐻' });
+  const k3 = Turnier.beitreten(code, { name: 'Verlaesst', emoji: '🐼' });
+  const k4 = Turnier.beitreten(code, { name: 'Aktiv3', emoji: '🦁' });
+
+  Turnier.starten(t, leitung);
+  // k3 verlässt vor Rundenstart
+  Turnier.verlassen(code, k3.schluessel);
+  assert.strictEqual(t.teilnehmer.get(k3.id).aktiv, false);
+
+  Turnier.rundeStarten(t, leitung, 1000);
+  Turnier.rundeAktivieren(t, 4000);
+
+  const runde = t.runden[0];
+  const spielMitK3 = runde.spiele.find((sp) => sp.teilnehmer.includes(k3.id));
+  assert(spielMitK3, 'Spiel mit k3 muss existieren');
+  // Spiel muss kampflos für den Gegner gewertet werden
+  const gegnerId = spielMitK3.teilnehmer.find((id) => id !== k3.id);
+  const erg = Turnier.wertungSpiel(spielMitK3, 'aufgaben', t.einstellungen, runde.start, runde.dauerMs);
+  assert.strictEqual(erg[0].id, gegnerId, 'Gegner gewinnt kampflos');
+  assert.strictEqual(erg[1].nichtAngetreten, true);
 });
 
 (async () => {
