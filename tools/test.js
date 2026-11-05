@@ -477,6 +477,67 @@ pruefe('A3: Duell mit Gleichstand wechselt in Phase entscheidung und Sieger komm
   assert.strictEqual(t.teilnehmer.get(k1.id).platz, 2);
 });
 
+// Duell mit Gleichstand bis zur Phase 'entscheidung', mit nachgebauten Live-Verbindungen
+function entscheidungsDuell(titel) {
+  const { code, leitung, turnier: t } = Turnier.anlegen({ titel, einstellungen: { format: 'ko', anzahl: 5 } });
+  const k1 = Turnier.beitreten(code, { name: 'KindA', emoji: '🦊' });
+  const k2 = Turnier.beitreten(code, { name: 'KindB', emoji: '🐻' });
+  const post = { leitung: [], [k1.id]: [], [k2.id]: [] };
+  const verbindung = (rolle, id) => ({ res: { write: (m) => post[id || 'leitung'].push(m) }, rolle, schluessel: null, teilnehmerId: id });
+  TurnierRouten.verbindungen.set(code, new Set([verbindung('leitung', null), verbindung('kind', k1.id), verbindung('kind', k2.id)]));
+  // Ereignisse eines Empfängers als [{ ev, daten }]
+  const ereignisse = (id) => post[id].map((m) => {
+    const ev = /event: (\w+)/.exec(m);
+    return ev ? { ev: ev[1], daten: JSON.parse(/data: (.*)/.exec(m)[1]) } : null;
+  }).filter(Boolean);
+
+  Turnier.starten(t, leitung);
+  Turnier.rundeStarten(t, leitung, 1000);
+  Turnier.rundeAktivieren(t, 4000);
+  const spiel = t.runden[0].spiele[0];
+  spiel.aufgaben.slice(0, 5).forEach((aufg, i) => {
+    antwortenUndSenden(t, k1.schluessel, { spiel: spiel.id, index: i, wert: aufg.loesung }, 5000 + i * 1000);
+    antwortenUndSenden(t, k2.schluessel, { spiel: spiel.id, index: i, wert: aufg.loesung }, 5000 + i * 1000);
+  });
+  assert.strictEqual(t.phase, 'entscheidung');
+  return { code, leitung, t, k1, k2, spiel, ereignisse };
+}
+
+pruefe('Entscheidung gelöst: rundenende geht an Lehrkraft und Kinder, Beamer sieht den Sieger', () => {
+  const { code, t, k1, k2, spiel, ereignisse } = entscheidungsDuell('Entscheidung-Senden');
+  const r = Turnier.antworten(t, k2.schluessel, { spiel: spiel.id, wert: spiel.entscheidung.aufgabe.loesung }, 12000);
+  assert.strictEqual(r.entscheidungBeendet, true);
+  // So ruft es die Route auf
+  TurnierRouten.rundenendeSenden(t);
+
+  const ende = (id) => ereignisse(id).filter((e) => e.ev === 'rundenende');
+  assert.strictEqual(ende('leitung').length, 1, 'Lehrkraft bekommt rundenende');
+  assert.strictEqual(ende(k1.id).length, 1, 'Kind A bekommt rundenende');
+  assert.strictEqual(ende(k2.id).length, 1, 'Kind B bekommt rundenende');
+  assert.strictEqual(ende(k2.id)[0].daten.ich.ausgang, 'gewonnen');
+  assert.strictEqual(ende(k1.id)[0].daten.ich.ausgang, 'verloren');
+
+  // Beamer: Stand der Entscheidung ja, Aufgabe mit Lösung nein
+  const anzeige = ende('leitung')[0].daten.runde.spiele[0];
+  assert.strictEqual(anzeige.entscheidung.geloestVon, k2.id);
+  assert.strictEqual(anzeige.entscheidung.aufgabe, undefined, 'Entscheidungsaufgabe darf nicht an den Beamer');
+  assert.strictEqual(anzeige.ergebnis[0].id, k2.id);
+  assert.deepStrictEqual(anzeige.ergebnis.map((e) => e.platz), [1, 2], 'nach der Entscheidung kein geteilter Platz');
+  TurnierRouten.verbindungen.delete(code);
+});
+
+pruefe('Entscheidung nach 60 s ohne Lösung: rundenende geht trotzdem raus', () => {
+  const { code, t, k1, spiel, ereignisse } = entscheidungsDuell('Entscheidung-Zeit');
+  // So ruft es der 60-s-Timer auf
+  Turnier.entscheidungTimeoutAufloesen(t);
+  TurnierRouten.rundenendeSenden(t);
+  assert.strictEqual(t.phase, 'auswertung');
+  assert.strictEqual(ereignisse('leitung').filter((e) => e.ev === 'rundenende').length, 1, 'Lehrkraft bekommt rundenende');
+  assert.strictEqual(ereignisse(k1.id).filter((e) => e.ev === 'rundenende').length, 1, 'Kind bekommt rundenende');
+  assert(spiel.entscheidung.losEntscheidung, 'Sieger per Los oder Fehlerzahl festgelegt');
+  TurnierRouten.verbindungen.delete(code);
+});
+
 pruefe('A2: Zeit-Runde beendet sich zur Zeitgrenze und blockiert späte Antworten', () => {
   const { code, leitung, turnier: t } = Turnier.anlegen({
     titel: 'Zeit-Test',

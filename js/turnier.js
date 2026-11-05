@@ -730,6 +730,9 @@
     if (rolle === 'leitung' || rolle === 'zuschauer') {
       zeigeScreen('screen-ergebnis');
       ergebnisRendern((daten && daten.runde) || (aktuellerZustand && aktuellerZustand.runde));
+      // War vorher eine Entscheidung offen, ist der Knopf noch gesperrt
+      const btn = $('#btn-naechste-runde');
+      if (btn) btn.disabled = false;
     } else if (rolle === 'kind') {
       zeigeScreen('screen-kind-ergebnis');
       const ich = daten && daten.ich;

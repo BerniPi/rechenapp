@@ -60,10 +60,16 @@ function timerLoeschen(code) {
 function rundenendeSenden(t, leitungSchluessel) {
   timerLoeschen(t.code);
   let runde;
-  try {
-    runde = Turnier.rundeBeenden(t, leitungSchluessel);
-  } catch (err) {
-    return;
+  if (t.phase === 'auswertung') {
+    // Nach einer Entscheidungsaufgabe ist die Runde schon ausgewertet – nur noch verschicken
+    runde = t.runden[t.aktuelleRundeNr - 1];
+    if (!runde) return;
+  } else {
+    try {
+      runde = Turnier.rundeBeenden(t, leitungSchluessel);
+    } catch (err) {
+      return;
+    }
   }
 
   // Phase 'entscheidung': Duelle mit Gleichstand
@@ -201,6 +207,14 @@ function rundeFuerAnzeige(t, conn) {
       ergebnis: sp.ergebnis || null,
       typ: sp.typ || null,
       gruppeNr: sp.gruppeNr || null,
+      // Nur der Stand der Entscheidung, nie die Aufgabe (enthält die Lösung)
+      entscheidung: sp.entscheidung
+        ? {
+          geloestVon: sp.entscheidung.geloestVon || null,
+          losEntscheidung: sp.entscheidung.losEntscheidung || null,
+          los: Boolean(sp.entscheidung.los),
+        }
+        : null,
     };
 
     // Kinder im selben Spiel bekommen ihre Aufgaben ohne Lösung

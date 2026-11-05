@@ -353,6 +353,7 @@ function wertungSpiel(spiel, art, einstellungen = {}, rundenStart = null, runden
   });
 
   // Duell-Entscheidungsaufgabe bei absolutem Gleichstand
+  let entschieden = false;
   if (teilnehmer.length === 2 && !spiel.freilos) {
     const [e1, e2] = ergebnisse;
     if (!e1.nichtAngetreten && !e2.nichtAngetreten) {
@@ -360,6 +361,7 @@ function wertungSpiel(spiel, art, einstellungen = {}, rundenStart = null, runden
         // Falls bereits eine Entscheidung gelöst wurde:
         if (spiel.entscheidung && (spiel.entscheidung.geloestVon || spiel.entscheidung.losEntscheidung)) {
           const siegerId = spiel.entscheidung.geloestVon || spiel.entscheidung.losEntscheidung;
+          entschieden = true;
           if (siegerId === e2.id) {
             // e2 hat gewonnen
             ergebnisse.reverse();
@@ -378,9 +380,9 @@ function wertungSpiel(spiel, art, einstellungen = {}, rundenStart = null, runden
     }
   }
 
-  // Plätze vergeben (bei gleicher Wertung gleicher Platz)
+  // Plätze vergeben (bei gleicher Wertung gleicher Platz – außer nach einer Entscheidung)
   ergebnisse.forEach((e, idx) => {
-    if (idx > 0 && e.wertung === ergebnisse[idx - 1].wertung && e.nichtAngetreten === ergebnisse[idx - 1].nichtAngetreten) {
+    if (!entschieden && idx > 0 && e.wertung === ergebnisse[idx - 1].wertung && e.nichtAngetreten === ergebnisse[idx - 1].nichtAngetreten) {
       e.platz = ergebnisse[idx - 1].platz;
     } else {
       e.platz = idx + 1;
