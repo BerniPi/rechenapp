@@ -79,6 +79,7 @@ Einstieg `server/server.js` (ein `http.createServer`, Routing per `"${METHODE} $
 | `db.js` | SQLite-Schema + Migrationen, `transaktion(fn)` |
 | `hilfe.js` | Validierung (Name, Emoji, Benutzername, Mail, Rekord-Key/-Wert), JSON-Antworten, Hashing, scrypt-Passwörter, Rate-Limit `erlaubt()`, `ip()` |
 | `turnier.js` | Spiellogik für Turniere (ohne HTTP): Zustand im RAM, Paarungen, K.-o.-Baum, Wertung |
+| `turnier-routen.js` | HTTP-Routen `/api/turnier/*` und SSE-Live-Verbindungen |
 | `einstellungen.js` | `ANMELDUNG`, `DOMAIN`, MS-Daten, `ADRESSE` aus Env |
 | `sso.js` | Microsoft-Login (bgbb): start → rückruf → `/#sso=<Übergabe>` → einlösen |
 

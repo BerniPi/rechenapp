@@ -14,6 +14,7 @@ const H = require('./hilfe');
 const admin = require('./admin');
 const E = require('./einstellungen');
 const SSO = require('./sso');
+const turnierRouten = require('./turnier-routen');
 
 const PORT = Number(process.env.PORT) || 8080;
 const ORIGINS = (process.env.ERLAUBTE_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -406,7 +407,7 @@ const TYPEN = {
   '.gz': 'application/gzip', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json',
 };
 // Nur diese Teile der App werden ausgeliefert – nie server/, .git usw.
-const APP_ERLAUBT = /^\/(index\.html|manifest\.json|sw\.js|(css|js|icons|vendor|models|audio)\/[\w./-]+)$/;
+const APP_ERLAUBT = /^\/(index\.html|turnier\.html|manifest\.json|sw\.js|(css|js|icons|vendor|models|audio)\/[\w./-]+)$/;
 
 function datei(res, wurzel, rel, extra = {}) {
   const ziel = path.normalize(path.join(wurzel, rel));
@@ -428,8 +429,10 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
     const p = decodeURIComponent(url.pathname);
+    if (p.startsWith('/api/turnier')) return await turnierRouten.anfrage(req, res, url);
     if (p.startsWith('/api/')) return await api(req, res, url);
     if (p === '/admin' || p.startsWith('/admin/')) return await admin.anfrage(req, res, url, datei);
+    if (p === '/turnier' || p === '/turnier/' || p === '/turnier/index.html') return datei(res, APP, '/turnier.html');
     if (req.method !== 'GET' && req.method !== 'HEAD') return H.fehler(res, 405, 'Nicht erlaubt');
     if (!APP) return H.fehler(res, 404, 'Gibt es nicht');
     const rel = p === '/' ? '/index.html' : p;
