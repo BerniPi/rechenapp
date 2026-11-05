@@ -446,7 +446,7 @@ async function anfrage(req, res, url) {
             if (t.phase === 'laeuft' || t.phase === 'countdown') {
               rundenendeSenden(t);
             }
-          }, Math.max(0, startUm + dauerMs + 2000 - Date.now()));
+          }, Math.max(0, startUm + dauerMs + 1000 - Date.now()));
           rTimer.unref();
 
           timerMap.set(t.code, { countdownTimer: cTimer, rundenTimer: rTimer });
@@ -562,36 +562,12 @@ async function anfrage(req, res, url) {
           ));
         }
 
-        // Falls die Runde durch diese Antwort beendet wurde
-        if (t.phase === 'auswertung' || t.phase === 'ende') {
-          timerLoeschen(t.code);
-          const pool = verbindungen.get(t.code);
-          if (pool) {
-            for (const c of pool) {
-              const payload = {
-                phase: t.phase,
-                runde: rundeFuerAnzeige(t, c),
-                ergebnisse: runde.spiele.map((sp) => ({ id: sp.id, ergebnis: sp.ergebnis })),
-                teilnehmer: teilnehmerListe(t),
-              };
-              if (c.rolle === 'kind') {
-                const kindTn = t.teilnehmer.get(c.teilnehmerId);
-                if (kindTn) {
-                  const sp = runde.spiele.find((s) => s.teilnehmer.includes(c.teilnehmerId));
-                  const meinErg = sp && sp.ergebnis && sp.ergebnis.find((e) => e.id === c.teilnehmerId);
-                  payload.ich = {
-                    platz: meinErg ? meinErg.platz : null,
-                    weiter: kindTn.aktiv,
-                    richtig: meinErg ? meinErg.richtig : 0,
-                    falsch: meinErg ? meinErg.falsch : 0,
-                    zeit: meinErg ? meinErg.zeit : 0,
-                    turnierPlatz: kindTn.platz,
-                  };
-                }
-              }
-              sseSenden(c.res, t.phase === 'ende' ? 'ende' : 'rundenende', payload);
-            }
-          }
+      }
+
+      // Falls die Runde durch Zeitablauf oder durch Fertigstellung aller Spiele beendet wird
+      if (ergebnis.zeitUm || ergebnis.rundeFertig) {
+        if (t.phase === 'laeuft' || t.phase === 'countdown') {
+          rundenendeSenden(t);
         }
       }
 
@@ -621,4 +597,6 @@ module.exports = {
   anfrage,
   senden,
   verbindungen,
+  rundenendeSenden,
+  timerMap,
 };

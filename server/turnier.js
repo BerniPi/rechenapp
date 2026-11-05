@@ -1106,16 +1106,13 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
   const runde = t.runden[t.aktuelleRundeNr - 1];
   if (!runde) return { ignoriert: true, grund: 'Keine aktive Runde' };
 
-  // Zeit abgelaufen?
-  if (runde.endeUm && jetzt >= runde.endeUm + 1000) {
-    if (t.phase === 'laeuft') {
-      rundeBeenden(t, null, runde.endeUm);
-    }
-    return { ignoriert: true, grund: 'Zeit um' };
-  }
-
   if (t.phase !== 'laeuft') {
     return { ignoriert: true, grund: 'Runde läuft nicht' };
+  }
+
+  // Zeit abgelaufen?
+  if (runde.endeUm && jetzt >= runde.endeUm) {
+    return { ignoriert: true, zeitUm: true, grund: 'Zeit um' };
   }
 
   const tn = teilnehmerNachSchluessel(t, teilnehmerSchluessel);
@@ -1188,16 +1185,13 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
   }
 
   const naechsteAufg = !istFertig ? spiel.aufgaben[st.index] : null;
-
-  // Prüfen, ob alle Spiele fertig sind
-  if (alleSpieleFertig(runde)) {
-    rundeBeenden(t, null, jetzt);
-  }
+  const rundeFertig = alleSpieleFertig(runde);
 
   return {
     richtig: istRichtig,
     index: st.index,
     fertig: istFertig,
+    rundeFertig,
     naechste: aufgabenFuerKind(naechsteAufg),
   };
 }

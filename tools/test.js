@@ -215,6 +215,15 @@ pruefe('Klassen-CSV', () => {
 
 // ---- Turniermodus (server/turnier.js) ----
 const Turnier = require('../server/turnier.js');
+const TurnierRouten = require('../server/turnier-routen.js');
+
+const antwortenUndSenden = (turnier, schluessel, daten, jetzt) => {
+  const res = Turnier.antworten(turnier, schluessel, daten, jetzt);
+  if (res.rundeFertig || res.zeitUm) {
+    TurnierRouten.rundenendeSenden(turnier);
+  }
+  return res;
+};
 
 pruefe('Turnier-Gruppen für n = 2..60', () => {
   for (let n = 2; n <= 60; n++) {
@@ -440,6 +449,16 @@ pruefe('A2: Zeit-Runde beendet sich zur Zeitgrenze und blockiert späte Antworte
   const k1 = Turnier.beitreten(code, { name: 'Kati', emoji: '🐱' });
   const k2 = Turnier.beitreten(code, { name: 'Lars', emoji: '🦁' });
 
+  // Verbindung simulieren
+  const gesendet = [];
+  const fakeRes = { write: (msg) => gesendet.push(msg) };
+  TurnierRouten.verbindungen.set(code, new Set([{
+    res: fakeRes,
+    rolle: 'leitung',
+    schluessel: leitung,
+    teilnehmerId: null,
+  }]));
+
   Turnier.starten(t, leitung);
   Turnier.rundeStarten(t, leitung, 1000); // startUm = 4000, dauer = 30000, endeUm = 34000
   Turnier.rundeAktivieren(t, 4000);
@@ -452,13 +471,24 @@ pruefe('A2: Zeit-Runde beendet sich zur Zeitgrenze und blockiert späte Antworte
   const r1 = Turnier.antworten(t, k1.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 10000);
   assert.strictEqual(r1.richtig, true);
 
-  // Antwort 10 Minuten nach dem Start (t=600000) -> abgelehnt
-  const rSpät = Turnier.antworten(t, k2.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 600000);
+  // Antwort 1,5s nach dem EndeUm (t=35500) -> ignoriert und meldet zeitUm
+  const rSpät = Turnier.antworten(t, k2.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 35500);
   assert.strictEqual(rSpät.ignoriert, true);
+  assert.strictEqual(rSpät.zeitUm, true);
   assert.strictEqual(rSpät.grund, 'Zeit um');
 
-  // Prüfe automatische Beendigung durch Zeit
+  // turnier.js beendet die Runde nicht mehr still im Hintergrund
+  assert.strictEqual(t.phase, 'laeuft');
+
+  // Die Route ruft daraufhin rundenendeSenden(t) auf
+  TurnierRouten.rundenendeSenden(t);
   assert.strictEqual(t.phase, 'auswertung');
+  assert(gesendet.some((m) => m.includes('event: rundenende')), 'rundenende-Event muss gesendet werden');
+
+  // Spätere Antwort nach Beendigung wird wegen phase !== laeuft abgelehnt
+  const rDanach = Turnier.antworten(t, k2.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 36000);
+  assert.strictEqual(rDanach.ignoriert, true);
+  assert.strictEqual(rDanach.grund, 'Runde läuft nicht');
 });
 
 pruefe('A3: Liga mit 13 Kindern spielt 3 Runden und endet mit Rangliste', () => {
@@ -490,7 +520,7 @@ pruefe('A3: Liga mit 13 Kindern spielt 3 Runden und endet mit Rangliste', () => 
       spiel.aufgaben.forEach((aufg, aIdx) => {
         // Erste Kinder antworten schneller und richtig
         const wert = aIdx === 0 && tIdx > 8 ? 9999 : aufg.loesung;
-        Turnier.antworten(t, tn.schluessel, { spiel: spiel.id, index: aIdx, wert }, 4100 + tIdx * 100 + aIdx * 10);
+        antwortenUndSenden(t, tn.schluessel, { spiel: spiel.id, index: aIdx, wert }, 4100 + tIdx * 100 + aIdx * 10);
       });
     });
 
@@ -535,7 +565,7 @@ pruefe('A3: Gruppenphase mit 13 Kindern wechselt in KO-Baum bis zum Ende', () =>
       sp.teilnehmer.forEach((tnId, tIdx) => {
         const tn = kinder.find((k) => k.id === tnId);
         sp.aufgaben.forEach((aufg, aIdx) => {
-          Turnier.antworten(t, tn.schluessel, { spiel: sp.id, index: aIdx, wert: aufg.loesung }, 4100 + tIdx * 100 + aIdx * 10);
+          antwortenUndSenden(t, tn.schluessel, { spiel: sp.id, index: aIdx, wert: aufg.loesung }, 4100 + tIdx * 100 + aIdx * 10);
         });
       });
     });
@@ -562,7 +592,7 @@ pruefe('A3: Gruppenphase mit 13 Kindern wechselt in KO-Baum bis zum Ende', () =>
       sp.teilnehmer.forEach((tnId, tIdx) => {
         const tn = kinder.find((k) => k.id === tnId);
         sp.aufgaben.forEach((aufg, aIdx) => {
-          Turnier.antworten(t, tn.schluessel, { spiel: sp.id, index: aIdx, wert: aufg.loesung }, 4100 + tIdx * 200 + aIdx * 10);
+          antwortenUndSenden(t, tn.schluessel, { spiel: sp.id, index: aIdx, wert: aufg.loesung }, 4100 + tIdx * 200 + aIdx * 10);
         });
       });
     });
