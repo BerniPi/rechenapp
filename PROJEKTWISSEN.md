@@ -143,6 +143,13 @@ Auth: `Authorization: Bearer <schluessel>`; gespeichert wird nur `sha256` in Tab
 - Neue App-Ordner/Dateitypen: im Server `APP_ERLAUBT` und `TYPEN` ergänzen, im `Dockerfile` mitkopieren.
 - Mikrofon und Installation brauchen HTTPS (oder localhost).
 - Nicht im Repo: `server/.env`, `server/*.env`, `server/daten/`, `.claude/`.
+- **Turniermodus (`/turnier`)**:
+  - Reine In-Memory-Verwaltung (`server/turnier.js`), keine SQLite-Speicherung, keine Sterne- oder Rekordänderung.
+  - Zustände: `lobby` ──starten──▶ `vorschau` ──runde_starten──▶ `countdown` (3 s) ──▶ `laeuft` ──alle fertig / Zeit um / beenden──▶ `auswertung` ──naechste──▶ `vorschau` (Folgerunde) bzw. `ende` (letzte Runde).
+  - SSE-Ereignisse: `hallo` (Zustand + Synchronzeit), `teilnehmer`, `beitritt` (`{ offen }`), `vorschau`, `countdown`, `aufgaben` (ohne Lösungen), `fortschritt`, `rundenende`, `ende`, `entfernt`.
+  - Server-Timer: Automatischer Countdown (3 s) und Runden-Timeout (`dauerMs` + 2 s Kulanz). Bei Abbruch/vorzeitigem Beenden werden die Timer per `timerLoeschen()` aufgeräumt.
+  - Inaktive Turniere (>3 h inaktiv oder >8 h alt) werden alle 10 min per `aufraeumenAlle()` entfernt und deren offene SSE-Verbindungen ordentlich per `res.end()` geschlossen.
+  - Formate: Sprint (1 Runde, alle zusammen), K.-o. (1-gegen-1 mit Freilosen, Kampflos-Wertung bei Ausfall, Entscheidungsaufgabe bei Duell-Gleichstand, optional Spiel um Platz 3), Liga (Sprintrunden mit Punkten 10, 8, 6, 5...), Gruppenphase → K.-o. (feste Gruppen über Vorrunden, danach K.-o.-Baum der besten Aufsteiger).
 
 ## Arbeitsweise
 

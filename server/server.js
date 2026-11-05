@@ -432,7 +432,11 @@ const server = http.createServer(async (req, res) => {
     if (p.startsWith('/api/turnier')) return await turnierRouten.anfrage(req, res, url);
     if (p.startsWith('/api/')) return await api(req, res, url);
     if (p === '/admin' || p.startsWith('/admin/')) return await admin.anfrage(req, res, url, datei);
-    if (p === '/turnier' || p === '/turnier/' || p === '/turnier/index.html') return datei(res, APP, '/turnier.html');
+    if (p === '/turnier/') {
+      res.writeHead(301, { Location: '/turnier' + (url.search || '') });
+      return res.end();
+    }
+    if (p === '/turnier' || p === '/turnier/index.html') return datei(res, APP, '/turnier.html');
     if (req.method !== 'GET' && req.method !== 'HEAD') return H.fehler(res, 405, 'Nicht erlaubt');
     if (!APP) return H.fehler(res, 404, 'Gibt es nicht');
     const rel = p === '/' ? '/index.html' : p;

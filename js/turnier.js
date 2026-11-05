@@ -22,6 +22,29 @@
   let aufgabenIndex = 0;
   let aktuelleEingabe = '';
   let wakeLock = null;
+  let sendetGerade = false;
+  let rundenLiveTimer = null;
+
+  function rundenUhrStarten(endeUm) {
+    if (rundenLiveTimer) clearInterval(rundenLiveTimer);
+    function tick() {
+      const restMs = endeUm - (Date.now() + uhrOffsetMs);
+      const restSek = Math.max(0, Math.ceil(restMs / 1000));
+      const min = Math.floor(restSek / 60);
+      const sek = restSek % 60;
+      const str = `${String(min).padStart(2, '0')}:${String(sek).padStart(2, '0')}`;
+      const beamerUhr = $('#live-uhr');
+      if (beamerUhr) beamerUhr.textContent = str;
+      const handyUhr = $('#leiste-uhr');
+      if (handyUhr) handyUhr.textContent = `⏱️ ${restSek} s`;
+      if (restMs <= 0) {
+        clearInterval(rundenLiveTimer);
+        rundenLiveTimer = null;
+      }
+    }
+    tick();
+    rundenLiveTimer = setInterval(tick, 500);
+  }
 
   // Bildschirmwechsel
   function zeigeScreen(id) {
@@ -84,7 +107,27 @@
 
     eventSource.addEventListener('countdown', (ev) => {
       const daten = JSON.parse(ev.data);
-      countdownStarten(daten.startUm);
+      if (aktuellerZustand) {
+        aktuellerZustand.phase = 'countdown';
+        aktuellerZustand.countdownBis = daten.startUm;
+      }
+      if (rolle === 'leitung' || rolle === 'zuschauer') {
+        zeigeScreen('screen-live');
+        if (aktuellerZustand && aktuellerZustand.runde) {
+          liveRendern(aktuellerZustand.runde);
+        }
+      }
+      countdownStarten(daten.startUm, daten.dauerMs);
+    });
+
+    eventSource.addEventListener('beitritt', (ev) => {
+      const daten = JSON.parse(ev.data);
+      if (aktuellerZustand) aktuellerZustand.offen = daten.offen;
+      const btn = $('#btn-beitritt-toggle');
+      if (btn) {
+        btn.textContent = daten.offen ? 'Beitritt: Offen' : 'Beitritt: Geschlossen';
+        btn.className = daten.offen ? 'knopf klein gruen' : 'knopf klein grau';
+      }
     });
 
     eventSource.addEventListener('aufgaben', (ev) => {
@@ -204,17 +247,25 @@
       }
       case 'laeuft': {
         if (z.runde && ich && ich.aktiv) {
-          // Eigene Aufgaben laden falls noch nicht vorhanden
+          if (ich.fertig) {
+            zeigeScreen('screen-warten');
+            $('#warten-status').textContent = 'Du hast alle Aufgaben gelöst! Warte auf das Rundenende …';
+            return;
+          }
           const sp = z.runde.spiele && z.runde.spiele.find((s) => s.teilnehmer.some((t) => t.id === ich.id));
           if (sp && sp.meineAufgaben) {
             meineAufgaben = sp.meineAufgaben;
             meinSpielId = sp.id;
           }
+          aufgabenIndex = typeof ich.index === 'number' ? ich.index : 0;
           zeigeScreen('screen-rechnen');
           aufgabeZeigen();
+          if (z.runde.start && z.runde.dauerMs) {
+            rundenUhrStarten(z.runde.start + z.runde.dauerMs);
+          }
         } else {
           zeigeScreen('screen-warten');
-          $('#warten-status').textContent = 'Du bist Zuschauer in dieser Runde.';
+          $('#warten-status').textContent = 'Du schaust in dieser Runde zu.';
         }
         break;
       }
@@ -308,11 +359,26 @@
       const karte = document.createElement('div');
       karte.className = 'duell-karte';
 
+      const titel = sp.typ === 'platz3'
+        ? '<div class="grau klein fett text-blau">🥉 Spiel um Platz 3</div>'
+        : (sp.gruppeNr ? `<div class="grau klein fett">Gruppe ${sp.gruppeNr}</div>` : `<div class="grau klein">Spiel ${idx + 1}</div>`);
+
+      if (sp.teilnehmer.length > 2) {
+        let spielerHtml = '<div class="gruppe-teilnehmer-liste mt-1">';
+        sp.teilnehmer.forEach((tn) => {
+          spielerHtml += `<div><span class="emoji">${tn.emoji}</span> ${escapeHtml(tn.name)}</div>`;
+        });
+        spielerHtml += '</div>';
+        karte.innerHTML = `${titel}${spielerHtml}`;
+        raster.appendChild(karte);
+        return;
+      }
+
       const t1 = sp.teilnehmer[0] || { name: 'Offen', emoji: '❓' };
       const t2 = sp.teilnehmer[1] || (sp.freilos ? { name: 'Freilos', emoji: '✨' } : { name: 'Offen', emoji: '❓' });
 
       karte.innerHTML = `
-        <div class="grau klein">Spiel ${idx + 1}</div>
+        ${titel}
         <div class="duell-kontrahenten">
           <div class="spieler-name-box">
             <span class="emoji">${t1.emoji}</span>
@@ -336,6 +402,13 @@
     if (!sp || !kasten) return;
 
     kasten.classList.remove('versteckt');
+    if (sp.teilnehmer.length > 2) {
+      const andere = sp.teilnehmer.filter((t) => t.id !== meinTeilnehmer.id);
+      const namen = andere.map((t) => `${t.emoji} ${escapeHtml(t.name)}`).join(', ');
+      kasten.innerHTML = `<p>${sp.gruppeNr ? `Gruppe ${sp.gruppeNr}` : 'Sprint'}: Du spielst gegen <strong>${namen}</strong></p>`;
+      return;
+    }
+
     const gegner = sp.teilnehmer.find((t) => t.id !== meinTeilnehmer.id);
     if (sp.freilos || !gegner) {
       kasten.innerHTML = '<p class="text-gruen">✨ Du hast in dieser Runde ein Freilos!</p>';
@@ -348,7 +421,7 @@
   // Countdown
   // -------------------------------------------------------------------
   let countdownTimer = null;
-  function countdownStarten(startUm) {
+  function countdownStarten(startUm, dauerMs) {
     const overlay = $('#countdown-overlay');
     const zahl = $('#countdown-zahl');
     if (countdownTimer) clearInterval(countdownTimer);
@@ -371,6 +444,10 @@
             zeigeScreen('screen-rechnen');
             aufgabeZeigen();
           }
+          const effektiveDauerMs = dauerMs || (aktuellerZustand && aktuellerZustand.runde && aktuellerZustand.runde.dauerMs);
+          if (effektiveDauerMs) {
+            rundenUhrStarten(startUm + effektiveDauerMs);
+          }
         }, 600);
       }
     }
@@ -390,6 +467,39 @@
     liste.innerHTML = '';
 
     (runde.spiele || []).forEach((sp) => {
+      if (sp.teilnehmer && sp.teilnehmer.length > 2) {
+        const kasten = document.createElement('div');
+        kasten.className = 'live-mehrspieler-kasten';
+        kasten.id = `live-spiel-${sp.id}`;
+        if (sp.gruppeNr) {
+          const ueberschrift = document.createElement('div');
+          ueberschrift.className = 'grau klein fett';
+          ueberschrift.textContent = `Gruppe ${sp.gruppeNr}`;
+          kasten.appendChild(ueberschrift);
+        }
+        sp.teilnehmer.forEach((tn) => {
+          const st = (sp.stand && sp.stand[tn.id]) || { richtig: 0, falsch: 0, index: 0 };
+          const z = document.createElement('div');
+          z.className = 'live-spieler-zeile';
+          z.innerHTML = `
+            <div class="spieler-name-box">
+              <span class="emoji">${tn.emoji}</span>
+              <span>${escapeHtml(tn.name)}</span>
+            </div>
+            <div class="fortschritt-balken-rahmen">
+              <div id="balken-${sp.id}-${tn.id}-richtig" class="fortschritt-segment richtig" style="width: 0%"></div>
+              <div id="balken-${sp.id}-${tn.id}-falsch" class="fortschritt-segment falsch" style="width: 0%"></div>
+            </div>
+            <div class="duell-score text-rechts">
+              <span id="score-${sp.id}-${tn.id}">${st.richtig}</span>
+            </div>
+          `;
+          kasten.appendChild(z);
+        });
+        liste.appendChild(kasten);
+        return;
+      }
+
       const zeile = document.createElement('div');
       zeile.className = 'live-duell-zeile';
       zeile.id = `live-spiel-${sp.id}`;
@@ -397,8 +507,8 @@
       const t1 = sp.teilnehmer[0] || { id: 't1', name: '-', emoji: '❓' };
       const t2 = sp.teilnehmer[1] || (sp.freilos ? { id: 't2', name: 'Freilos', emoji: '✨' } : { id: 't2', name: '-', emoji: '❓' });
 
-      const st1 = sp.stand[t1.id] || { richtig: 0, falsch: 0, index: 0 };
-      const st2 = sp.stand[t2.id] || { richtig: 0, falsch: 0, index: 0 };
+      const st1 = (sp.stand && sp.stand[t1.id]) || { richtig: 0, falsch: 0, index: 0 };
+      const st2 = (sp.stand && sp.stand[t2.id]) || { richtig: 0, falsch: 0, index: 0 };
 
       zeile.innerHTML = `
         <div class="spieler-name-box">
@@ -432,7 +542,20 @@
     const scoreElem = $(`#score-${spiel}-${id}`);
     if (scoreElem) scoreElem.textContent = richtig;
 
-    const zielAnzahl = (aktuellerZustand && aktuellerZustand.einstellungen && aktuellerZustand.einstellungen.anzahl) || 10;
+    const istZeitModus = aktuellerZustand && aktuellerZustand.einstellungen && aktuellerZustand.einstellungen.art === 'zeit';
+    let zielAnzahl = 10;
+    if (istZeitModus) {
+      const scoreElems = $$(`[id^="score-${spiel}-"]`);
+      let maxScore = 5;
+      scoreElems.forEach((el) => {
+        const val = Number.parseInt(el.textContent) || 0;
+        if (val > maxScore) maxScore = val;
+      });
+      zielAnzahl = maxScore;
+    } else {
+      zielAnzahl = (aktuellerZustand && aktuellerZustand.einstellungen && aktuellerZustand.einstellungen.anzahl) || 10;
+    }
+
     const pRichtig = Math.min(100, (richtig / zielAnzahl) * 100);
     const pFalsch = Math.min(100, (falsch / zielAnzahl) * 100);
 
@@ -441,11 +564,14 @@
     if (bRichtig) bRichtig.style.width = `${pRichtig}%`;
     if (bFalsch) bFalsch.style.width = `${pFalsch}%`;
 
-    // Auch Mini-Leiste am Handy aktualisieren falls es der Gegner ist
+    // Auch Mini-Leiste am Handy aktualisieren
     if (rolle === 'kind' && meinTeilnehmer) {
       if (id !== meinTeilnehmer.id) {
         $('#leiste-gegner').textContent = `Gegner: ${richtig}`;
         $('#balken-gegner').style.width = `${pRichtig}%`;
+      } else {
+        $('#leiste-ich').textContent = `Du: ${richtig}`;
+        $('#balken-ich').style.width = `${pRichtig}%`;
       }
     }
   }
@@ -464,13 +590,15 @@
       karte.className = 'duell-karte';
 
       const erg = sp.ergebnis || [];
-      const sieger = erg[0] ? runde.teilnehmer && runde.teilnehmer.find((t) => t.id === erg[0].id) : null;
+      const titel = sp.typ === 'platz3'
+        ? '<div class="grau klein fett text-blau">🥉 Spiel um Platz 3</div>'
+        : (sp.gruppeNr ? `<div class="grau klein fett">Gruppe ${sp.gruppeNr}</div>` : `<div class="grau klein">Spiel ${idx + 1}</div>`);
 
-      let html = `<div class="grau klein">Spiel ${idx + 1}</div>`;
+      let html = titel;
       erg.forEach((e) => {
-        const tn = (sp.teilnehmer || []).find((t) => t.id === e.id);
-        const name = tn ? tn.name : e.id;
-        const emoji = tn ? tn.emoji : '👤';
+        const tn = (sp.teilnehmer || []).find((t) => (typeof t === 'string' ? t === e.id : t.id === e.id));
+        const name = tn ? (tn.name || tn.id) : e.id;
+        const emoji = tn ? (tn.emoji || '👤') : '👤';
         const istGewinner = e.platz === 1;
         html += `
           <div class="duell-kontrahenten ${istGewinner ? 'text-gruen fett' : 'grau'}">
@@ -527,16 +655,68 @@
   }
 
   function rundenendeRendern(daten) {
+    if (rundenLiveTimer) { clearInterval(rundenLiveTimer); rundenLiveTimer = null; }
+    if (aktuellerZustand) {
+      aktuellerZustand.phase = 'auswertung';
+      if (daten && daten.runde) aktuellerZustand.runde = daten.runde;
+      if (daten && daten.teilnehmer) aktuellerZustand.teilnehmer = daten.teilnehmer;
+    }
+
     if (rolle === 'leitung' || rolle === 'zuschauer') {
       zeigeScreen('screen-ergebnis');
-      ergebnisRendern(aktuellerZustand && aktuellerZustand.runde);
+      ergebnisRendern((daten && daten.runde) || (aktuellerZustand && aktuellerZustand.runde));
+    } else if (rolle === 'kind') {
+      zeigeScreen('screen-kind-ergebnis');
+      const ich = daten && daten.ich;
+      const format = (aktuellerZustand && aktuellerZustand.einstellungen && aktuellerZustand.einstellungen.format) || 'ko';
+      const detailsElem = $('#kind-ergebnis-details');
+
+      if (ich) {
+        if (ich.weiter) {
+          $('#kind-ergebnis-emoji').textContent = '🎉';
+          $('#kind-ergebnis-titel').textContent = 'Runde beendet!';
+          $('#kind-ergebnis-nachricht').textContent = (format === 'ko' || format === 'gruppen_ko')
+            ? 'Gewonnen! Du bist eine Runde weiter!'
+            : `Runde abgeschlossen! Platz ${ich.platz || '-'}`;
+        } else {
+          $('#kind-ergebnis-emoji').textContent = '👏';
+          $('#kind-ergebnis-titel').textContent = 'Stark gekämpft!';
+          $('#kind-ergebnis-nachricht').textContent = 'Du scheidest aus und schaust jetzt zu.';
+        }
+        if (detailsElem) {
+          detailsElem.innerHTML = `
+            <p><strong>${ich.richtig || 0}</strong> richtig${ich.falsch ? `, <strong>${ich.falsch}</strong> Fehler` : ''}</p>
+            ${ich.zeit ? `<p class="grau klein">Zeit: ${ich.zeit} s</p>` : ''}
+          `;
+        }
+      }
     }
   }
 
   function turnierendeRendern(daten) {
+    if (rundenLiveTimer) { clearInterval(rundenLiveTimer); rundenLiveTimer = null; }
+    if (aktuellerZustand) {
+      aktuellerZustand.phase = 'ende';
+      if (daten && daten.teilnehmer) aktuellerZustand.teilnehmer = daten.teilnehmer;
+    }
+
     if (rolle === 'leitung' || rolle === 'zuschauer') {
       zeigeScreen('screen-siegerehrung');
       siegerehrungRendern((daten && daten.teilnehmer) || (aktuellerZustand && aktuellerZustand.teilnehmer) || []);
+    } else if (rolle === 'kind') {
+      zeigeScreen('screen-kind-ergebnis');
+      $('#kind-ergebnis-emoji').textContent = '🏆';
+      $('#kind-ergebnis-titel').textContent = 'Turnier beendet!';
+      let meinPlatz = null;
+      if (daten && daten.teilnehmer && meinTeilnehmer) {
+        const tn = daten.teilnehmer.find((t) => t.id === meinTeilnehmer.id);
+        if (tn) meinPlatz = tn.platz;
+      }
+      $('#kind-ergebnis-nachricht').textContent = meinPlatz ? `Du hast Platz ${meinPlatz} erreicht!` : 'Tolle Leistung!';
+      const detailsElem = $('#kind-ergebnis-details');
+      if (detailsElem) {
+        detailsElem.innerHTML = '<p class="text-gruen fett">Danke fürs Mitmachen!</p>';
+      }
     }
   }
 
@@ -572,6 +752,7 @@
   }
 
   async function zifferTippen(z) {
+    if (sendetGerade) return;
     const auf = meineAufgaben[aufgabenIndex];
     if (!auf) return;
 
@@ -585,11 +766,13 @@
     if (aktuelleEingabe.length >= auf.stellen) {
       const wert = aktuelleEingabe;
       aktuelleEingabe = '';
+      sendetGerade = true;
       await antwortAbsenden(wert);
     }
   }
 
   function zifferZurueck() {
+    if (sendetGerade) return;
     const auf = meineAufgaben[aufgabenIndex];
     if (!auf || !aktuelleEingabe) return;
     aktuelleEingabe = aktuelleEingabe.slice(0, -1);
@@ -615,10 +798,28 @@
         }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        sendetGerade = false;
+        return;
+      }
       const daten = await res.json();
 
-      if (daten.ignoriert) return;
+      if (daten.ignoriert) {
+        if (typeof daten.aktuellerIndex === 'number') {
+          aufgabenIndex = daten.aktuellerIndex;
+          if (daten.naechste) {
+            meineAufgaben[aufgabenIndex] = daten.naechste;
+          }
+          if (daten.fertig || aufgabenIndex >= meineAufgaben.length) {
+            zeigeScreen('screen-warten');
+            $('#warten-status').textContent = 'Geschafft! Warte auf das Rundenende …';
+          } else {
+            aufgabeZeigen();
+          }
+        }
+        sendetGerade = false;
+        return;
+      }
 
       if (daten.richtig) {
         if (typeof Ton !== 'undefined') Ton.richtig();
@@ -640,9 +841,10 @@
         } else {
           aufgabeZeigen();
         }
+        sendetGerade = false;
       }, 150);
     } catch (e) {
-      // Offline/Netzfehler
+      sendetGerade = false;
     }
   }
 
@@ -675,6 +877,7 @@
       case 'finale': return '🏆 Finale';
       case 'halbfinale': return 'Halbfinale';
       case 'viertelfinale': return 'Viertelfinale';
+      case 'achtelfinale': return 'Achtelfinale';
       case 'platz3': return 'Spiel um Platz 3';
       case 'gruppe': return `Gruppenphase (Runde ${nr})`;
       case 'liga': return `Liga (Runde ${nr})`;

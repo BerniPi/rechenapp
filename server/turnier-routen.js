@@ -43,6 +43,74 @@ setInterval(() => {
   }
 }, 20000).unref();
 
+// Server-Timer für Runden und Countdowns: Map<TurnierCode, { countdownTimer, rundenTimer }>
+const timerMap = new Map();
+
+function timerLoeschen(code) {
+  const tObj = timerMap.get(code);
+  if (tObj) {
+    if (tObj.countdownTimer) clearTimeout(tObj.countdownTimer);
+    if (tObj.rundenTimer) clearTimeout(tObj.rundenTimer);
+    timerMap.delete(code);
+  }
+}
+
+// Rundenende an alle Verbindungen senden
+function rundenendeSenden(t, leitungSchluessel) {
+  timerLoeschen(t.code);
+  let runde;
+  try {
+    runde = Turnier.rundeBeenden(t, leitungSchluessel);
+  } catch (err) {
+    return;
+  }
+  const pool = verbindungen.get(t.code);
+  if (pool) {
+    for (const c of pool) {
+      const payload = {
+        phase: t.phase,
+        runde: rundeFuerAnzeige(t, c),
+        ergebnisse: runde.spiele.map((sp) => ({ id: sp.id, ergebnis: sp.ergebnis })),
+        teilnehmer: teilnehmerListe(t),
+      };
+      if (c.rolle === 'kind') {
+        const tn = t.teilnehmer.get(c.teilnehmerId);
+        if (tn) {
+          const sp = runde.spiele.find((s) => s.teilnehmer.includes(c.teilnehmerId));
+          const meinErg = sp && sp.ergebnis && sp.ergebnis.find((e) => e.id === c.teilnehmerId);
+          payload.ich = {
+            platz: meinErg ? meinErg.platz : null,
+            weiter: tn.aktiv,
+            richtig: meinErg ? meinErg.richtig : 0,
+            falsch: meinErg ? meinErg.falsch : 0,
+            zeit: meinErg ? meinErg.zeit : 0,
+            turnierPlatz: tn.platz,
+          };
+        }
+      }
+      sseSenden(c.res, t.phase === 'ende' ? 'ende' : 'rundenende', payload);
+    }
+  }
+}
+
+// Regelmäßiges Aufräumen inaktiver Turniere und deren Verbindungen
+function aufraeumenAlle() {
+  const geloescht = Turnier.aufraeumen();
+  if (Array.isArray(geloescht)) {
+    for (const code of geloescht) {
+      timerLoeschen(code);
+      const pool = verbindungen.get(code);
+      if (pool) {
+        for (const conn of pool) {
+          try { conn.res.end(); } catch (e) {}
+        }
+        verbindungen.delete(code);
+      }
+    }
+  }
+}
+setInterval(aufraeumenAlle, 10 * 60 * 1000).unref();
+
 // Teilnehmer-Liste für die Anzeige vorbereiten
 function teilnehmerListe(t) {
   return Array.from(t.teilnehmer.values()).map((tn) => ({
@@ -112,12 +180,19 @@ function zustandFuer(t, conn) {
   if (conn.rolle === 'kind') {
     const tn = t.teilnehmer.get(conn.teilnehmerId);
     if (tn) {
+      const runde = t.runden[t.aktuelleRundeNr - 1];
+      const sp = runde && runde.spiele && runde.spiele.find((s) => s.teilnehmer.includes(conn.teilnehmerId));
+      const st = sp && sp.stand && sp.stand[conn.teilnehmerId];
       daten.ich = {
         id: tn.id,
         name: tn.name,
         emoji: tn.emoji,
         aktiv: tn.aktiv,
         platz: tn.platz,
+        index: st ? st.index : 0,
+        richtig: st ? st.richtig : 0,
+        falsch: st ? st.falsch : 0,
+        fertig: Boolean(st && st.fertigUm),
       };
     }
   }
@@ -338,9 +413,9 @@ async function anfrage(req, res, url) {
           return H.json(res, 200, { ok: true });
         }
         case 'runde_starten': {
-          const { startUm, rundeNr } = Turnier.rundeStarten(t, schluessel);
+          const { startUm, dauerMs, rundeNr } = Turnier.rundeStarten(t, schluessel);
           // Countdown verschicken
-          senden(t.code, 'countdown', { startUm, runde: rundeNr });
+          senden(t.code, 'countdown', { startUm, dauerMs, runde: rundeNr });
           // Aufgaben an die einzelnen Teilnehmer verschicken
           const pool = verbindungen.get(t.code);
           if (pool) {
@@ -357,28 +432,32 @@ async function anfrage(req, res, url) {
               }
             }
           }
+
+          // Timer für Countdown und Rundenende
+          timerLoeschen(t.code);
+          const cTimer = setTimeout(() => {
+            if (t.phase === 'countdown') {
+              Turnier.rundeAktivieren(t, Date.now());
+            }
+          }, Math.max(0, startUm - Date.now()));
+          cTimer.unref();
+
+          const rTimer = setTimeout(() => {
+            if (t.phase === 'laeuft' || t.phase === 'countdown') {
+              rundenendeSenden(t);
+            }
+          }, Math.max(0, startUm + dauerMs + 2000 - Date.now()));
+          rTimer.unref();
+
+          timerMap.set(t.code, { countdownTimer: cTimer, rundenTimer: rTimer });
           return H.json(res, 200, { ok: true, startUm });
         }
         case 'beenden': {
-          const runde = Turnier.rundeBeenden(t, schluessel);
-          const pool = verbindungen.get(t.code);
-          if (pool) {
-            for (const c of pool) {
-              const payload = {
-                phase: t.phase,
-                ergebnisse: runde.spiele.map((sp) => ({ id: sp.id, ergebnis: sp.ergebnis })),
-                teilnehmer: teilnehmerListe(t),
-              };
-              if (c.rolle === 'kind') {
-                const tn = t.teilnehmer.get(c.teilnehmerId);
-                if (tn) payload.ich = { platz: tn.platz, weiter: tn.aktiv };
-              }
-              sseSenden(c.res, t.phase === 'ende' ? 'ende' : 'rundenende', payload);
-            }
-          }
+          rundenendeSenden(t, schluessel);
           return H.json(res, 200, { ok: true, phase: t.phase });
         }
         case 'abbrechen': {
+          timerLoeschen(t.code);
           Turnier.abbrechen(t, schluessel);
           const pool = verbindungen.get(t.code);
           if (pool) {
@@ -410,11 +489,7 @@ async function anfrage(req, res, url) {
         }
         case 'beitritt': {
           Turnier.beitrittSchliessen(t, schluessel, b.offen);
-          senden(t.code, 'hallo', {
-            jetzt: Date.now(),
-            rolle: 'alle',
-            zustand: { offen: t.offen },
-          });
+          senden(t.code, 'beitritt', { offen: t.offen });
           return H.json(res, 200, { ok: true, offen: t.offen });
         }
         case 'entfernen': {
@@ -426,6 +501,7 @@ async function anfrage(req, res, url) {
           return H.json(res, 200, { ok: true });
         }
         case 'neues_turnier': {
+          timerLoeschen(t.code);
           Turnier.neuesTurnierGleicheKinder(t, schluessel);
           const pool = verbindungen.get(t.code);
           if (pool) {
@@ -488,17 +564,30 @@ async function anfrage(req, res, url) {
 
         // Falls die Runde durch diese Antwort beendet wurde
         if (t.phase === 'auswertung' || t.phase === 'ende') {
+          timerLoeschen(t.code);
           const pool = verbindungen.get(t.code);
           if (pool) {
             for (const c of pool) {
               const payload = {
                 phase: t.phase,
+                runde: rundeFuerAnzeige(t, c),
                 ergebnisse: runde.spiele.map((sp) => ({ id: sp.id, ergebnis: sp.ergebnis })),
                 teilnehmer: teilnehmerListe(t),
               };
               if (c.rolle === 'kind') {
                 const kindTn = t.teilnehmer.get(c.teilnehmerId);
-                if (kindTn) payload.ich = { platz: kindTn.platz, weiter: kindTn.aktiv };
+                if (kindTn) {
+                  const sp = runde.spiele.find((s) => s.teilnehmer.includes(c.teilnehmerId));
+                  const meinErg = sp && sp.ergebnis && sp.ergebnis.find((e) => e.id === c.teilnehmerId);
+                  payload.ich = {
+                    platz: meinErg ? meinErg.platz : null,
+                    weiter: kindTn.aktiv,
+                    richtig: meinErg ? meinErg.richtig : 0,
+                    falsch: meinErg ? meinErg.falsch : 0,
+                    zeit: meinErg ? meinErg.zeit : 0,
+                    turnierPlatz: kindTn.platz,
+                  };
+                }
               }
               sseSenden(c.res, t.phase === 'ende' ? 'ende' : 'rundenende', payload);
             }

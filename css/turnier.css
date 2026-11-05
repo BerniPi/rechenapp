@@ -440,6 +440,35 @@
   font-weight: bold;
 }
 
+.live-mehrspieler-kasten {
+  background: white;
+  border-radius: 1rem;
+  padding: 1.2rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.live-spieler-zeile {
+  display: grid;
+  grid-template-columns: 200px 1fr 60px;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.leiste-uhr {
+  font-family: monospace;
+  font-weight: bold;
+  background: #1e293b;
+  color: #38bdf8;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  font-size: 0.9rem;
+}
+
 .duell-balken-mitte {
   display: flex;
   align-items: center;
