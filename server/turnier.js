@@ -1303,7 +1303,7 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
 
   // Bereits fertig?
   if (st.fertigUm) {
-    return { fertig: true, richtig: null, naechste: null };
+    return { ignoriert: true, fertig: true, richtig: null, naechste: null };
   }
 
   // Index-Prüfung: doppelte oder veraltete Antworten ignorieren
@@ -1320,7 +1320,7 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
   const aufgabe = spiel.aufgaben[st.index];
   if (!aufgabe) {
     st.fertigUm = jetzt;
-    return { fertig: true, richtig: null, naechste: null };
+    return { ignoriert: true, fertig: true, richtig: null, naechste: null };
   }
 
   const istRichtig = Number(wert) === aufgabe.loesung;

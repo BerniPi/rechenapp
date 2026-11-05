@@ -826,6 +826,29 @@ pruefe('B6: Sprint mit 4 Kindern bis ende', () => {
   assert.strictEqual(t.teilnehmer.get(kinder[3].id).platz, 4);
 });
 
+pruefe('B8: Antwort auf eine schon fertige Aufgabenliste liefert ignoriert: true', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Fertig-Test',
+    einstellungen: { format: 'sprint', anzahl: 2 },
+  });
+  const k1 = Turnier.beitreten(code, { name: 'FertigKind', emoji: '🦊' });
+  Turnier.beitreten(code, { name: 'AnderesKind', emoji: '🐻' });
+
+  Turnier.starten(t, leitung);
+  Turnier.rundeStarten(t, leitung, 1000);
+  Turnier.rundeAktivieren(t, 4000);
+
+  const sp = t.runden[0].spiele[0];
+  Turnier.antworten(t, k1.schluessel, { spiel: sp.id, index: 0, wert: sp.aufgaben[0].loesung }, 5000);
+  const rFertig = Turnier.antworten(t, k1.schluessel, { spiel: sp.id, index: 1, wert: sp.aufgaben[1].loesung }, 6000);
+  assert.strictEqual(rFertig.fertig, true);
+
+  const rExtra = Turnier.antworten(t, k1.schluessel, { spiel: sp.id, index: 2, wert: 42 }, 7000);
+  assert.strictEqual(rExtra.ignoriert, true);
+  assert.strictEqual(rExtra.fertig, true);
+  assert.strictEqual(rExtra.richtig, null);
+});
+
 (async () => {
   const h = await H.pwHash('geheim123');
   pruefe('Passwort-Hash', () => assert(/^scrypt\$[\w-]+\$[\w-]+$/.test(h) && !h.includes('geheim123')));

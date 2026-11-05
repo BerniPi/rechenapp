@@ -937,10 +937,10 @@
         return;
       }
 
-      if (daten.richtig) {
+      if (daten.richtig === true) {
         if (typeof Ton !== 'undefined') Ton.richtig();
         karte.classList.add('ok');
-      } else {
+      } else if (daten.richtig === false) {
         if (typeof Ton !== 'undefined') Ton.falsch();
         karte.classList.add('nok');
       }
