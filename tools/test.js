@@ -667,6 +667,49 @@ pruefe('B4: Gruppen werden zufaellig gemischt und bei neuMischen neu ausgelost',
   assert(veraendert, 'Gruppenaufteilung muss sich durch neuMischen aendern');
 });
 
+pruefe('B5: Gruppen-KO Setzung trennt Gruppengegner und wertet Punkte > Richtig > Zeit', () => {
+  const { code, turnier: t } = Turnier.anlegen({
+    titel: 'Setzung-Test',
+    einstellungen: { format: 'gruppen_ko', gruppenGroesse: 3, gruppenRunden: 1, weiterProGruppe: 2, anzahl: 5 },
+  });
+  const g1k1 = Turnier.beitreten(code, { name: 'G1_Erster', emoji: '🦊' });
+  const g1k2 = Turnier.beitreten(code, { name: 'G1_Zweiter', emoji: '🐻' });
+  const g1k3 = Turnier.beitreten(code, { name: 'G1_Dritter', emoji: '🐼' });
+  const g2k1 = Turnier.beitreten(code, { name: 'G2_Erster', emoji: '🦁' });
+  const g2k2 = Turnier.beitreten(code, { name: 'G2_Zweiter', emoji: '🐯' });
+  const g2k3 = Turnier.beitreten(code, { name: 'G2_Dritter', emoji: '🐨' });
+
+  t.gruppen = [
+    [g1k1.id, g1k2.id, g1k3.id],
+    [g2k1.id, g2k2.id, g2k3.id],
+  ];
+
+  const tnG1E = t.teilnehmer.get(g1k1.id);
+  const tnG1Z = t.teilnehmer.get(g1k2.id);
+  tnG1E.punkte = 5; tnG1E.gesamtRichtig = 10; tnG1E.gesamtZeit = 20;
+  tnG1Z.punkte = 5; tnG1Z.gesamtRichtig = 8;  tnG1Z.gesamtZeit = 15;
+
+  const tnG2E = t.teilnehmer.get(g2k1.id);
+  const tnG2Z = t.teilnehmer.get(g2k2.id);
+  tnG2E.punkte = 6; tnG2E.gesamtRichtig = 10; tnG2E.gesamtZeit = 20;
+  tnG2Z.punkte = 4; tnG2Z.gesamtRichtig = 7;  tnG2Z.gesamtZeit = 25;
+
+  const gesetzte = Turnier.gruppenKoSetzung(t.gruppen, t.teilnehmer, 2);
+  assert.strictEqual(gesetzte[0], g2k1.id, 'G2_Erster muss bester Gruppensieger sein');
+  assert.strictEqual(gesetzte[1], g1k1.id, 'G1_Erster muss zweiter Gruppensieger sein');
+
+  const baum = Turnier.koBaumErstellen(gesetzte);
+  const duell1 = baum.duelleRunde1[0];
+  const duell2 = baum.duelleRunde1[1];
+  const obereIds = [duell1.t1, duell1.t2];
+  const untereIds = [duell2.t1, duell2.t2];
+
+  assert(obereIds.includes(g2k1.id), 'G2_Erster muss in oberer Hälfte sein');
+  assert(untereIds.includes(g2k2.id), 'G2_Zweiter muss in unterer Hälfte sein');
+  assert(untereIds.includes(g1k1.id), 'G1_Erster muss in unterer Hälfte sein');
+  assert(obereIds.includes(g1k2.id), 'G1_Zweiter muss in oberer Hälfte sein');
+});
+
 pruefe('B5: Neues Turnier nur in Phase ende erlaubt', () => {
   const { leitung, turnier: t } = Turnier.anlegen({ titel: 'Test' });
   assert.strictEqual(t.phase, 'lobby');

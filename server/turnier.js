@@ -161,6 +161,96 @@ function koBaumErstellen(teilnehmerIds, optionen = {}) {
   };
 }
 
+// Setzliste nach Gruppenphase: Gruppensieger auf obere Setzplätze, Zweite in die entgegengesetzte Baumhälfte
+function gruppenKoSetzung(gruppen, teilnehmerMap, weiterProGruppe = 2) {
+  // 1. Sortieren innerhalb jeder Gruppe: punkte > gesamtRichtig > gesamtZeit
+  const rangierteGruppen = gruppen.map((gruppe, gIdx) => {
+    const tnList = gruppe.map((id) => (teilnehmerMap.get ? teilnehmerMap.get(id) : teilnehmerMap[id])).filter(Boolean);
+    tnList.sort((a, b) => {
+      if ((b.punkte || 0) !== (a.punkte || 0)) return (b.punkte || 0) - (a.punkte || 0);
+      if ((b.gesamtRichtig || 0) !== (a.gesamtRichtig || 0)) return (b.gesamtRichtig || 0) - (a.gesamtRichtig || 0);
+      return (a.gesamtZeit || 0) - (b.gesamtZeit || 0);
+    });
+    return {
+      gruppeNr: gIdx + 1,
+      sieger: tnList[0] || null,
+      zweiter: tnList[1] || null,
+      weitere: tnList.slice(2, weiterProGruppe),
+    };
+  });
+
+  const siegerListe = rangierteGruppen.map((g) => ({ tn: g.sieger, gNr: g.gruppeNr })).filter((x) => x.tn);
+  siegerListe.sort((a, b) => {
+    if ((b.tn.punkte || 0) !== (a.tn.punkte || 0)) return (b.tn.punkte || 0) - (a.tn.punkte || 0);
+    if ((b.tn.gesamtRichtig || 0) !== (a.tn.gesamtRichtig || 0)) return (b.tn.gesamtRichtig || 0) - (a.tn.gesamtRichtig || 0);
+    return (a.tn.gesamtZeit || 0) - (b.tn.gesamtZeit || 0);
+  });
+
+  const k = rangierteGruppen.reduce((sum, g) => sum + (g.sieger ? 1 : 0) + (g.zweiter ? 1 : 0) + g.weitere.length, 0);
+  let groesse = 2;
+  while (groesse < k) groesse *= 2;
+
+  const reihenfolge = setzListe(groesse);
+  const obereHaelfteSeeds = new Set(reihenfolge.slice(0, groesse / 2));
+  const untereHaelfteSeeds = new Set(reihenfolge.slice(groesse / 2));
+
+  const seedBelegung = new Map();
+  const siegerHaelfte = new Map();
+
+  siegerListe.forEach((item, idx) => {
+    const seed = idx + 1;
+    seedBelegung.set(seed, item.tn.id);
+    siegerHaelfte.set(item.gNr, obereHaelfteSeeds.has(seed) ? 'oben' : 'unten');
+  });
+
+  const freieZweiteSeedsOben = [];
+  const freieZweiteSeedsUnten = [];
+  for (let s = siegerListe.length + 1; s <= k; s++) {
+    if (obereHaelfteSeeds.has(s)) freieZweiteSeedsOben.push(s);
+    else freieZweiteSeedsUnten.push(s);
+  }
+
+  const zweiteListe = rangierteGruppen.map((g) => ({ tn: g.zweiter, gNr: g.gruppeNr })).filter((x) => x.tn);
+  zweiteListe.sort((a, b) => {
+    if ((b.tn.punkte || 0) !== (a.tn.punkte || 0)) return (b.tn.punkte || 0) - (a.tn.punkte || 0);
+    if ((b.tn.gesamtRichtig || 0) !== (a.tn.gesamtRichtig || 0)) return (b.tn.gesamtRichtig || 0) - (a.tn.gesamtRichtig || 0);
+    return (a.tn.gesamtZeit || 0) - (b.tn.gesamtZeit || 0);
+  });
+
+  zweiteListe.forEach((item) => {
+    const sHaelfte = siegerHaelfte.get(item.gNr);
+    let targetSeed;
+    if (sHaelfte === 'oben') {
+      targetSeed = freieZweiteSeedsUnten.shift() || freieZweiteSeedsOben.shift();
+    } else {
+      targetSeed = freieZweiteSeedsOben.shift() || freieZweiteSeedsUnten.shift();
+    }
+    if (targetSeed) {
+      seedBelegung.set(targetSeed, item.tn.id);
+    }
+  });
+
+  // Falls es 3. Plätze gibt (weiterProGruppe > 2)
+  let restSeed = siegerListe.length + zweiteListe.length + 1;
+  rangierteGruppen.forEach((g) => {
+    g.weitere.forEach((w) => {
+      while (seedBelegung.has(restSeed) && restSeed <= k) restSeed++;
+      if (restSeed <= k) {
+        seedBelegung.set(restSeed, w.id);
+        restSeed++;
+      }
+    });
+  });
+
+  const gesetzteIds = [];
+  for (let s = 1; s <= k; s++) {
+    if (seedBelegung.has(s)) {
+      gesetzteIds.push(seedBelegung.get(s));
+    }
+  }
+  return gesetzteIds;
+}
+
 // Aufgaben für ein Spiel erzeugen
 function aufgabenErzeugen(einstellungen = {}, anzahlExtra = 0) {
   const gen = Aufgaben.erzeuger({
@@ -590,25 +680,14 @@ function rundePlanen(t) {
     if (istErsteKoRunde) {
       let setzReihenfolge;
       if (format === 'gruppen_ko') {
-        // Gruppen-Aufsteiger ermitteln
         t.inKoPhase = true;
-        const aufsteiger = [];
-        t.gruppen.forEach((gruppe) => {
-          const tnGruppe = gruppe.map((id) => t.teilnehmer.get(id));
-          tnGruppe.sort((a, b) => (b.punkte || 0) - (a.punkte || 0));
-          const weiter = tnGruppe.slice(0, t.einstellungen.weiterProGruppe);
-          aufsteiger.push(...weiter);
-        });
+        setzReihenfolge = gruppenKoSetzung(t.gruppen, t.teilnehmer, t.einstellungen.weiterProGruppe);
 
         // Alle Nicht-Aufsteiger ausscheiden lassen
-        const aufsteigerIds = new Set(aufsteiger.map((tn) => tn.id));
+        const aufsteigerIds = new Set(setzReihenfolge);
         t.teilnehmer.forEach((tn) => {
           if (!aufsteigerIds.has(tn.id)) tn.aktiv = false;
         });
-
-        // Sortieren nach Gruppenpunkten für K.-o.-Setzung
-        aufsteiger.sort((a, b) => (b.punkte || 0) - (a.punkte || 0));
-        setzReihenfolge = aufsteiger.map((tn) => tn.id);
       } else {
         setzReihenfolge = mischen(aktive.map((tn) => tn.id));
       }
@@ -1380,6 +1459,7 @@ module.exports = {
   neuesTurnierGleicheKinder,
   // Pure Algorithmen und Helfer für Tests
   gruppenEinteilen,
+  gruppenKoSetzung,
   koBaumErstellen,
   wertungSpiel,
   aufgabenFuerKind,
