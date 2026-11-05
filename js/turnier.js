@@ -266,6 +266,14 @@
         break;
       }
       case 'countdown': {
+        if (z.runde && ich && ich.aktiv) {
+          const sp = z.runde.spiele && z.runde.spiele.find((s) => s.teilnehmer.some((t) => t.id === ich.id));
+          if (sp && sp.meineAufgaben) {
+            meineAufgaben = sp.meineAufgaben;
+            meinSpielId = sp.id;
+          }
+          aufgabenIndex = typeof ich.index === 'number' ? ich.index : 0;
+        }
         if (z.countdownBis) countdownStarten(z.countdownBis);
         break;
       }
