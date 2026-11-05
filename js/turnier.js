@@ -295,14 +295,30 @@
       }
       case 'auswertung': {
         zeigeScreen('screen-kind-ergebnis');
-        if (ich && ich.aktiv) {
-          $('#kind-ergebnis-emoji').textContent = '🎉';
-          $('#kind-ergebnis-titel').textContent = 'Runde beendet!';
-          $('#kind-ergebnis-nachricht').textContent = 'Super gerechnet!';
-        } else {
-          $('#kind-ergebnis-emoji').textContent = '👏';
-          $('#kind-ergebnis-titel').textContent = 'Gekämpft!';
-          $('#kind-ergebnis-nachricht').textContent = ich && ich.platz ? `Dein Platz: ${ich.platz}` : 'Runde vorbei';
+        const ich = z.ich;
+        if (ich) {
+          const ausgang = ich.ausgang || (ich.aktiv ? 'gewonnen' : 'verloren');
+          if (ausgang === 'gewonnen') {
+            $('#kind-ergebnis-emoji').textContent = '🎉';
+            $('#kind-ergebnis-titel').textContent = 'Gewonnen!';
+            $('#kind-ergebnis-nachricht').textContent = 'Du bist weiter!';
+          } else if (ausgang === 'platz3') {
+            $('#kind-ergebnis-emoji').textContent = '🥉';
+            $('#kind-ergebnis-titel').textContent = 'Halbfinale beendet';
+            $('#kind-ergebnis-nachricht').textContent = "Knapp verloren – jetzt geht's um Platz 3!";
+          } else if (ausgang === 'gruppe') {
+            $('#kind-ergebnis-emoji').textContent = '👏';
+            $('#kind-ergebnis-titel').textContent = 'Runde beendet!';
+            $('#kind-ergebnis-nachricht').textContent = `Platz ${ich.spielPlatz || ich.platz || '-'} in deiner Gruppe – ${ich.punkte || 0} Punkte`;
+          } else if (ausgang === 'liga') {
+            $('#kind-ergebnis-emoji').textContent = '👏';
+            $('#kind-ergebnis-titel').textContent = 'Runde beendet!';
+            $('#kind-ergebnis-nachricht').textContent = `Runde abgeschlossen! Platz ${ich.spielPlatz || ich.platz || '-'}`;
+          } else {
+            $('#kind-ergebnis-emoji').textContent = '👏';
+            $('#kind-ergebnis-titel').textContent = 'Stark gekämpft!';
+            $('#kind-ergebnis-nachricht').textContent = 'Du scheidest aus und schaust jetzt zu.';
+          }
         }
         break;
       }
@@ -709,12 +725,23 @@
       const detailsElem = $('#kind-ergebnis-details');
 
       if (ich) {
-        if (ich.weiter) {
+        const ausgang = ich.ausgang || (ich.weiter ? 'gewonnen' : 'verloren');
+        if (ausgang === 'gewonnen') {
           $('#kind-ergebnis-emoji').textContent = '🎉';
+          $('#kind-ergebnis-titel').textContent = 'Gewonnen!';
+          $('#kind-ergebnis-nachricht').textContent = 'Du bist weiter!';
+        } else if (ausgang === 'platz3') {
+          $('#kind-ergebnis-emoji').textContent = '🥉';
+          $('#kind-ergebnis-titel').textContent = 'Halbfinale beendet';
+          $('#kind-ergebnis-nachricht').textContent = "Knapp verloren – jetzt geht's um Platz 3!";
+        } else if (ausgang === 'gruppe') {
+          $('#kind-ergebnis-emoji').textContent = '👏';
           $('#kind-ergebnis-titel').textContent = 'Runde beendet!';
-          $('#kind-ergebnis-nachricht').textContent = (format === 'ko' || format === 'gruppen_ko')
-            ? 'Gewonnen! Du bist eine Runde weiter!'
-            : `Runde abgeschlossen! Platz ${ich.platz || '-'}`;
+          $('#kind-ergebnis-nachricht').textContent = `Platz ${ich.platz || '-'} in deiner Gruppe – ${ich.punkte || 0} Punkte`;
+        } else if (ausgang === 'liga') {
+          $('#kind-ergebnis-emoji').textContent = '👏';
+          $('#kind-ergebnis-titel').textContent = 'Runde beendet!';
+          $('#kind-ergebnis-nachricht').textContent = `Runde abgeschlossen! Platz ${ich.platz || '-'}`;
         } else {
           $('#kind-ergebnis-emoji').textContent = '👏';
           $('#kind-ergebnis-titel').textContent = 'Stark gekämpft!';

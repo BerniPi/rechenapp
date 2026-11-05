@@ -117,12 +117,31 @@ function rundenendeSenden(t, leitungSchluessel) {
         if (tn) {
           const sp = runde.spiele.find((s) => s.teilnehmer.includes(c.teilnehmerId));
           const meinErg = sp && sp.ergebnis && sp.ergebnis.find((e) => e.id === c.teilnehmerId);
+
+          let ausgang = 'verloren';
+          if (runde.stufe === 'liga') {
+            ausgang = 'liga';
+          } else if (runde.stufe === 'gruppe') {
+            ausgang = 'gruppe';
+          } else if (meinErg && meinErg.platz === 1) {
+            ausgang = 'gewonnen';
+          } else {
+            const istHalbfinale = runde.stufe === 'halbfinale' || (runde.spiele.length === 2 && !runde.spiele.some((s) => s.typ === 'platz3'));
+            if (istHalbfinale && t.einstellungen.platz3) {
+              ausgang = 'platz3';
+            } else {
+              ausgang = 'verloren';
+            }
+          }
+
           payload.ich = {
             platz: meinErg ? meinErg.platz : null,
             weiter: tn.aktiv,
+            ausgang,
             richtig: meinErg ? meinErg.richtig : 0,
             falsch: meinErg ? meinErg.falsch : 0,
             zeit: meinErg ? meinErg.zeit : 0,
+            punkte: (meinErg ? meinErg.punkte : 0) || tn.punkte || 0,
             turnierPlatz: tn.platz,
           };
         }
@@ -228,11 +247,27 @@ function zustandFuer(t, conn) {
         emoji: tn.emoji,
         aktiv: tn.aktiv,
         platz: tn.platz,
+        punkte: tn.punkte,
         index: st ? st.index : 0,
         richtig: st ? st.richtig : 0,
         falsch: st ? st.falsch : 0,
         fertig: Boolean(st && st.fertigUm),
       };
+
+      if (t.phase === 'auswertung' && sp && sp.ergebnis) {
+        const meinErg = sp.ergebnis.find((e) => e.id === conn.teilnehmerId);
+        let ausgang = 'verloren';
+        if (runde.stufe === 'liga') ausgang = 'liga';
+        else if (runde.stufe === 'gruppe') ausgang = 'gruppe';
+        else if (meinErg && meinErg.platz === 1) ausgang = 'gewonnen';
+        else {
+          const istHalbfinale = runde.stufe === 'halbfinale' || (runde.spiele.length === 2 && !runde.spiele.some((s) => s.typ === 'platz3'));
+          if (istHalbfinale && t.einstellungen.platz3) ausgang = 'platz3';
+          else ausgang = 'verloren';
+        }
+        daten.ich.ausgang = ausgang;
+        daten.ich.spielPlatz = meinErg ? meinErg.platz : null;
+      }
     }
   }
 
