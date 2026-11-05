@@ -744,6 +744,88 @@ pruefe('B6: Kampflos-Sieg bei verlassenen/ausgeschiedenen Teilnehmern in KO', ()
   assert.strictEqual(erg[1].nichtAngetreten, true);
 });
 
+pruefe('B6: KO-Turnier mit 5 Kindern durchspielen (Freilose, Halbfinale, Finale, Platz 3)', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'KO-5-Test',
+    einstellungen: { format: 'ko', anzahl: 5, platz3: true },
+  });
+  const kinder = Array.from({ length: 5 }, (_, i) =>
+    Turnier.beitreten(code, { name: `Kind_${i + 1}`, emoji: H.EMOJIS[i] })
+  );
+
+  Turnier.starten(t, leitung);
+  assert.strictEqual(t.phase, 'vorschau');
+
+  let sicherheit = 0;
+  while (t.phase !== 'ende' && sicherheit < 10) {
+    sicherheit++;
+    Turnier.rundeStarten(t, leitung, 1000);
+    Turnier.rundeAktivieren(t, 4000);
+
+    const runde = t.runden[t.aktuelleRundeNr - 1];
+    runde.spiele.forEach((sp) => {
+      if (sp.freilos || sp.kampflos) return;
+      sp.teilnehmer.forEach((tnId, tIdx) => {
+        const tn = kinder.find((k) => k.id === tnId);
+        sp.aufgaben.forEach((aufg, aIdx) => {
+          const wert = (aIdx === 0 && tIdx === 1) ? 9999 : aufg.loesung;
+          antwortenUndSenden(t, tn.schluessel, { spiel: sp.id, index: aIdx, wert }, 4100 + tIdx * 100 + aIdx * 10);
+        });
+      });
+    });
+
+    if (t.phase === 'auswertung') {
+      Turnier.naechste(t, leitung);
+    }
+  }
+
+  assert.strictEqual(t.phase, 'ende');
+  kinder.forEach((k) => {
+    const tn = t.teilnehmer.get(k.id);
+    assert(tn.platz !== null, `Kind ${tn.name} muss am Ende einen Platz haben`);
+  });
+  const p1 = kinder.find((k) => t.teilnehmer.get(k.id).platz === 1);
+  const p2 = kinder.find((k) => t.teilnehmer.get(k.id).platz === 2);
+  const p3 = kinder.find((k) => t.teilnehmer.get(k.id).platz === 3);
+  const p4 = kinder.find((k) => t.teilnehmer.get(k.id).platz === 4);
+  assert(p1 && p2 && p3 && p4, 'Plätze 1 bis 4 müssen vergeben sein');
+});
+
+pruefe('B6: Sprint mit 4 Kindern bis ende', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Sprint-Test',
+    einstellungen: { format: 'sprint', anzahl: 5 },
+  });
+  const kinder = Array.from({ length: 4 }, (_, i) =>
+    Turnier.beitreten(code, { name: `Sprinter_${i + 1}`, emoji: H.EMOJIS[i] })
+  );
+
+  Turnier.starten(t, leitung);
+  Turnier.rundeStarten(t, leitung, 1000);
+  Turnier.rundeAktivieren(t, 4000);
+
+  const runde = t.runden[0];
+  const spiel = runde.spiele[0];
+  spiel.teilnehmer.forEach((tnId, tIdx) => {
+    const tn = kinder.find((k) => k.id === tnId);
+    spiel.aufgaben.forEach((aufg, aIdx) => {
+      let wert = aufg.loesung;
+      if (tIdx === 2 && aIdx >= 4) wert = 9999;
+      if (tIdx === 3 && aIdx >= 3) wert = 9999;
+      antwortenUndSenden(t, tn.schluessel, { spiel: spiel.id, index: aIdx, wert }, 4100 + tIdx * 500 + aIdx * 10);
+    });
+  });
+
+  assert.strictEqual(t.phase, 'auswertung');
+  Turnier.naechste(t, leitung);
+  assert.strictEqual(t.phase, 'ende');
+
+  assert.strictEqual(t.teilnehmer.get(kinder[0].id).platz, 1);
+  assert.strictEqual(t.teilnehmer.get(kinder[1].id).platz, 2);
+  assert.strictEqual(t.teilnehmer.get(kinder[2].id).platz, 3);
+  assert.strictEqual(t.teilnehmer.get(kinder[3].id).platz, 4);
+});
+
 (async () => {
   const h = await H.pwHash('geheim123');
   pruefe('Passwort-Hash', () => assert(/^scrypt\$[\w-]+\$[\w-]+$/.test(h) && !h.includes('geheim123')));
