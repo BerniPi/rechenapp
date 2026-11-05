@@ -123,8 +123,28 @@ docker compose -p piazzi --env-file server/piazzi.env -f server/docker-compose.y
 
 Genauso `bgbb.env` mit `NAME=rechenheld-bgbb`, `PORT_HOST=8082`, `ENV_DATEI=bgbb.env` und `-p bgbb`. Jede Instanz hat ihr eigenes Volume und damit ihre eigene Datenbank.
 
+## Turniermodus
+
+Unter `/turnier` kann jede Lehrkraft ohne Anmeldung ein Rechen-Turnier für die Klasse anlegen.
+
+- **Lehrkraft (Laptop am Beamer)**: Wählt Übungen und Format (Sprint, K.-o.-Duelle, Gruppenphase oder Liga) und zeigt den QR-Code am Beamer.
+- **Kinder (Handy)**: Scannen den QR-Code, wählen Spitzname und Bild und landen im Wartebereich. Keine Registrierung, keine Fotos. Bei Verbindungsverlust oder Neuladen wird automatisch wiederverbunden.
+- **Fairness & Live-Anzeige**: Im selben Duell bekommen alle dieselben Aufgaben. Lösungen verlassen nie den Server. Der Beamer zeigt live den Fortschritt (Fortschrittsbalken) und am Ende die Siegerehrung (Podest 1–3 mit Konfetti).
+- **Reverse-Proxy-Hinweis für SSE**: Für die Live-Anzeige verwendet der Server Server-Sent Events (SSE). Ein vorgeschalteter Reverse-Proxy (z. B. nginx) darf die Verbindung nicht puffern:
+  ```nginx
+  location /api/turnier/ {
+      proxy_pass http://localhost:8080;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_buffering off;
+      proxy_cache off;
+      proxy_read_timeout 3600s;
+  }
+  ```
+
 ## Fremde Bestandteile
 
 - `audio/jonas/` – Wortschnipsel der Microsoft-Stimme „Jonas" (de-AT-JonasNeural), erzeugt mit `tools/stimme.py`. Derzeit über edge-tts erzeugt; für eine öffentlich verteilte App über Azure AI Speech neu erzeugen.
 - `vendor/vosk.js` – [vosk-browser](https://github.com/ccoreilly/vosk-browser) 0.0.8, Apache-2.0
+- `vendor/qrcode.js` – [QRCode for JavaScript](http://www.d-project.com/) (Kazuhiko Arase), MIT
 - `models/vosk-model-small-de-0.15.tar.gz` – [Vosk](https://alphacephei.com/vosk/models) deutsches Modell, Apache-2.0 (Lizenz liegt im Archiv). Aus der Original-ZIP unverändert als tar.gz umgepackt.

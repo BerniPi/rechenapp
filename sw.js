@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar.
 // Bei jeder Änderung an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'rechenheld-25';
+const VERSION = 'rechenheld-26';
 // Sprachmodell, Vosk-Bibliothek und Stimm-Schnipsel, bleibt über Updates erhalten.
 // Werden Dateien darin ausgetauscht (z. B. audio/jonas neu erzeugt), Namen erhöhen.
 const GROSS = 'rechenheld-gross-1';
@@ -27,9 +27,9 @@ self.addEventListener('activate', (ev) => {
 // Erst Netz (damit Updates sofort ankommen), sonst Cache.
 self.addEventListener('fetch', (ev) => {
   if (ev.request.method !== 'GET') return;
-  // Bestenliste (API) und fremde Server nie aus dem Cache
+  // Bestenliste (API), Turniermodus und fremde Server nie aus dem Cache
   const url = new URL(ev.request.url);
-  if (url.origin !== location.origin || url.pathname.includes('/api/')) return;
+  if (url.origin !== location.origin || url.pathname.includes('/api/') || url.pathname.includes('/turnier')) return;
   // Große Dateien ändern sich nie: erst Cache, nur beim ersten Mal aus dem Netz.
   if (/\/(models|vendor|audio)\//.test(new URL(ev.request.url).pathname)) {
     ev.respondWith(
