@@ -97,26 +97,19 @@
 
     eventSource.addEventListener('vorschau', (ev) => {
       const daten = JSON.parse(ev.data);
-      if (aktuellerZustand) {
-        aktuellerZustand.phase = 'vorschau';
-        aktuellerZustand.runde = daten.runde;
-        aktuellerZustand.baum = daten.baum;
-      }
-      vorschauRendern(daten.runde);
+      if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
+      aktuellerZustand.phase = 'vorschau';
+      aktuellerZustand.runde = daten.runde;
+      if (daten.baum !== undefined) aktuellerZustand.baum = daten.baum;
+      zustandAktualisieren(aktuellerZustand);
     });
 
     eventSource.addEventListener('countdown', (ev) => {
       const daten = JSON.parse(ev.data);
-      if (aktuellerZustand) {
-        aktuellerZustand.phase = 'countdown';
-        aktuellerZustand.countdownBis = daten.startUm;
-      }
-      if (rolle === 'leitung' || rolle === 'zuschauer') {
-        zeigeScreen('screen-live');
-        if (aktuellerZustand && aktuellerZustand.runde) {
-          liveRendern(aktuellerZustand.runde);
-        }
-      }
+      if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
+      aktuellerZustand.phase = 'countdown';
+      aktuellerZustand.countdownBis = daten.startUm;
+      zustandAktualisieren(aktuellerZustand);
       countdownStarten(daten.startUm, daten.dauerMs);
     });
 
@@ -656,11 +649,11 @@
 
   function rundenendeRendern(daten) {
     if (rundenLiveTimer) { clearInterval(rundenLiveTimer); rundenLiveTimer = null; }
-    if (aktuellerZustand) {
-      aktuellerZustand.phase = 'auswertung';
-      if (daten && daten.runde) aktuellerZustand.runde = daten.runde;
-      if (daten && daten.teilnehmer) aktuellerZustand.teilnehmer = daten.teilnehmer;
-    }
+    if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
+    aktuellerZustand.phase = 'auswertung';
+    if (daten && daten.runde) aktuellerZustand.runde = daten.runde;
+    if (daten && daten.teilnehmer) aktuellerZustand.teilnehmer = daten.teilnehmer;
+    if (daten && daten.ich) aktuellerZustand.ich = daten.ich;
 
     if (rolle === 'leitung' || rolle === 'zuschauer') {
       zeigeScreen('screen-ergebnis');
@@ -695,10 +688,10 @@
 
   function turnierendeRendern(daten) {
     if (rundenLiveTimer) { clearInterval(rundenLiveTimer); rundenLiveTimer = null; }
-    if (aktuellerZustand) {
-      aktuellerZustand.phase = 'ende';
-      if (daten && daten.teilnehmer) aktuellerZustand.teilnehmer = daten.teilnehmer;
-    }
+    if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
+    aktuellerZustand.phase = 'ende';
+    if (daten && daten.teilnehmer) aktuellerZustand.teilnehmer = daten.teilnehmer;
+    if (daten && daten.ich) aktuellerZustand.ich = daten.ich;
 
     if (rolle === 'leitung' || rolle === 'zuschauer') {
       zeigeScreen('screen-siegerehrung');
