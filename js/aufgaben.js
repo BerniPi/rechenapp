@@ -111,7 +111,7 @@ const Aufgaben = (() => {
     const ids = uebungen.filter((id) => NACH_ID[id]);
     if (!ids.length) ids.push('plus10');
     const zuletzt = [];
-    const merken = 8;
+    const merken = 10;
     return () => {
       let auf;
       for (let i = 0; i < 60; i++) {
