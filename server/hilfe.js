@@ -189,7 +189,7 @@ function ip(req) {
 }
 
 module.exports = {
-  SICHER, json, fehler, body, sha, gleich, neuerCode, codeKern, neuerSchluessel, neueId,
+  SICHER, json, fehler, body, sha, gleich, ZEICHEN, neuerCode, codeKern, neuerSchluessel, neueId,
   Aufgaben, kategorieText, EMOJIS, name, emoji, gruppenName, rekordKey, kleinerBesser, rekordWert, datum, erlaubt, ip,
   benutzername, passwort, email, pwHash, pwPruefen, neuesPasswort, klassenCsv,
 };

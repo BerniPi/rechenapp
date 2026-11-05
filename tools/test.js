@@ -213,6 +213,232 @@ pruefe('Klassen-CSV', () => {
   assert.deepStrictEqual(r.fehler.map((f) => f.zeile), [5, 6, 7]);
 });
 
+// ---- Turniermodus (server/turnier.js) ----
+const Turnier = require('../server/turnier.js');
+
+pruefe('Turnier-Gruppen für n = 2..60', () => {
+  for (let n = 2; n <= 60; n++) {
+    const kinder = Array.from({ length: n }, (_, i) => `k_${i + 1}`);
+    for (const gg of [3, 4, 5]) {
+      const gruppen = Turnier.gruppenEinteilen(kinder, gg);
+      assert(gruppen.length >= 1, `n=${n}, gg=${gg}: keine Gruppen`);
+      const enthalten = new Set();
+      let minGr = Infinity;
+      let maxGr = 0;
+      for (const g of gruppen) {
+        assert(g.length >= 2, `n=${n}, gg=${gg}: Gruppe kleiner als 2: ${g.length}`);
+        if (g.length < minGr) minGr = g.length;
+        if (g.length > maxGr) maxGr = g.length;
+        for (const k of g) {
+          assert(!enthalten.has(k), `n=${n}, gg=${gg}: doppelt ${k}`);
+          enthalten.add(k);
+        }
+      }
+      assert.strictEqual(enthalten.size, n, `n=${n}, gg=${gg}: nicht alle Kinder`);
+      assert(maxGr - minGr <= 1, `n=${n}, gg=${gg}: ungleichmäßig ${minGr}..${maxGr}`);
+    }
+  }
+});
+
+pruefe('Turnier-KO-Baum für k = 2..60', () => {
+  for (let k = 2; k <= 60; k++) {
+    const kinder = Array.from({ length: k }, (_, i) => `k_${i + 1}`);
+    const baum = Turnier.koBaumErstellen(kinder);
+    const zweierpotenz = 2 ** Math.ceil(Math.log2(k));
+    assert.strictEqual(baum.groesse, zweierpotenz);
+    assert.strictEqual(baum.freiloseAnzahl, zweierpotenz - k);
+
+    const gefunden = new Set();
+    baum.duelleRunde1.forEach((d) => {
+      [d.t1, d.t2].filter(Boolean).forEach((id) => {
+        assert(!gefunden.has(id), `k=${k}: doppeltes Kind ${id}`);
+        gefunden.add(id);
+      });
+      if (d.freilos) {
+        assert(d.t1 && !d.t2, `k=${k}: Freilos-Slot ungültig`);
+        assert.strictEqual(d.sieger, d.t1);
+      }
+    });
+    assert.strictEqual(gefunden.size, k, `k=${k}: nicht alle Kinder im Baum`);
+  }
+});
+
+pruefe('Turnier-Wertung Aufgaben- und Zeitmodus', () => {
+  // Aufgaben-Modus: mehr richtig > weniger Zeit (inkl. Strafe)
+  const spAufgaben = {
+    teilnehmer: ['k1', 'k2', 'k3'],
+    freilos: false,
+    dauerMs: 20000,
+    start: 1000,
+    stand: {
+      k1: { index: 10, richtig: 9, falsch: 1, fertigUm: 15000, letzterPunktUm: 14000 }, // 9 richtig, 14s + 5s = 19s
+      k2: { index: 10, richtig: 9, falsch: 0, fertigUm: 18000, letzterPunktUm: 18000 }, // 9 richtig, 17s + 0s = 17s -> gewinnt vor k1!
+      k3: { index: 10, richtig: 10, falsch: 0, fertigUm: 19000, letzterPunktUm: 19000 }, // 10 richtig -> Platz 1!
+    },
+  };
+  const ergA = Turnier.wertungSpiel(spAufgaben, 'aufgaben', { strafe: 5 });
+  assert.strictEqual(ergA[0].id, 'k3');
+  assert.strictEqual(ergA[0].platz, 1);
+  assert.strictEqual(ergA[1].id, 'k2');
+  assert.strictEqual(ergA[1].platz, 2);
+  assert.strictEqual(ergA[2].id, 'k1');
+  assert.strictEqual(ergA[2].platz, 3);
+
+  // Zeit-Modus: Punkte = richtig - floor(falsch/4)
+  const spZeit = {
+    teilnehmer: ['z1', 'z2', 'z3'],
+    freilos: false,
+    start: 1000,
+    stand: {
+      z1: { index: 15, richtig: 12, falsch: 3, fertigUm: null, letzterPunktUm: 20000 }, // 12 - 0 = 12 Pkt, 3 Falsch
+      z2: { index: 16, richtig: 13, falsch: 3, fertigUm: null, letzterPunktUm: 22000 }, // 13 - 0 = 13 Pkt -> Platz 1
+      z3: { index: 16, richtig: 12, falsch: 1, fertigUm: null, letzterPunktUm: 21000 }, // 12 - 0 = 12 Pkt, 1 Falsch -> vor z1
+    },
+  };
+  const ergZ = Turnier.wertungSpiel(spZeit, 'zeit');
+  assert.strictEqual(ergZ[0].id, 'z2');
+  assert.strictEqual(ergZ[0].platz, 1);
+  assert.strictEqual(ergZ[1].id, 'z3');
+  assert.strictEqual(ergZ[1].platz, 2);
+  assert.strictEqual(ergZ[2].id, 'z1');
+  assert.strictEqual(ergZ[2].platz, 3);
+
+  // Nicht angetreten verliert
+  const spNicht = {
+    teilnehmer: ['a1', 'a2'],
+    freilos: false,
+    start: 1000,
+    stand: {
+      a1: { index: 1, richtig: 0, falsch: 1, fertigUm: null, letzterPunktUm: null },
+      a2: { index: 0, richtig: 0, falsch: 0, fertigUm: null, letzterPunktUm: null }, // nicht angetreten
+    },
+  };
+  const ergNicht = Turnier.wertungSpiel(spNicht, 'aufgaben');
+  assert.strictEqual(ergNicht[0].id, 'a1');
+  assert.strictEqual(ergNicht[1].id, 'a2');
+  assert.strictEqual(ergNicht[1].nichtAngetreten, true);
+
+  // Freilos
+  const spFrei = { freilos: true, sieger: 'f1', teilnehmer: ['f1'] };
+  const ergFrei = Turnier.wertungSpiel(spFrei, 'aufgaben');
+  assert.strictEqual(ergFrei[0].id, 'f1');
+  assert.strictEqual(ergFrei[0].freilos, true);
+});
+
+pruefe('Turnier-Aufgaben für Kinder ohne Lösung', () => {
+  const aufg = { a: 7, op: '+', b: 5, c: 12, luecke: 'c', loesung: 12, uebung: 'plus20' };
+  const gefiltert = Turnier.aufgabenFuerKind(aufg);
+  assert.strictEqual(gefiltert.loesung, undefined);
+  assert.strictEqual(gefiltert.c, null);
+  assert.strictEqual(gefiltert.a, 7);
+  assert.strictEqual(gefiltert.b, 5);
+  assert.strictEqual(gefiltert.stellen, 2);
+
+  const lueckeA = { a: 4, op: '+', b: 6, c: 10, luecke: 'a', loesung: 4, uebung: 'plus10' };
+  const gefiltertA = Turnier.aufgabenFuerKind(lueckeA);
+  assert.strictEqual(gefiltertA.a, null);
+  assert.strictEqual(gefiltertA.c, 10);
+  assert.strictEqual(gefiltertA.stellen, 1);
+});
+
+pruefe('Turnier-Zustandsautomat und doppelte Antwort', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Test-Cup',
+    einstellungen: { format: 'sprint', anzahl: 5 },
+  });
+
+  // Befehl naechste in lobby muss abgelehnt werden
+  assert.throws(() => Turnier.naechste(t, leitung), /nicht erlaubt/);
+
+  // Kinder beitreten
+  const k1 = Turnier.beitreten(code, { name: 'Anna', emoji: '🦊' });
+  const k2 = Turnier.beitreten(code, { name: 'Ben', emoji: '🐻' });
+  assert.strictEqual(t.teilnehmer.size, 2);
+
+  // Name doppelt ablehnen
+  assert.throws(() => Turnier.beitreten(code, { name: 'anna', emoji: '🐼' }), /gibt es schon/);
+
+  // Starten -> vorschau
+  Turnier.starten(t, leitung);
+  assert.strictEqual(t.phase, 'vorschau');
+
+  // Runde starten -> countdown -> laeuft
+  const { startUm } = Turnier.rundeStarten(t, leitung, 1000);
+  assert.strictEqual(t.phase, 'countdown');
+  Turnier.rundeAktivieren(t, startUm);
+  assert.strictEqual(t.phase, 'laeuft');
+
+  // Antworten
+  const spielId = t.runden[0].spiele[0].id;
+  const aufg0 = t.runden[0].spiele[0].aufgaben[0];
+
+  // Richtig antworten mit Index 0
+  const r1 = Turnier.antworten(t, k1.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 2000);
+  assert.strictEqual(r1.richtig, true);
+  assert.strictEqual(r1.index, 1);
+
+  // Selbe Antwort mit Index 0 nochmal senden -> muss ignoriert werden!
+  const rDoppelt = Turnier.antworten(t, k1.schluessel, { spiel: spielId, index: 0, wert: aufg0.loesung }, 2100);
+  assert.strictEqual(rDoppelt.ignoriert, true);
+  assert.strictEqual(t.runden[0].spiele[0].stand[k1.id].richtig, 1);
+
+  // Vorzeitiges Beenden durch Leitung
+  Turnier.rundeBeenden(t, leitung, 3000);
+  assert.strictEqual(t.phase, 'ende'); // Sprint endet nach 1 Runde!
+
+  // Antwort nach Rundenende wird ignoriert
+  const rSpät = Turnier.antworten(t, k2.schluessel, { spiel: spielId, index: 0, wert: 5 }, 4000);
+  assert.strictEqual(rSpät.ignoriert, true);
+});
+
+pruefe('Turnier durchspielen: KO-Turnier mit 5 Kindern', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'KO-Test',
+    einstellungen: { format: 'ko', anzahl: 5 },
+  });
+
+  const kinder = ['Tim', 'Mia', 'Leo', 'Ida', 'Sam'].map((name, i) =>
+    Turnier.beitreten(code, { name, emoji: H.EMOJIS[i] })
+  );
+
+  Turnier.starten(t, leitung);
+  assert.strictEqual(t.phase, 'vorschau');
+
+  // Runden bis zum Ende durchspielen
+  let rundenZaehler = 0;
+  while (t.phase !== 'ende' && rundenZaehler < 10) {
+    rundenZaehler++;
+    Turnier.rundeStarten(t, leitung, 1000);
+    Turnier.rundeAktivieren(t, 4000);
+    assert.strictEqual(t.phase, 'laeuft');
+
+    const runde = t.runden[t.aktuelleRundeNr - 1];
+    // Alle Spiele der Runde beantworten
+    runde.spiele.forEach((sp) => {
+      if (sp.freilos) return;
+      sp.teilnehmer.forEach((tnId) => {
+        const tn = kinder.find((k) => k.id === tnId);
+        sp.aufgaben.forEach((aufg, idx) => {
+          Turnier.antworten(t, tn.schluessel, { spiel: sp.id, index: idx, wert: aufg.loesung }, 4100 + idx * 500);
+        });
+      });
+    });
+
+    if (t.phase === 'auswertung') {
+      Turnier.naechste(t, leitung);
+    }
+  }
+
+  assert.strictEqual(t.phase, 'ende');
+  // Am Ende hat jedes Kind einen Platz
+  kinder.forEach((k) => {
+    const tn = t.teilnehmer.get(k.id);
+    assert(tn.platz !== null, `Kind ${tn.name} hat keinen Platz`);
+  });
+  const sieger = Array.from(t.teilnehmer.values()).find((tn) => tn.platz === 1);
+  assert(sieger, 'Kein Sieger gefunden');
+});
+
 (async () => {
   const h = await H.pwHash('geheim123');
   pruefe('Passwort-Hash', () => assert(/^scrypt\$[\w-]+\$[\w-]+$/.test(h) && !h.includes('geheim123')));

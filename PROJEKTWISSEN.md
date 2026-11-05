@@ -37,7 +37,7 @@ Rechentrainer für die Volksschule als PWA. Kinder rechnen (tippen oder sprechen
 | Icons | `node tools/icon.js` |
 | Stimme neu | `python tools/stimme.py` (Azure mit `AZURE_SPEECH_KEY`/`_REGION`, sonst edge-tts) |
 
-`tools/test.js` prüft: Aufgaben-Generator je Übung (keine negativen Ergebnisse, keine Reste, eindeutige Lücken, Zehnerübergang wie angegeben), Rekord-Schlüssel und Umstellung alter Schlüssel (auch `Speicher.uebungenUmstellen`, dafür exportiert `speicher.js` für Node), Zahlwort-Parser, Jonas-Schnipsel vollständig, Level-Generatoren Schrauben/Unblock, Server-Helfer (`hilfe.js`: Benutzername, Mail, Klassen-CSV, Passwort-Hash). Kein Test für HTTP-Routen oder UI.
+`tools/test.js` prüft: Aufgaben-Generator je Übung (keine negativen Ergebnisse, keine Reste, eindeutige Lücken, Zehnerübergang wie angegeben), Rekord-Schlüssel und Umstellung alter Schlüssel (auch `Speicher.uebungenUmstellen`, dafür exportiert `speicher.js` für Node), Zahlwort-Parser, Jonas-Schnipsel vollständig, Level-Generatoren Schrauben/Unblock, Server-Helfer (`hilfe.js`: Benutzername, Mail, Klassen-CSV, Passwort-Hash), Turnier-Logik (`turnier.js`: Gruppen, K.-o.-Baum, Wertung, Zustandsautomat, Aufgabenfilter, Durchspielen). Kein Test für HTTP-Routen oder UI.
 
 ## Frontend
 
@@ -78,6 +78,7 @@ Einstieg `server/server.js` (ein `http.createServer`, Routing per `"${METHODE} $
 | `admin/` | Admin-Oberfläche (HTML/CSS/JS) |
 | `db.js` | SQLite-Schema + Migrationen, `transaktion(fn)` |
 | `hilfe.js` | Validierung (Name, Emoji, Benutzername, Mail, Rekord-Key/-Wert), JSON-Antworten, Hashing, scrypt-Passwörter, Rate-Limit `erlaubt()`, `ip()` |
+| `turnier.js` | Spiellogik für Turniere (ohne HTTP): Zustand im RAM, Paarungen, K.-o.-Baum, Wertung |
 | `einstellungen.js` | `ANMELDUNG`, `DOMAIN`, MS-Daten, `ADRESSE` aus Env |
 | `sso.js` | Microsoft-Login (bgbb): start → rückruf → `/#sso=<Übergabe>` → einlösen |
 
