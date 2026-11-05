@@ -7,9 +7,344 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/turnier.css">
 </head>
-<body>
-  <div id="app">
-    <p>Lade Turniermodus …</p>
+<body class="turnier-body">
+
+  <div id="offline-balken" class="offline-balken versteckt">
+    ⚠️ Verbindung weg – versuche es wieder …
   </div>
+
+  <main id="app-container">
+
+    <!-- ============ LADE-BILDSCHIRM ============ -->
+    <section id="screen-laden" class="screen aktiv">
+      <div class="turnier-karte text-mitte">
+        <div class="spin-emoji">🏆</div>
+        <h2>Lade Turniermodus …</h2>
+      </div>
+    </section>
+
+    <!-- ============ LEHRKRAFT: TURNIER ERSTELLEN ============ -->
+    <section id="screen-erstellen" class="screen">
+      <div class="turnier-karte breite-box">
+        <h1>🏆 Neues Turnier</h1>
+        <p class="untertitel">Veranstalte ein Rechen-Turnier in der Klasse. Ohne Anmeldung, ohne Installation.</p>
+
+        <div class="feld-gruppe">
+          <label for="turnier-titel">Titel (optional)</label>
+          <input type="text" id="turnier-titel" placeholder="z. B. 3b Einmaleins-Cup" maxlength="40">
+        </div>
+
+        <div class="feld-gruppe">
+          <label>Übungen auswählen</label>
+          <div id="uebungen-katalog" class="chips-raster">
+            <!-- Wird dynamisch aus Aufgaben.UEBUNGEN befüllt -->
+          </div>
+        </div>
+
+        <div class="feld-gruppe">
+          <label class="checkbox-label">
+            <input type="checkbox" id="turnier-einsetzen">
+            <span>Einsetzaufgaben einbeziehen (z. B. 3 + __ = 8)</span>
+          </label>
+        </div>
+
+        <div class="einstellungen-raster">
+          <div class="feld-gruppe">
+            <label for="turnier-art">Rundenmodus</label>
+            <select id="turnier-art">
+              <option value="aufgaben">Feste Aufgabenanzahl (wer zuerst fertig ist)</option>
+              <option value="zeit">Zeit-Challenge (wer mehr schafft)</option>
+            </select>
+          </div>
+
+          <div class="feld-gruppe" id="feld-anzahl">
+            <label for="turnier-anzahl">Aufgaben pro Spiel</label>
+            <select id="turnier-anzahl">
+              <option value="5">5 Aufgaben (kurz)</option>
+              <option value="10" selected>10 Aufgaben (Standard)</option>
+              <option value="20">20 Aufgaben (lang)</option>
+            </select>
+          </div>
+
+          <div class="feld-gruppe versteckt" id="feld-zeit">
+            <label for="turnier-sekunden">Zeit pro Spiel</label>
+            <select id="turnier-sekunden">
+              <option value="30">30 Sekunden</option>
+              <option value="60" selected>1 Minute</option>
+              <option value="120">2 Minuten</option>
+            </select>
+          </div>
+
+          <div class="feld-gruppe">
+            <label for="turnier-format">Turnierformat</label>
+            <select id="turnier-format">
+              <option value="ko" selected>Nur K.-o. (1-gegen-1 Duelle)</option>
+              <option value="sprint">Sprint (alle gleichzeitig gegeneinander)</option>
+              <option value="gruppen_ko">Gruppenphase → K.-o.</option>
+              <option value="liga">Liga (mehrere Runden mit Punkten)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="knopfreihe mt-2">
+          <button id="btn-turnier-anlegen" class="knopf gross gruen">Turnier anlegen ➔</button>
+          <a href="/" class="knopf grau">Zur RechenArena</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LEHRKRAFT: LOBBY ============ -->
+    <section id="screen-lobby" class="screen">
+      <div class="beamer-layout">
+        <header class="beamer-kopf">
+          <div class="beamer-titel-box">
+            <h1 id="lobby-titel">Rechen-Turnier</h1>
+            <div class="turnier-adresse">
+              Adresse: <strong id="lobby-url-text">rechenarena.bgblumenstrasse.at/turnier</strong>
+              · Code: <strong id="lobby-code" class="hervorgehoben">----</strong>
+            </div>
+          </div>
+          <div class="beamer-aktionen">
+            <button id="btn-fullscreen" class="knopf klein grau" title="Vollbild">⛶ Vollbild</button>
+            <button id="btn-beitritt-toggle" class="knopf klein gruen">Beitritt: Offen</button>
+          </div>
+        </header>
+
+        <div class="lobby-inhalt">
+          <div class="lobby-qr-kasten">
+            <div id="lobby-qr-code" class="qr-code-svg"></div>
+            <p class="qr-hinweis">Mit dem Handy scannen oder Code oben eingeben</p>
+          </div>
+
+          <div class="lobby-teilnehmer-kasten">
+            <div class="teilnehmer-kopf">
+              <h2>Mitspieler</h2>
+              <span id="lobby-zaehler" class="zaehler-badge">0 Kinder da</span>
+            </div>
+            <div id="lobby-teilnehmer-raster" class="kinder-raster">
+              <!-- Dynamisch mit Emojis und Namen -->
+            </div>
+          </div>
+        </div>
+
+        <footer class="beamer-fuss">
+          <button id="btn-turnier-starten" class="knopf riesig gruen" disabled>Turnier starten ➔</button>
+        </footer>
+      </div>
+    </section>
+
+    <!-- ============ LEHRKRAFT: VORSCHAU ============ -->
+    <section id="screen-vorschau" class="screen">
+      <div class="beamer-layout">
+        <header class="beamer-kopf">
+          <div>
+            <h1 id="vorschau-stufe">Runde 1: Duelle</h1>
+            <p class="untertitel" id="vorschau-info">Mache dich bereit für die nächste Runde</p>
+          </div>
+          <div class="beamer-aktionen">
+            <button id="btn-neu-mischen" class="knopf grau">🎲 Neu mischen</button>
+          </div>
+        </header>
+
+        <div id="vorschau-spiele-raster" class="spiele-raster">
+          <!-- Paarungen / Gruppen -->
+        </div>
+
+        <footer class="beamer-fuss">
+          <button id="btn-runde-starten" class="knopf riesig gruen">Runde starten (3 s Countdown) ➔</button>
+        </footer>
+      </div>
+    </section>
+
+    <!-- ============ LEHRKRAFT / BEAMER: LIVE-ANZEIGE ============ -->
+    <section id="screen-live" class="screen">
+      <div class="beamer-layout">
+        <header class="beamer-kopf">
+          <div class="live-titel-box">
+            <h1 id="live-stufe">Runde 1 läuft</h1>
+            <span id="live-uhr" class="live-uhr">00:00</span>
+          </div>
+          <div class="beamer-aktionen">
+            <button id="btn-runde-abbrechen" class="knopf klein grau">Abbrechen</button>
+            <button id="btn-runde-beenden" class="knopf klein rot">Runde beenden</button>
+          </div>
+        </header>
+
+        <div id="countdown-overlay" class="countdown-overlay versteckt">
+          <div id="countdown-zahl" class="countdown-zahl">3</div>
+        </div>
+
+        <div id="live-spiele-liste" class="live-spiele-liste">
+          <!-- Fortschrittsbalken pro Duell oder Sprint-Rennbahn -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LEHRKRAFT: ERGEBNIS DER RUNDE ============ -->
+    <section id="screen-ergebnis" class="screen">
+      <div class="beamer-layout">
+        <header class="beamer-kopf">
+          <div>
+            <h1 id="ergebnis-titel">Ergebnis der Runde</h1>
+            <p class="untertitel">Glückwunsch an alle Teilnehmer!</p>
+          </div>
+          <div class="beamer-aktionen">
+            <button id="btn-naechste-runde" class="knopf riesig gruen">Nächste Runde ➔</button>
+          </div>
+        </header>
+
+        <div id="ergebnis-spiele-raster" class="spiele-raster">
+          <!-- Ergebnisse aller Duelle / Gruppen -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LEHRKRAFT: SIEGEREHRUNG ============ -->
+    <section id="screen-siegerehrung" class="screen">
+      <div class="beamer-layout">
+        <header class="beamer-kopf text-mitte">
+          <h1>🎉 Siegerehrung 🎉</h1>
+          <p class="untertitel" id="siegerehrung-titel">3b Einmaleins-Cup</p>
+        </header>
+
+        <div class="podest-container">
+          <div class="podest-platz platz-2">
+            <div id="podest-emoji-2" class="podest-emoji">🥈</div>
+            <div id="podest-name-2" class="podest-name">-</div>
+            <div class="podest-sockel sockel-2">2</div>
+          </div>
+          <div class="podest-platz platz-1">
+            <div class="krone">👑</div>
+            <div id="podest-emoji-1" class="podest-emoji">🥇</div>
+            <div id="podest-name-1" class="podest-name">-</div>
+            <div class="podest-sockel sockel-1">1</div>
+          </div>
+          <div class="podest-platz platz-3">
+            <div id="podest-emoji-3" class="podest-emoji">🥉</div>
+            <div id="podest-name-3" class="podest-name">-</div>
+            <div class="podest-sockel sockel-3">3</div>
+          </div>
+        </div>
+
+        <div class="tabelle-box">
+          <h2>Endplatzierungen</h2>
+          <table class="turnier-tabelle" id="endrangliste">
+            <thead>
+              <tr><th>Platz</th><th>Name</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <footer class="beamer-fuss">
+          <button id="btn-drucken" class="knopf blau">🖨️ Ergebnis drucken / PDF</button>
+          <button id="btn-neues-turnier-gleiche" class="knopf gruen">Neues Turnier mit denselben Kindern 🔄</button>
+          <button id="btn-turnier-beenden" class="knopf grau">Turnier beenden</button>
+        </footer>
+      </div>
+    </section>
+
+    <!-- ============ KIND: BEITRETEN ============ -->
+    <section id="screen-beitreten" class="screen">
+      <div class="turnier-karte handy-box">
+        <h1>👋 Mitmachen!</h1>
+        <p class="untertitel">Gib deinen Spitznamen ein und wähle ein Bild.</p>
+
+        <div class="feld-gruppe" id="box-code-eingabe">
+          <label for="kind-code">Turnier-Code</label>
+          <input type="text" id="kind-code" class="grosser-code" maxlength="4" placeholder="K7MQ" autocomplete="off">
+        </div>
+
+        <div class="feld-gruppe">
+          <label for="kind-name">Dein Spitzname</label>
+          <input type="text" id="kind-name" maxlength="16" placeholder="z. B. Lena" autocomplete="name">
+        </div>
+
+        <div class="feld-gruppe">
+          <label>Wähle dein Bild</label>
+          <div id="kind-emoji-raster" class="emoji-auswahl-raster">
+            <!-- Dynamisch aus H.EMOJIS -->
+          </div>
+        </div>
+
+        <div id="beitritt-fehler" class="fehlermeldung versteckt"></div>
+
+        <button id="btn-kind-beitreten" class="knopf gross gruen volle-breite">Mitmachen ➔</button>
+      </div>
+    </section>
+
+    <!-- ============ KIND: WARTEBEREICH ============ -->
+    <section id="screen-warten" class="screen">
+      <div class="turnier-karte handy-box text-mitte">
+        <div id="warten-mein-emoji" class="grosses-pulsierendes-emoji">🦊</div>
+        <h2 id="warten-mein-name">Hallo!</h2>
+        <div class="status-kasten mt-2">
+          <p id="warten-status" class="warten-text">Warte auf den Start durch die Lehrkraft …</p>
+          <div id="warten-gegner-info" class="gegner-box versteckt"></div>
+        </div>
+        <p id="warten-zaehler" class="grau klein mt-2">Du bist dabei!</p>
+      </div>
+    </section>
+
+    <!-- ============ KIND: RECHNEN ============ -->
+    <section id="screen-rechnen" class="screen">
+      <div class="rechnen-layout">
+        <!-- Blitz-Effekt bei richtig / falsch -->
+        <div id="blitz" class="blitz"></div>
+
+        <!-- Gegner-Leiste oben -->
+        <div id="kind-gegner-leiste" class="gegner-leiste">
+          <span id="leiste-ich">Du: 0</span>
+          <div class="mini-fortschritt">
+            <div id="balken-ich" class="mini-balken gruen" style="width: 0%"></div>
+            <div id="balken-gegner" class="mini-balken blau" style="width: 0%"></div>
+          </div>
+          <span id="leiste-gegner">Gegner: 0</span>
+        </div>
+
+        <!-- Aufgaben-Karte -->
+        <div class="rechnen-mitte">
+          <div id="aufgabe-karte" class="aufgabe-karte">
+            <div id="turnier-aufgabe" class="aufgabe-anzeige">
+              <span id="teil-a">?</span>
+              <span id="teil-op">+</span>
+              <span id="teil-b">?</span>
+              <span id="teil-gleich">=</span>
+              <span id="teil-c" class="luecke">?</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bildschirmtastatur unten -->
+        <div id="tastatur" class="tastatur">
+          <button data-z="7">7</button><button data-z="8">8</button><button data-z="9">9</button>
+          <button data-z="4">4</button><button data-z="5">5</button><button data-z="6">6</button>
+          <button data-z="1">1</button><button data-z="2">2</button><button data-z="3">3</button>
+          <button id="btn-zurueck" class="nebenknopf" aria-label="Letzte Ziffer löschen">⌫</button>
+          <button data-z="0">0</button>
+          <button id="btn-ok" class="nebenknopf ok-knopf" aria-label="Eingabe bestätigen">✓</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ KIND: NACH DER RUNDE ============ -->
+    <section id="screen-kind-ergebnis" class="screen">
+      <div class="turnier-karte handy-box text-mitte">
+        <div id="kind-ergebnis-emoji" class="grosses-pulsierendes-emoji">🎉</div>
+        <h2 id="kind-ergebnis-titel">Runde beendet!</h2>
+        <p id="kind-ergebnis-nachricht" class="ergebnis-text">Warte auf die Auswertung …</p>
+
+        <div id="kind-ergebnis-details" class="status-kasten mt-2"></div>
+
+        <button id="btn-kind-weiter" class="knopf gruen mt-2">Zum Wartebereich ➔</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="vendor/qrcode.js"></script>
+  <script src="js/aufgaben.js"></script>
+  <script src="js/ton.js"></script>
+  <script src="js/turnier.js"></script>
 </body>
 </html>

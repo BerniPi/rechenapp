@@ -13,6 +13,8 @@ Rechentrainer für die Volksschule als PWA. Kinder rechnen (tippen oder sprechen
 | Ordner/Datei | Inhalt |
 |---|---|
 | `index.html` | alle Bildschirme als `<section class="screen">`: `benutzer`, `neu`, `anmeldung`, `start`, `runde`, `ergebnis`, `spiele`, `spiel`, `highscores`, `pin`, `eltern` |
+| `turnier.html` | Turniermodus (Lehrkraft-Lobby, Beamer-Live, Rechnen auf Handys) |
+| `css/turnier.css` | Styling für Turniermodus (Beamer, Mobilgeräte, Podest) |
 | `css/style.css` | gesamtes Styling |
 | `js/` | App-Logik (siehe Frontend) |
 | `js/spiele/` | Minispiele + Register `spiele.js` |
@@ -21,6 +23,7 @@ Rechentrainer für die Volksschule als PWA. Kinder rechnen (tippen oder sprechen
 | `audio/jonas/` | ~310 MP3-Wortschnipsel der Ersatz-Stimme |
 | `models/` | Vosk-Sprachmodell Deutsch (tar.gz) |
 | `vendor/vosk.js` | vosk-browser 0.0.8 |
+| `vendor/qrcode.js` | QRCode for JavaScript (Kazuhiko Arase, MIT) |
 | `tools/` | `test.js` (Selbsttest), `icon.js` (Icons), `stimme.py` (Schnipsel erzeugen) |
 
 ## Befehle
@@ -45,6 +48,7 @@ Einstieg: `index.html` lädt der Reihe nach `speicher → online → aufgaben �
 
 | Datei | Zuständig für |
 |---|---|
+| `js/turnier.js` | Turniermodus UI (Lehrkraft & Kind), SSE-Live-Verbindung, Countdown, Live-Fortschritt |
 | `js/app.js` | gesamte UI in einer IIFE: Bildschirme, Rechenrunde, Auswertung/Sterne, Rekorde, Spiele-Auswahl, Eltern-Bereich + PIN, Online-UI, Anmelde-Bildschirm, Spielerwahl. Abschnitte mit `// ---------- … ----------` |
 | `js/speicher.js` | `Speicher`: localStorage je Spieler, Standardwerte (`standard()`), Migrationen alter Daten in `laden()` |
 | `js/online.js` | `Online`: Server-Anfragen, Verbinden (Code/Konto/SSO), Warteschlange für offline, `senden()` = `POST /api/sync` |

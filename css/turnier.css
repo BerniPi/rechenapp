@@ -1,1 +1,681 @@
-/* Turniermodus Stylesheet */
+/* Turniermodus Stylesheet für Beamer und Mobilgeräte */
+
+/* Basis */
+.turnier-body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg, #f4f6f9);
+  color: var(--text, #1e293b);
+  font-family: system-ui, -apple-system, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.screen {
+  display: none;
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.screen.aktiv {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Offline-Balken */
+.offline-balken {
+  background-color: #f59e0b;
+  color: #78350f;
+  text-align: center;
+  padding: 0.6rem;
+  font-weight: bold;
+  font-size: 0.95rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Karten & Boxen */
+.turnier-karte {
+  background: white;
+  border-radius: 1.2rem;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin: 1.5rem auto;
+  box-sizing: border-box;
+}
+
+.breite-box {
+  max-width: 800px;
+  width: 92%;
+}
+
+.handy-box {
+  max-width: 480px;
+  width: 92%;
+}
+
+.text-mitte { text-align: center; }
+.mt-2 { margin-top: 1rem; }
+.grau { color: #64748b; }
+.klein { font-size: 0.9rem; }
+.untertitel { color: #64748b; margin-top: -0.2rem; margin-bottom: 1.5rem; }
+
+/* Feld-Gruppen */
+.feld-gruppe {
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.feld-gruppe label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.feld-gruppe input[type="text"],
+.feld-gruppe select {
+  padding: 0.75rem 1rem;
+  border: 2px solid #cbd5e1;
+  border-radius: 0.8rem;
+  font-size: 1.1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.feld-gruppe input[type="text"]:focus,
+.feld-gruppe select:focus {
+  border-color: #3b82f6;
+}
+
+.grosser-code {
+  font-size: 2rem !important;
+  text-align: center;
+  letter-spacing: 0.4rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.checkbox-label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.einstellungen-raster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+/* Übungs-Chips */
+.chips-raster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  padding: 0.5rem 0.9rem;
+  border-radius: 2rem;
+  border: 2px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.chip.gewaehlt {
+  background: #3b82f6;
+  color: white;
+  border-color: #2563eb;
+}
+
+/* Emoji-Auswahl */
+.emoji-auswahl-raster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 0.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.8rem;
+  background: #f8fafc;
+}
+
+.emoji-knopf {
+  font-size: 1.8rem;
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 0.6rem;
+  cursor: pointer;
+  padding: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s, border-color 0.1s;
+}
+
+.emoji-knopf:active { transform: scale(0.9); }
+.emoji-knopf.gewaehlt {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  transform: scale(1.05);
+}
+
+.fehlermeldung {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.8rem;
+  border-radius: 0.6rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* Pulsierendes Emoji für Wartebereich */
+.grosses-pulsierendes-emoji {
+  font-size: 5rem;
+  margin: 1rem auto;
+  animation: pulsiere 2s infinite ease-in-out;
+}
+
+@keyframes pulsiere {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.spin-emoji {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: drehe 3s infinite linear;
+}
+
+@keyframes drehe {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================================
+   BEAMER-LAYOUT
+   ======================================================== */
+.beamer-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 2.5rem;
+  box-sizing: border-box;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.beamer-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid #e2e8f0;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.beamer-kopf h1 {
+  font-size: 2.2rem;
+  margin: 0 0 0.3rem 0;
+}
+
+.turnier-adresse {
+  font-size: 1.4rem;
+  color: #475569;
+}
+
+.turnier-adresse strong.hervorgehoben {
+  color: #2563eb;
+  font-size: 1.8rem;
+  letter-spacing: 0.15rem;
+  background: #eff6ff;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.4rem;
+}
+
+.beamer-aktionen {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.beamer-fuss {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* Lobby */
+.lobby-inhalt {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 2.5rem;
+  flex: 1;
+  align-items: center;
+}
+
+.lobby-qr-kasten {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.06);
+}
+
+.qr-code-svg svg {
+  max-width: 100%;
+  max-height: 45vh;
+  display: block;
+}
+
+.qr-hinweis {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.lobby-teilnehmer-kasten {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.06);
+  min-height: 45vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.teilnehmer-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 0.5rem;
+}
+
+.zaehler-badge {
+  background: #3b82f6;
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 2rem;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.kinder-raster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.8rem;
+  overflow-y: auto;
+  max-height: 45vh;
+  padding: 0.5rem;
+}
+
+.kind-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.8rem;
+  padding: 0.5rem 0.8rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  animation: einfaden 0.3s ease-out;
+}
+
+@keyframes einfaden {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.kind-chip .emoji { margin-right: 0.4rem; font-size: 1.4rem; }
+.kind-chip .loeschen-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+.kind-chip .loeschen-btn:hover { color: #ef4444; }
+
+/* Duelle / Spiele Raster */
+.spiele-raster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.duell-karte {
+  background: white;
+  border-radius: 1.2rem;
+  padding: 1.2rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.duell-kontrahenten {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.duell-vs {
+  font-size: 1rem;
+  color: #94a3b8;
+  font-weight: normal;
+  padding: 0 0.5rem;
+}
+
+.spieler-name-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.spieler-name-box.rechts {
+  justify-content: flex-end;
+}
+
+/* Live-Balken */
+.live-spiele-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.live-duell-zeile {
+  background: white;
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  display: grid;
+  grid-template-columns: 1.2fr 2fr 1.2fr;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.duell-balken-mitte {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.fortschritt-balken-rahmen {
+  flex: 1;
+  height: 24px;
+  background: #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+}
+
+.fortschritt-segment.richtig { background: #22c55e; }
+.fortschritt-segment.falsch { background: #ef4444; }
+
+.duell-score {
+  font-family: monospace;
+  font-size: 1.4rem;
+  white-space: nowrap;
+}
+
+.live-uhr {
+  font-size: 1.8rem;
+  font-family: monospace;
+  font-weight: bold;
+  background: #1e293b;
+  color: #38bdf8;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.6rem;
+}
+
+/* Countdown Overlay */
+.countdown-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  backdrop-filter: blur(4px);
+}
+
+.countdown-zahl {
+  font-size: 12rem;
+  font-weight: 900;
+  color: #fbbf24;
+  animation: countdown-puls 1s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes countdown-puls {
+  0% { transform: scale(0.6); opacity: 0; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+/* Siegerehrung & Podest */
+.podest-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1.5rem;
+  height: 38vh;
+  margin: 1.5rem auto;
+}
+
+.podest-platz {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 180px;
+}
+
+.podest-emoji { font-size: 4rem; }
+.podest-name { font-size: 1.4rem; font-weight: bold; margin: 0.4rem 0; text-align: center; }
+
+.podest-sockel {
+  width: 100%;
+  border-radius: 1rem 1rem 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: 900;
+  color: white;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.sockel-1 { height: 180px; background: linear-gradient(135deg, #f59e0b, #d97706); }
+.sockel-2 { height: 130px; background: linear-gradient(135deg, #94a3b8, #64748b); }
+.sockel-3 { height: 90px; background: linear-gradient(135deg, #b45309, #78350f); }
+.krone { font-size: 2.5rem; animation: wackeln 2s infinite ease-in-out; }
+
+@keyframes wackeln {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+.turnier-tabelle {
+  width: 100%;
+  max-width: 600px;
+  margin: 1rem auto;
+  border-collapse: collapse;
+}
+
+.turnier-tabelle th, .turnier-tabelle td {
+  padding: 0.7rem 1.2rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 1.15rem;
+}
+
+.turnier-tabelle th { background: #f8fafc; font-weight: 600; text-align: left; }
+
+/* ========================================================
+   HANDY-RECHEN-ANSICHT (KIND)
+   ======================================================== */
+.rechnen-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.gegner-leiste {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: white;
+  border-bottom: 2px solid #e2e8f0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mini-fortschritt {
+  flex: 1;
+  max-width: 140px;
+  height: 12px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  margin: 0 0.8rem;
+}
+
+.mini-balken.gruen { background: #22c55e; }
+.mini-balken.blau { background: #3b82f6; }
+
+.rechnen-mitte {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.aufgabe-karte {
+  background: white;
+  border-radius: 1.5rem;
+  padding: 2rem 2.5rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+  font-size: 2.8rem;
+  font-weight: bold;
+  letter-spacing: 0.1rem;
+  transition: all 0.15s;
+}
+
+.aufgabe-karte.ok {
+  background: #dcfce7;
+  border: 3px solid #22c55e;
+}
+
+.aufgabe-karte.nok {
+  background: #fee2e2;
+  border: 3px solid #ef4444;
+}
+
+.luecke {
+  display: inline-block;
+  min-width: 1.8ch;
+  border-bottom: 4px solid #3b82f6;
+  color: #2563eb;
+  text-align: center;
+}
+
+/* Bildschirmtastatur */
+.tastatur {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.8rem;
+  background: white;
+  border-top: 2px solid #e2e8f0;
+}
+
+.tastatur button {
+  height: 64px;
+  font-size: 1.8rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 0.8rem;
+  background: #f1f5f9;
+  color: #1e293b;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.1s, transform 0.05s;
+}
+
+.tastatur button:active {
+  background: #cbd5e1;
+  transform: scale(0.96);
+}
+
+.tastatur .nebenknopf {
+  font-size: 1.5rem;
+  color: #64748b;
+  background: #e2e8f0;
+}
+
+.tastatur .ok-knopf {
+  background: #22c55e;
+  color: white;
+}
+.tastatur .ok-knopf:active { background: #16a34a; }
+
+/* Druck-Stylesheet für die Siegerehrung der Lehrkraft */
+@media print {
+  body { background: white !important; color: black !important; }
+  .beamer-kopf .beamer-aktionen, .beamer-fuss, .offline-balken { display: none !important; }
+  .beamer-layout { padding: 0 !important; max-width: 100% !important; }
+  .podest-container { height: auto !important; margin: 1rem 0 !important; }
+  .podest-sockel { border: 1px solid #ccc !important; }
+  .turnier-tabelle { width: 100% !important; max-width: 100% !important; }
+}
