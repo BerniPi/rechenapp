@@ -645,6 +645,28 @@ pruefe('A3: Gruppenphase mit 13 Kindern wechselt in KO-Baum bis zum Ende', () =>
   });
 });
 
+pruefe('B4: Gruppen werden zufaellig gemischt und bei neuMischen neu ausgelost', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Gruppen-Mischen-Test',
+    einstellungen: { format: 'gruppen_ko', gruppenGroesse: 3, gruppenRunden: 2, weiterProGruppe: 2, anzahl: 5 },
+  });
+  for (let i = 1; i <= 12; i++) {
+    Turnier.beitreten(code, { name: `Schueler_${i}`, emoji: '🦊' });
+  }
+  Turnier.starten(t, leitung);
+  const gruppen1 = JSON.stringify(t.gruppen);
+
+  let veraendert = false;
+  for (let i = 0; i < 20; i++) {
+    Turnier.neuMischen(t, leitung);
+    if (JSON.stringify(t.gruppen) !== gruppen1) {
+      veraendert = true;
+      break;
+    }
+  }
+  assert(veraendert, 'Gruppenaufteilung muss sich durch neuMischen aendern');
+});
+
 pruefe('B5: Neues Turnier nur in Phase ende erlaubt', () => {
   const { leitung, turnier: t } = Turnier.anlegen({ titel: 'Test' });
   assert.strictEqual(t.phase, 'lobby');

@@ -556,7 +556,7 @@ function rundePlanen(t) {
   } else if (format === 'gruppen_ko' && (!t.inKoPhase && nr <= t.einstellungen.gruppenRunden)) {
     // Gruppenphase (Runde 1 bis gruppenRunden): feste Gruppen!
     if (!t.gruppen) {
-      t.gruppen = gruppenEinteilen(aktive.map((tn) => tn.id), t.einstellungen.gruppenGroesse);
+      t.gruppen = gruppenEinteilen(mischen(aktive.map((tn) => tn.id)), t.einstellungen.gruppenGroesse);
     }
     t.gruppen.forEach((gruppe, gIdx) => {
       const aufgaben = aufgabenErzeugen(t.einstellungen);
