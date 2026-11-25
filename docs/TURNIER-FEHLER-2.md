@@ -1,6 +1,6 @@
 # Turniermodus: zweite Prüfung (Zweig `turnier`, Stand 68a60bb)
 
-> **Auftrag an Gemini:** Behebe die folgenden Punkte auf dem Zweig `turnier`. Es gelten weiter `docs/TURNIER-KONZEPT.md`, `docs/TURNIER-FEHLER.md` und `PROJEKTWISSEN.md`. Schreib zu jedem Punkt der Logik zuerst einen Test in `tools/test.js`, der heute fehlschlägt. Der Test muss den **echten Ablauf** über `starten` → `rundeStarten` → `antworten` → `rundeBeenden`/`naechste` prüfen, nicht Felder von Hand setzen. Danach `node tools/test.js` und ein Durchlauf im Browser (siehe Abschnitt C). Ein Commit pro Punkt (`fix(turnier): …`).
+> **Auftrag an Gemini:** Behebe die folgenden Punkte auf dem Zweig `turnier`. Es gelten weiter `docs/TURNIER-KONZEPT.md`, `docs/TURNIER-FEHLER.md` und `AGENTS.md`. Schreib zu jedem Punkt der Logik zuerst einen Test in `tools/test.js`, der heute fehlschlägt. Der Test muss den **echten Ablauf** über `starten` → `rundeStarten` → `antworten` → `rundeBeenden`/`naechste` prüfen, nicht Felder von Hand setzen. Danach `node tools/test.js` und ein Durchlauf im Browser (siehe Abschnitt C). Ein Commit pro Punkt (`fix(turnier): …`).
 
 Behoben und bestätigt sind aus der ersten Liste: A1 Zeit-Wertung, A2 Zeitgrenze, A3 Liga/Gruppen, A4 Beitritt, A6 Live-Anzeige beim Countdown, A7 Neuverbinden, B1, B2, B4, B5, B6, B7. Die folgenden Punkte sind neu oder noch offen.
 

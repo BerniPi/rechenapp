@@ -1,6 +1,6 @@
 # Turniermodus: Fehlerliste aus der Prüfung (Zweig `turnier`, Stand 371009c)
 
-> **Auftrag an Gemini:** Behebe die folgenden Punkte auf dem Zweig `turnier`. Grundlage bleibt `docs/TURNIER-KONZEPT.md`, und es gelten die Regeln aus `PROJEKTWISSEN.md`. Schreib zu jedem Fehler der Logik **zuerst einen Test in `tools/test.js`**, der heute fehlschlägt, und behebe ihn dann. Mach einen Commit pro Punkt oder pro zusammengehöriger Gruppe (`fix(turnier): …`). Lass am Ende `node tools/test.js` laufen und spiel im Browser einmal mit 1 Lehrkraft und 3 Kindern durch: K.-o. im Aufgaben-Modus, K.-o. im Zeit-Modus, Sprint, Liga, Gruppenphase → K.-o. Lade dabei ein Kind mitten in der Runde neu und schalte einmal „Beitritt“ um.
+> **Auftrag an Gemini:** Behebe die folgenden Punkte auf dem Zweig `turnier`. Grundlage bleibt `docs/TURNIER-KONZEPT.md`, und es gelten die Regeln aus `AGENTS.md`. Schreib zu jedem Fehler der Logik **zuerst einen Test in `tools/test.js`**, der heute fehlschlägt, und behebe ihn dann. Mach einen Commit pro Punkt oder pro zusammengehöriger Gruppe (`fix(turnier): …`). Lass am Ende `node tools/test.js` laufen und spiel im Browser einmal mit 1 Lehrkraft und 3 Kindern durch: K.-o. im Aufgaben-Modus, K.-o. im Zeit-Modus, Sprint, Liga, Gruppenphase → K.-o. Lade dabei ein Kind mitten in der Runde neu und schalte einmal „Beitritt“ um.
 
 ## A. Schwere Fehler
 
@@ -62,5 +62,5 @@
 ## C. Vor dem Zusammenführen in `server`
 
 - README: Formate erst nennen, wenn sie funktionieren.
-- `PROJEKTWISSEN.md`: Zustände, Ereignisse und Timer des Turniers kurz eintragen (Pflege-Regel).
+- `AGENTS.md`: Zustände, Ereignisse und Timer des Turniers kurz eintragen (Pflege-Regel).
 - `sw.js`: `VERSION` hochzählen.

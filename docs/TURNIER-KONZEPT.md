@@ -1,6 +1,6 @@
 # Konzept: Turniermodus für RechenArena
 
-> **Auftrag an Gemini:** Setze den hier beschriebenen Turniermodus im Projekt RechenArena um. Lies zuerst `PROJEKTWISSEN.md` (Zweig `server`) und halte dich an die dortigen Regeln: kein Build-Schritt, keine npm-Abhängigkeiten, alles auf Deutsch (Code, Bezeichner, Kommentare, Texte), 2 Leerzeichen, einfache Anführungszeichen, Semikolons, Conventional Commits auf Deutsch (`feat(turnier): …`). Arbeite auf einem eigenen Zweig, der von `server` abzweigt. Setze die Arbeit in den Etappen aus Abschnitt 11 um und lass nach jeder Etappe `node tools/test.js` laufen. Ist etwas unklar, entscheide nach Abschnitt 12 oder frag nach.
+> **Auftrag an Gemini:** Setze den hier beschriebenen Turniermodus im Projekt RechenArena um. Lies zuerst `AGENTS.md` (Zweig `server`) und halte dich an die dortigen Regeln: kein Build-Schritt, keine npm-Abhängigkeiten, alles auf Deutsch (Code, Bezeichner, Kommentare, Texte), 2 Leerzeichen, einfache Anführungszeichen, Semikolons, Conventional Commits auf Deutsch (`feat(turnier): …`). Arbeite auf einem eigenen Zweig, der von `server` abzweigt. Setze die Arbeit in den Etappen aus Abschnitt 11 um und lass nach jeder Etappe `node tools/test.js` laufen. Ist etwas unklar, entscheide nach Abschnitt 12 oder frag nach.
 
 ## 1. Ziel
 
@@ -20,7 +20,7 @@ Adresse: `https://rechenarena.bgblumenstrasse.at/turnier` (gilt für jede Instan
 
 - Bewusst **öffentlich ohne Zugriffsbeschränkung**. Geschützt wird nur, *wer steuern darf*: Der Leitungs-Schlüssel sind 32 Zufallsbytes (`H.neuerSchluessel()`), der Server speichert nur seinen `sha256`.
 - **Turnier-Code**: 4 Zeichen aus `H.ZEICHEN` (ohne 0/O/1/I). Er ist kurz, damit man ihn auch abtippen kann. Kollisionen prüft der Server mit allen laufenden Turnieren.
-- Nur Spitzname und Emoji, **nie Fotos** (Regel aus PROJEKTWISSEN: „Online sichtbar sind nur Spitzname + Emoji“). Die Emoji-Liste kommt aus `H.EMOJIS`, die Prüfung des Namens aus `H.name()`.
+- Nur Spitzname und Emoji, **nie Fotos** (Regel aus AGENTS.md: „Online sichtbar sind nur Spitzname + Emoji“). Die Emoji-Liste kommt aus `H.EMOJIS`, die Prüfung des Namens aus `H.name()`.
 - Ein Turnier verändert **keine Sterne, Rekorde oder Bestenlisten**. Es hat mit Konten nichts zu tun.
 
 ## 3. Ablauf im Detail
@@ -100,7 +100,7 @@ Handys (Kinder) ──POST Antworten──▶  │   Zustandsautomat,
 | `server/Dockerfile` | `turnier.html` und die neuen Dateien mitkopieren |
 | `sw.js` | `VERSION` hochzählen. `turnier.html` und `js/turnier.js` **nicht** cache-first behandeln: Das Turnier braucht ohnehin Netz, und alte Fassungen würden mit dem Server streiten. `/api/turnier/` nie cachen. |
 | `tools/test.js` | Tests für `server/turnier.js` (siehe Abschnitt 10) |
-| `README.md`, `PROJEKTWISSEN.md` | Nutzersicht bzw. Routen, Zustände, Regeln (Pflege-Regel beachten) |
+| `README.md`, `AGENTS.md` | Nutzersicht bzw. Routen, Zustände, Regeln (Pflege-Regel beachten) |
 | App `index.html`/`app.js` | kleiner Link „🏆 Turnier“ im Eltern- bzw. Lehrkraft-Bereich, der auf `/turnier` führt |
 
 ### 5.3 Datenmodell im Speicher
@@ -232,7 +232,7 @@ Nur gegen `server/turnier.js`, ohne HTTP:
 3. **Lehrkraft-Oberfläche**: Erstellen, Lobby mit QR-Code, Vorschau, Live-Anzeige, Ergebnis, Siegerehrung
 4. **Kind-Oberfläche**: Beitreten, Wartebereich, Rechnen (Tastatur wiederverwenden), Ergebnis, Neuverbinden
 5. **Gruppenphase und Liga**, Spiel um Platz 3, Entscheidungsaufgabe
-6. **Feinschliff**: Töne, Animationen, Wake-Lock, Vollbild, Zuschauer-Ansicht, README/PROJEKTWISSEN, `sw.js`
+6. **Feinschliff**: Töne, Animationen, Wake-Lock, Vollbild, Zuschauer-Ansicht, README/AGENTS.md, `sw.js`
 7. **Probelauf**: lokal mit `server-piazzi` und 3 Browserfenstern (1 × Leitung, 2 × Kind), danach auf echten Handys im WLAN
 
 Nach jeder Etappe einen eigenen Commit (`feat(turnier): …`).
