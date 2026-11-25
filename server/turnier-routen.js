@@ -282,6 +282,14 @@ function zustandFuer(t, conn) {
         daten.ich.ausgang = ausgang;
         daten.ich.spielPlatz = meinErg ? meinErg.platz : null;
       }
+
+      if (t.phase === 'entscheidung' && sp && sp.entscheidung && !sp.entscheidung.geloestVon && !sp.entscheidung.losEntscheidung) {
+        daten.entscheidung = {
+          spiel: sp.id,
+          aufgabe: Turnier.aufgabenFuerKind(sp.entscheidung.aufgabe),
+          sperreBis: (sp.entscheidung.sperreBis && sp.entscheidung.sperreBis[conn.teilnehmerId]) || 0,
+        };
+      }
     }
   }
 
@@ -666,7 +674,7 @@ async function anfrage(req, res, url) {
           };
 
           senden(t.code, 'fortschritt', fortschrittPayload, (c) => (
-            c.rolle === 'leitung' || c.rolle === 'zuschauer' || spiel.teilnehmer.includes(c.teilnehmerId)
+            c.rolle === 'leitung' || c.rolle === 'zuschauer' || (t.einstellungen.challengeMode && spiel.teilnehmer.includes(c.teilnehmerId))
           ));
         }
 

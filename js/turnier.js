@@ -22,28 +22,81 @@
   let aufgabenIndex = 0;
   let aktuelleEingabe = '';
   let wakeLock = null;
-  let sendetGerade = false;
   let rundenLiveTimer = null;
+  let istEntscheidung = false;
+  let meinRichtig = 0;
+  let meinFalsch = 0;
+  let rundeAufgabenAnzahl = 10;
+  let gegnerEmoji = '';
+  let antwortWarteschlange = [];
+  let warteschlangeAktiv = false;
+  let entscheidungSendet = false;
+  let tastaturGesperrt = false;
+  let countdownAbgelaufen = false;
+  let countdownStartTimeout = null;
+  let blitzTimer = null;
+  let spielStaende = new Map();
+  let ssePruefungLaeuft = false;
 
-  function rundenUhrStarten(endeUm) {
+  function istChallengeModeAktiv() {
+    return Boolean(aktuellerZustand && aktuellerZustand.einstellungen && aktuellerZustand.einstellungen.challengeMode);
+  }
+
+  function fmtUhr(sek) {
+    const s = Math.max(0, Math.floor(sek));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  function istZeitModusAktiv() {
+    return Boolean(aktuellerZustand && aktuellerZustand.einstellungen && aktuellerZustand.einstellungen.art === 'zeit');
+  }
+
+  function rundenUhrStarten(startUm, dauerMs) {
     if (rundenLiveTimer) clearInterval(rundenLiveTimer);
+    const basisStart = startUm || Date.now();
+    const hatDauer = typeof dauerMs === 'number' && dauerMs > 0;
+    const endeUm = hatDauer ? basisStart + dauerMs : null;
+
     function tick() {
-      const restMs = endeUm - (Date.now() + uhrOffsetMs);
-      const restSek = Math.max(0, Math.ceil(restMs / 1000));
-      const min = Math.floor(restSek / 60);
-      const sek = restSek % 60;
-      const str = `${String(min).padStart(2, '0')}:${String(sek).padStart(2, '0')}`;
+      const serverJetzt = Date.now() + uhrOffsetMs;
       const beamerUhr = $('#live-uhr');
-      if (beamerUhr) beamerUhr.textContent = str;
-      const handyUhr = $('#leiste-uhr');
-      if (handyUhr) handyUhr.textContent = `⏱️ ${restSek} s`;
-      if (restMs <= 0) {
+      if (beamerUhr && endeUm !== null) {
+        const restSek = Math.max(0, Math.ceil((endeUm - serverJetzt) / 1000));
+        const min = Math.floor(restSek / 60);
+        const sek = restSek % 60;
+        beamerUhr.textContent = `${String(min).padStart(2, '0')}:${String(sek).padStart(2, '0')}`;
+      }
+
+      const handyUhr = $('#uhr');
+      if (handyUhr) {
+        if (istEntscheidung || (istZeitModusAktiv() && endeUm !== null)) {
+          const restMs = Math.max(0, (endeUm || (basisStart + 60000)) - serverJetzt);
+          const restSek = Math.ceil(restMs / 1000);
+          handyUhr.textContent = fmtUhr(restSek);
+          if (!istEntscheidung && hatDauer) {
+            const balken = $('#fortschritt .balken');
+            if (balken && balken.firstElementChild) {
+              balken.firstElementChild.style.width = `${Math.max(0, restMs / dauerMs) * 100}%`;
+              balken.classList.toggle('knapp', restSek <= 10);
+            }
+          }
+          if (restMs <= 0 && !beamerUhr) {
+            clearInterval(rundenLiveTimer);
+            rundenLiveTimer = null;
+          }
+        } else {
+          const vergangenSek = Math.max(0, (serverJetzt - basisStart) / 1000);
+          handyUhr.textContent = fmtUhr(vergangenSek);
+        }
+      }
+
+      if (endeUm !== null && serverJetzt >= endeUm && (istEntscheidung || istZeitModusAktiv())) {
         clearInterval(rundenLiveTimer);
         rundenLiveTimer = null;
       }
     }
     tick();
-    rundenLiveTimer = setInterval(tick, 500);
+    rundenLiveTimer = setInterval(tick, 200);
   }
 
   // Bildschirmwechsel
@@ -51,6 +104,13 @@
     $$('.screen').forEach((s) => s.classList.remove('aktiv'));
     const ziel = $(`#${id}`);
     if (ziel) ziel.classList.add('aktiv');
+    document.body.classList.toggle('rechnen-aktiv', id === 'screen-rechnen');
+    if (id === 'screen-rechnen') {
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      window.scrollTo(0, 0);
+    }
   }
 
   // WakeLock für Handys anfordern
@@ -77,8 +137,20 @@
       $('#offline-balken').classList.add('versteckt');
     });
 
-    eventSource.addEventListener('error', () => {
+    eventSource.addEventListener('error', async () => {
       $('#offline-balken').classList.remove('versteckt');
+      const aktiverCode = turnierCode;
+      if (!aktiverCode || ssePruefungLaeuft) return;
+      ssePruefungLaeuft = true;
+      try {
+        const status = await turnierExistenzPruefen(aktiverCode);
+        if (status === 'nicht_gefunden' && turnierCode === aktiverCode) {
+          const alsKind = rolle === 'kind';
+          allesZuruecksetzen(alsKind, alsKind ? 'Das Turnier wurde beendet oder existiert nicht mehr.' : '');
+        }
+      } finally {
+        ssePruefungLaeuft = false;
+      }
     });
 
     eventSource.addEventListener('hallo', (ev) => {
@@ -109,7 +181,15 @@
       if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
       aktuellerZustand.phase = 'countdown';
       aktuellerZustand.countdownBis = daten.startUm;
-      zustandAktualisieren(aktuellerZustand);
+      if (daten.dauerMs) {
+        if (!aktuellerZustand.runde) aktuellerZustand.runde = {};
+        aktuellerZustand.runde.start = daten.startUm;
+        aktuellerZustand.runde.dauerMs = daten.dauerMs;
+      }
+      if (rolle === 'leitung' || rolle === 'zuschauer') {
+        zeigeScreen('screen-live');
+        liveRendern(aktuellerZustand.runde);
+      }
       countdownStarten(daten.startUm, daten.dauerMs);
     });
 
@@ -129,20 +209,39 @@
       meineAufgaben = daten.aufgaben || [];
       aufgabenIndex = 0;
       aktuelleEingabe = '';
+      istEntscheidung = false;
+      meinRichtig = 0;
+      meinFalsch = 0;
+      antwortWarteschlange = [];
+      warteschlangeAktiv = false;
+      entscheidungSendet = false;
+      sperreAufheben();
+
+      if (rolle === 'kind' && meineAufgaben.length > 0 && (countdownAbgelaufen || (aktuellerZustand && aktuellerZustand.phase === 'laeuft'))) {
+        const startUm = (aktuellerZustand && (aktuellerZustand.countdownBis || (aktuellerZustand.runde && aktuellerZustand.runde.start))) || Date.now();
+        const dauerMs = aktuellerZustand && aktuellerZustand.runde && aktuellerZustand.runde.dauerMs;
+        rechnenStarten(startUm, dauerMs);
+      }
     });
 
     eventSource.addEventListener('entscheidung', (ev) => {
       const daten = JSON.parse(ev.data);
+      const warSchonEntscheidung = istEntscheidung && meinSpielId === daten.spiel;
+      istEntscheidung = true;
       meinSpielId = daten.spiel;
       meineAufgaben = [daten.aufgabe];
       aufgabenIndex = 0;
       aktuelleEingabe = '';
-      zeigeScreen('screen-rechnen');
-      const tastatur = $('#tastatur');
-      if (tastatur) tastatur.classList.remove('gesperrt');
-      $('#leiste-ich').textContent = '⚡ Entscheidung';
-      $('#leiste-gegner').textContent = 'Wer zuerst richtig hat!';
-      aufgabeZeigen();
+      entscheidungSendet = false;
+
+      if (!warSchonEntscheidung) {
+        antwortWarteschlange = [];
+        warteschlangeAktiv = false;
+        sperreAufheben();
+        rechnenStarten(Date.now() + uhrOffsetMs, 60000);
+      } else {
+        aufgabeZeigen();
+      }
     });
 
     eventSource.addEventListener('entscheidung_beamer', (ev) => {
@@ -196,6 +295,7 @@
     $('#lobby-titel').textContent = z.titel || 'Rechen-Turnier';
     $('#lobby-code').textContent = z.code;
     $('#lobby-url-text').textContent = `${location.host}/turnier`;
+    $$('.btn-turnier-reset').forEach((btn) => btn.classList.toggle('versteckt', rolle !== 'leitung'));
 
     switch (z.phase) {
       case 'lobby': {
@@ -256,10 +356,14 @@
         zeigeScreen('screen-warten');
         $('#warten-status').textContent = 'Warte auf den Start durch die Lehrkraft …';
         $('#warten-gegner-info').classList.add('versteckt');
-        $('#warten-zaehler').textContent = `${(z.teilnehmer || []).length} Kinder sind dabei`;
+        $('#warten-zaehler').textContent = wartenZaehlerText((z.teilnehmer || []).length);
         break;
       }
       case 'vorschau': {
+        countdownStoppen();
+        sperreAufheben();
+        spielStaende.clear();
+        challengeAnzeigeVerstecken();
         zeigeScreen('screen-warten');
         $('#warten-status').textContent = 'Runde wird vorbereitet …';
         kindGegnerInfoRendern(z.runde);
@@ -268,16 +372,20 @@
       case 'countdown': {
         if (z.runde && ich && ich.aktiv) {
           const sp = z.runde.spiele && z.runde.spiele.find((s) => s.teilnehmer.some((t) => t.id === ich.id));
-          if (sp && sp.meineAufgaben) {
+          if (sp && Array.isArray(sp.meineAufgaben) && sp.meineAufgaben.length > 0) {
             meineAufgaben = sp.meineAufgaben;
             meinSpielId = sp.id;
           }
           aufgabenIndex = typeof ich.index === 'number' ? ich.index : 0;
+          meinRichtig = ich.richtig || 0;
+          meinFalsch = ich.falsch || 0;
+          istEntscheidung = false;
         }
-        if (z.countdownBis) countdownStarten(z.countdownBis);
+        if (z.countdownBis) countdownStarten(z.countdownBis, z.runde && z.runde.dauerMs);
         break;
       }
       case 'laeuft': {
+        countdownStoppen();
         if (z.runde && ich && ich.aktiv) {
           if (ich.fertig) {
             zeigeScreen('screen-warten');
@@ -285,19 +393,38 @@
             return;
           }
           const sp = z.runde.spiele && z.runde.spiele.find((s) => s.teilnehmer.some((t) => t.id === ich.id));
-          if (sp && sp.meineAufgaben) {
+          if (sp && Array.isArray(sp.meineAufgaben) && sp.meineAufgaben.length > 0) {
             meineAufgaben = sp.meineAufgaben;
             meinSpielId = sp.id;
           }
           aufgabenIndex = typeof ich.index === 'number' ? ich.index : 0;
-          zeigeScreen('screen-rechnen');
-          aufgabeZeigen();
-          if (z.runde.start && z.runde.dauerMs) {
-            rundenUhrStarten(z.runde.start + z.runde.dauerMs);
-          }
+          meinRichtig = ich.richtig || 0;
+          meinFalsch = ich.falsch || 0;
+          istEntscheidung = false;
+          aktuelleEingabe = '';
+          rechnenStarten(z.runde.start || (Date.now() + uhrOffsetMs), z.runde.dauerMs);
         } else {
           zeigeScreen('screen-warten');
           $('#warten-status').textContent = 'Du schaust in dieser Runde zu.';
+        }
+        break;
+      }
+      case 'entscheidung': {
+        countdownStoppen();
+        if (z.entscheidung && z.entscheidung.aufgabe) {
+          istEntscheidung = true;
+          meinSpielId = z.entscheidung.spiel;
+          meineAufgaben = [z.entscheidung.aufgabe];
+          aufgabenIndex = 0;
+          aktuelleEingabe = '';
+          rechnenStarten(Date.now() + uhrOffsetMs, 60000);
+          const restSperreMs = (z.entscheidung.sperreBis || 0) - (Date.now() + uhrOffsetMs);
+          if (restSperreMs > 0) {
+            sperreAktivieren(Math.ceil(restSperreMs / 1000));
+          }
+        } else {
+          zeigeScreen('screen-warten');
+          $('#warten-status').textContent = 'Entscheidungsaufgabe läuft …';
         }
         break;
       }
@@ -359,7 +486,16 @@
   // -------------------------------------------------------------------
   // Teilnehmerliste & Chips
   // -------------------------------------------------------------------
+  function wartenZaehlerText(n) {
+    return n === 1 ? '1 Kind ist dabei' : `${n} Kinder sind dabei`;
+  }
+
   function teilnehmerRendern(teilnehmer) {
+    if (aktuellerZustand) aktuellerZustand.teilnehmer = teilnehmer;
+    const wartenZaehler = $('#warten-zaehler');
+    if (wartenZaehler && (!aktuellerZustand || aktuellerZustand.phase === 'lobby')) {
+      wartenZaehler.textContent = wartenZaehlerText(teilnehmer.length);
+    }
     const raster = $('#lobby-teilnehmer-raster');
     const zaehler = $('#lobby-zaehler');
     if (zaehler) zaehler.textContent = `${teilnehmer.length} ${teilnehmer.length === 1 ? 'Kind' : 'Kinder'} da`;
@@ -469,10 +605,24 @@
   // Countdown
   // -------------------------------------------------------------------
   let countdownTimer = null;
+  function countdownStoppen() {
+    if (countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+    if (countdownStartTimeout) {
+      clearTimeout(countdownStartTimeout);
+      countdownStartTimeout = null;
+    }
+    const overlay = $('#countdown-overlay');
+    if (overlay) overlay.classList.add('versteckt');
+  }
+
   function countdownStarten(startUm, dauerMs) {
+    countdownStoppen();
+    countdownAbgelaufen = false;
     const overlay = $('#countdown-overlay');
     const zahl = $('#countdown-zahl');
-    if (countdownTimer) clearInterval(countdownTimer);
 
     if (overlay) overlay.classList.remove('versteckt');
 
@@ -486,15 +636,16 @@
         if (zahl) zahl.textContent = 'Los!';
         if (typeof Ton !== 'undefined') Ton.note(880, 0, 0.2, 'triangle', 0.3);
         clearInterval(countdownTimer);
-        setTimeout(() => {
+        countdownTimer = null;
+        countdownStartTimeout = setTimeout(() => {
+          countdownStartTimeout = null;
+          countdownAbgelaufen = true;
           if (overlay) overlay.classList.add('versteckt');
-          if (rolle === 'kind' && meineAufgaben.length > 0) {
-            zeigeScreen('screen-rechnen');
-            aufgabeZeigen();
-          }
           const effektiveDauerMs = dauerMs || (aktuellerZustand && aktuellerZustand.runde && aktuellerZustand.runde.dauerMs);
-          if (effektiveDauerMs) {
-            rundenUhrStarten(startUm + effektiveDauerMs);
+          if (rolle === 'kind' && meineAufgaben.length > 0) {
+            rechnenStarten(startUm, effektiveDauerMs);
+          } else if (effektiveDauerMs) {
+            rundenUhrStarten(startUm, effektiveDauerMs);
           }
         }, 600);
       }
@@ -612,14 +763,16 @@
     if (bRichtig) bRichtig.style.width = `${pRichtig}%`;
     if (bFalsch) bFalsch.style.width = `${pFalsch}%`;
 
-    // Auch Mini-Leiste am Handy aktualisieren
-    if (rolle === 'kind' && meinTeilnehmer) {
-      if (id !== meinTeilnehmer.id) {
-        $('#leiste-gegner').textContent = `Gegner: ${richtig}`;
-        $('#balken-gegner').style.width = `${pRichtig}%`;
-      } else {
-        $('#leiste-ich').textContent = `Du: ${richtig}`;
-        $('#balken-ich').style.width = `${pRichtig}%`;
+    // Challenge-Anzeige am Handy aktualisieren
+    if (rolle === 'kind' && meinTeilnehmer && istChallengeModeAktiv() && spiel === meinSpielId) {
+      const eintrag = spielStaende.get(id);
+      if (eintrag) {
+        if (richtig > eintrag.richtig) eintrag.zuletzt = Date.now();
+        eintrag.richtig = richtig;
+        eintrag.falsch = falsch;
+        eintrag.index = index;
+        eintrag.fertig = Boolean(daten.fertig);
+        challengeAnzeigeAktualisieren();
       }
     }
   }
@@ -720,6 +873,14 @@
   }
 
   function rundenendeRendern(daten) {
+    countdownStoppen();
+    sperreAufheben();
+    spielStaende.clear();
+    challengeAnzeigeVerstecken();
+    antwortWarteschlange = [];
+    warteschlangeAktiv = false;
+    entscheidungSendet = false;
+    istEntscheidung = false;
     if (rundenLiveTimer) { clearInterval(rundenLiveTimer); rundenLiveTimer = null; }
     if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
     aktuellerZustand.phase = 'auswertung';
@@ -773,6 +934,14 @@
   }
 
   function turnierendeRendern(daten) {
+    countdownStoppen();
+    sperreAufheben();
+    spielStaende.clear();
+    challengeAnzeigeVerstecken();
+    antwortWarteschlange = [];
+    warteschlangeAktiv = false;
+    entscheidungSendet = false;
+    istEntscheidung = false;
     if (rundenLiveTimer) { clearInterval(rundenLiveTimer); rundenLiveTimer = null; }
     if (!aktuellerZustand) aktuellerZustand = { code: turnierCode };
     aktuellerZustand.phase = 'ende';
@@ -802,10 +971,160 @@
   // -------------------------------------------------------------------
   // Kind: Rechnen & Eingabe
   // -------------------------------------------------------------------
+  function gegnerBadgeVorbereiten() {
+    const badge = $('#turnier-gegner-badge');
+    gegnerEmoji = '';
+    if (!badge) return;
+    badge.textContent = istEntscheidung ? '⚡' : '';
+  }
+
+  function challengeAnzeigeVerstecken() {
+    const el = $('#challenge-anzeige');
+    if (el) {
+      el.classList.add('versteckt');
+      el.textContent = '';
+    }
+  }
+
+  function challengeAnzeigeAktualisieren() {
+    const el = $('#challenge-anzeige');
+    if (!el) return;
+    if (!istChallengeModeAktiv() || istEntscheidung || rolle !== 'kind' || !meinTeilnehmer || spielStaende.size < 2) {
+      challengeAnzeigeVerstecken();
+      return;
+    }
+
+    const zeitModus = istZeitModusAktiv();
+    if (spielStaende.size === 2) {
+      let gegner = null;
+      for (const eintrag of spielStaende.values()) {
+        if (eintrag.id !== meinTeilnehmer.id) {
+          gegner = eintrag;
+          break;
+        }
+      }
+      if (!gegner) {
+        challengeAnzeigeVerstecken();
+        return;
+      }
+      el.textContent = zeitModus
+        ? `⚔️ ${gegner.emoji} ${gegner.name}: ${gegner.richtig} richtig`
+        : `⚔️ ${gegner.emoji} ${gegner.name}: ${gegner.richtig} / ${rundeAufgabenAnzahl}${gegner.fertig ? ' ✓' : ''}`;
+      el.classList.remove('versteckt');
+      return;
+    }
+
+    const sortiert = Array.from(spielStaende.values()).sort((a, b) => {
+      if (b.richtig !== a.richtig) return b.richtig - a.richtig;
+      if (a.falsch !== b.falsch) return a.falsch - b.falsch;
+      return (a.zuletzt || 0) - (b.zuletzt || 0);
+    });
+    const bester = sortiert[0];
+    if (!bester || bester.richtig <= 0) {
+      el.textContent = '👑 Führend: –';
+    } else if (bester.id === meinTeilnehmer.id) {
+      el.textContent = `👑 Du führst! (${bester.richtig})`;
+    } else {
+      el.textContent = `👑 Führend: ${bester.emoji} ${bester.name} (${bester.richtig})`;
+    }
+    el.classList.remove('versteckt');
+  }
+
+  function challengeVorbereiten() {
+    spielStaende.clear();
+    if (!istChallengeModeAktiv() || istEntscheidung || rolle !== 'kind' || !meinTeilnehmer) {
+      challengeAnzeigeVerstecken();
+      return;
+    }
+    const runde = aktuellerZustand && aktuellerZustand.runde;
+    const sp = runde && runde.spiele
+      && runde.spiele.find((s) => (meinSpielId && s.id === meinSpielId) || (s.teilnehmer && s.teilnehmer.some((t) => t.id === meinTeilnehmer.id)));
+    if (sp && Array.isArray(sp.teilnehmer)) {
+      sp.teilnehmer.forEach((tn) => {
+        const st = (sp.stand && sp.stand[tn.id]) || {};
+        spielStaende.set(tn.id, {
+          id: tn.id,
+          name: tn.name || '-',
+          emoji: tn.emoji || '👤',
+          richtig: Number(st.richtig) || 0,
+          falsch: Number(st.falsch) || 0,
+          index: Number(st.index) || 0,
+          fertig: Boolean(st.fertigUm),
+          zuletzt: Number(st.letzterPunktUm) || 0,
+        });
+      });
+    }
+    challengeAnzeigeAktualisieren();
+  }
+
+  function rechnenVorbereiten() {
+    sperreAufheben();
+    antwortWarteschlange = [];
+    warteschlangeAktiv = false;
+    entscheidungSendet = false;
+    aktuelleEingabe = '';
+    clearTimeout(blitzTimer);
+    const karte = $('#aufgabe-karte');
+    if (karte) karte.classList.remove('ok', 'nok');
+    const b = $('#blitz');
+    if (b) b.className = 'blitz';
+
+    const einstellungen = (aktuellerZustand && aktuellerZustand.einstellungen) || {};
+    const zeitModus = istZeitModusAktiv();
+    rundeAufgabenAnzahl = Number(einstellungen.anzahl) || meineAufgaben.length || 10;
+
+    const fort = $('#fortschritt');
+    if (fort) {
+      if (istEntscheidung) {
+        fort.innerHTML = '<span class="entscheidung-hinweis">⚡ Entscheidung</span>';
+      } else if (!zeitModus && rundeAufgabenAnzahl <= 20) {
+        fort.innerHTML = Array.from({ length: rundeAufgabenAnzahl }, () => '<span class="punkt"></span>').join('');
+      } else {
+        fort.innerHTML = '<div class="balken"><div></div></div>';
+      }
+    }
+
+    const btnUeberspringen = $('#ueberspringen');
+    if (btnUeberspringen) {
+      btnUeberspringen.classList.toggle('unsichtbar', istEntscheidung);
+      btnUeberspringen.disabled = istEntscheidung;
+    }
+
+    gegnerBadgeVorbereiten();
+    challengeVorbereiten();
+  }
+
+  function rechnenStarten(startUm, dauerMs) {
+    countdownStoppen();
+    rechnenVorbereiten();
+    zeigeScreen('screen-rechnen');
+    aufgabeZeigen();
+    rundenUhrStarten(startUm, dauerMs);
+  }
+
+  function zaehlerAktualisieren() {
+    const el = $('#zaehler');
+    if (!el || tastaturGesperrt) return;
+    if (istEntscheidung) {
+      el.textContent = '⚡ Entscheidung – wer zuerst richtig rechnet, gewinnt!';
+    } else if (istZeitModusAktiv()) {
+      el.textContent = `✅ ${meinRichtig}   ❌ ${meinFalsch}`;
+    } else {
+      const gesamt = rundeAufgabenAnzahl || meineAufgaben.length;
+      el.textContent = `Aufgabe ${Math.min(aufgabenIndex + 1, gesamt)} von ${gesamt}`;
+    }
+  }
+
   function aufgabeZeigen() {
-    if (aufgabenIndex >= meineAufgaben.length) {
+    const zeitModus = istZeitModusAktiv();
+    if (!istEntscheidung && !zeitModus && aufgabenIndex >= rundeAufgabenAnzahl) {
       zeigeScreen('screen-warten');
       $('#warten-status').textContent = 'Du hast alle Aufgaben gelöst! Warte auf das Rundenende …';
+      return;
+    }
+    if (aufgabenIndex >= meineAufgaben.length) {
+      zeigeScreen('screen-warten');
+      $('#warten-status').textContent = 'Geschafft! Warte auf das Rundenende …';
       return;
     }
 
@@ -813,157 +1132,274 @@
     const auf = meineAufgaben[aufgabenIndex];
     if (!auf) return;
 
-    $('#teil-a').textContent = auf.a === null ? '__' : auf.a;
-    $('#teil-op').textContent = Aufgaben.ZEICHEN[auf.op] || auf.op;
-    $('#teil-b').textContent = auf.b === null ? '__' : auf.b;
-    $('#teil-c').textContent = auf.c === null ? '?' : auf.c;
+    const luecke = `<span class="luecke" id="luecke">${aktuelleEingabe}</span>`;
+    const zeichen = Aufgaben.ZEICHEN[auf.op] || auf.op;
+    const zahl = (n) => (n === null ? luecke : n);
+    const aufgEl = $('#aufgabe');
+    if (aufgEl) {
+      aufgEl.innerHTML = `${zahl(auf.a)} ${zeichen} ${zahl(auf.b)} = ${zahl(auf.c)}`;
+    }
 
-    // Lücke hervorheben
-    ['a', 'b', 'c'].forEach((x) => {
-      const el = $(`#teil-${x}`);
-      if (el) el.classList.toggle('luecke', auf.luecke === x);
-    });
+    if (!istEntscheidung && !zeitModus) {
+      $$('#fortschritt .punkt').forEach((p, i) => p.classList.toggle('jetzt', i === aufgabenIndex));
+      const balken = $('#fortschritt .balken');
+      if (balken && balken.firstElementChild && rundeAufgabenAnzahl > 0) {
+        balken.firstElementChild.style.width = `${(aufgabenIndex / rundeAufgabenAnzahl) * 100}%`;
+      }
+    }
 
-    const lueckeElem = $(`#teil-${auf.luecke}`);
-    if (lueckeElem) lueckeElem.textContent = '?';
-
-    $('#leiste-ich').textContent = `Du: ${aufgabenIndex}/${meineAufgaben.length}`;
+    zaehlerAktualisieren();
   }
 
-  async function zifferTippen(z) {
-    if (sendetGerade) return;
+  function blitz(ok) {
+    const b = $('#blitz');
+    const k = $('#aufgabe-karte');
+    if (b) {
+      b.className = `blitz ${ok ? 'ok' : 'nok'}`;
+      requestAnimationFrame(() => { b.className = 'blitz'; });
+    }
+    if (k) {
+      k.classList.remove('ok', 'nok');
+      k.classList.add(ok ? 'ok' : 'nok');
+      clearTimeout(blitzTimer);
+      blitzTimer = setTimeout(() => k.classList.remove('ok', 'nok'), 250);
+    }
+  }
+
+  function zifferTippen(z) {
+    if (tastaturGesperrt) return;
+    const screen = $('#screen-rechnen');
+    if (!screen || !screen.classList.contains('aktiv')) return;
+    if (istEntscheidung && entscheidungSendet) return;
+
     const auf = meineAufgaben[aufgabenIndex];
     if (!auf) return;
 
-    aktuelleEingabe += z;
-    const lueckeElem = $(`#teil-${auf.luecke}`);
-    if (lueckeElem) lueckeElem.textContent = aktuelleEingabe;
+    aktuelleEingabe += String(z);
+    const l = $('#luecke');
+    if (l) l.textContent = aktuelleEingabe;
 
     if (typeof Ton !== 'undefined') Ton.klick();
 
-    // Erst absenden, wenn alle Stellen eingegeben sind
-    if (aktuelleEingabe.length >= auf.stellen) {
-      const wert = aktuelleEingabe;
+    const zielStellen = Math.max(1, Number(auf.stellen) || 1);
+    if (aktuelleEingabe.length >= zielStellen) {
+      const wert = Number(aktuelleEingabe);
       aktuelleEingabe = '';
-      sendetGerade = true;
-      await antwortAbsenden(wert);
+      eingabeAbschicken(wert);
     }
   }
 
   function zifferZurueck() {
-    if (sendetGerade) return;
-    const auf = meineAufgaben[aufgabenIndex];
-    if (!auf || !aktuelleEingabe) return;
+    if (tastaturGesperrt) return;
+    const screen = $('#screen-rechnen');
+    if (!screen || !screen.classList.contains('aktiv')) return;
+    if (istEntscheidung && entscheidungSendet) return;
+    if (!aktuelleEingabe) return;
+
     aktuelleEingabe = aktuelleEingabe.slice(0, -1);
-    const lueckeElem = $(`#teil-${auf.luecke}`);
-    if (lueckeElem) lueckeElem.textContent = aktuelleEingabe || '?';
+    const l = $('#luecke');
+    if (l) l.textContent = aktuelleEingabe;
+  }
+
+  function aufgabeUeberspringen() {
+    if (tastaturGesperrt || istEntscheidung) return;
+    const screen = $('#screen-rechnen');
+    if (!screen || !screen.classList.contains('aktiv')) return;
+    const auf = meineAufgaben[aufgabenIndex];
+    if (!auf) return;
+
+    aktuelleEingabe = '';
+    if (typeof Ton !== 'undefined') Ton.klick();
+    eingabeAbschicken(null);
+  }
+
+  function eingabeAbschicken(wert) {
+    if (istEntscheidung) {
+      entscheidungSendet = true;
+      antwortWarteschlange.push({
+        spiel: meinSpielId,
+        index: aufgabenIndex,
+        wert,
+        entscheidung: true,
+      });
+      warteschlangeAbarbeiten();
+      return;
+    }
+
+    const index = aufgabenIndex;
+    aufgabenIndex++;
+    antwortWarteschlange.push({
+      spiel: meinSpielId,
+      index,
+      wert,
+      entscheidung: false,
+    });
+    warteschlangeAbarbeiten();
+
+    const zeitModus = istZeitModusAktiv();
+    if (!zeitModus && aufgabenIndex >= rundeAufgabenAnzahl) {
+      zeigeScreen('screen-warten');
+      $('#warten-status').textContent = 'Du hast alle Aufgaben gelöst! Warte auf das Rundenende …';
+    } else if (aufgabenIndex >= meineAufgaben.length) {
+      zeigeScreen('screen-warten');
+      $('#warten-status').textContent = 'Geschafft! Warte auf das Rundenende …';
+    } else {
+      aufgabeZeigen();
+    }
   }
 
   let sperreTimer = null;
+  function sperreAufheben() {
+    if (sperreTimer) {
+      clearInterval(sperreTimer);
+      sperreTimer = null;
+    }
+    tastaturGesperrt = false;
+    const tastatur = $('#tastatur');
+    if (tastatur) tastatur.classList.remove('gesperrt');
+  }
+
   function sperreAktivieren(sekunden) {
+    sperreAufheben();
+    tastaturGesperrt = true;
     const tastatur = $('#tastatur');
     if (tastatur) tastatur.classList.add('gesperrt');
-    const leisteIch = $('#leiste-ich');
-    let rest = sekunden;
-    if (leisteIch) leisteIch.textContent = `⏳ Sperre (${rest} s)`;
-    if (sperreTimer) clearInterval(sperreTimer);
+    const el = $('#zaehler');
+    let rest = Math.max(1, sekunden);
+    if (el) el.textContent = `⏳ Sperre (${rest} s)`;
     sperreTimer = setInterval(() => {
       rest--;
       if (rest > 0) {
-        if (leisteIch) leisteIch.textContent = `⏳ Sperre (${rest} s)`;
+        if (el) el.textContent = `⏳ Sperre (${rest} s)`;
       } else {
-        clearInterval(sperreTimer);
-        sperreTimer = null;
-        if (tastatur) tastatur.classList.remove('gesperrt');
-        if (leisteIch) leisteIch.textContent = '⚡ Entscheidung';
+        sperreAufheben();
+        zaehlerAktualisieren();
       }
     }, 1000);
   }
 
-  async function antwortAbsenden(wert) {
-    const index = aufgabenIndex;
-    const karte = $('#aufgabe-karte');
-
+  async function antwortSendenMitRetry(item, versuch = 0) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
     try {
-      const res = await fetch(`/api/turnier/${turnierCode}/antwort`, {
+      return await fetch(`/api/turnier/${turnierCode}/antwort`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${meinTeilnehmer.schluessel}`,
         },
         body: JSON.stringify({
-          spiel: meinSpielId,
-          index,
-          wert: Number(wert),
+          spiel: item.spiel,
+          index: item.index,
+          wert: item.wert,
         }),
+        signal: controller ? controller.signal : undefined,
       });
-
-      if (!res.ok) {
-        sendetGerade = false;
-        return;
+    } catch (err) {
+      if (versuch < 1 && item.spiel === meinSpielId && (!aktuellerZustand || aktuellerZustand.phase === 'laeuft' || aktuellerZustand.phase === 'entscheidung' || aktuellerZustand.phase === 'countdown')) {
+        return antwortSendenMitRetry(item, versuch + 1);
       }
-      const daten = await res.json();
+      throw err;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
 
-      if (daten.gesperrt) {
-        if (typeof Ton !== 'undefined') Ton.falsch();
-        karte.classList.add('nok');
-        sperreAktivieren(daten.restSek || 3);
-        if (daten.aufgabeNeu) {
-          meineAufgaben = [daten.aufgabeNeu];
-          aufgabenIndex = 0;
-        }
-        setTimeout(() => {
-          karte.classList.remove('nok');
-          aufgabeZeigen();
-          sendetGerade = false;
-        }, 300);
-        return;
-      }
+  async function warteschlangeAbarbeiten() {
+    if (warteschlangeAktiv) return;
+    warteschlangeAktiv = true;
 
-      if (daten.ignoriert) {
-        if (daten.fertig) {
-          zeigeScreen('screen-warten');
-          $('#warten-status').textContent = 'Du hast alle Aufgaben gelöst! Warte auf das Rundenende …';
-        } else if (typeof daten.aktuellerIndex === 'number') {
-          aufgabenIndex = daten.aktuellerIndex;
-          if (daten.naechste) {
-            meineAufgaben[aufgabenIndex] = daten.naechste;
+    try {
+      while (antwortWarteschlange.length > 0) {
+        const item = antwortWarteschlange.shift();
+        if (!item || !meinTeilnehmer || !turnierCode) continue;
+        if (item.spiel !== meinSpielId) continue;
+
+        try {
+          const res = await antwortSendenMitRetry(item);
+          if (!res.ok) {
+            if (item.entscheidung) {
+              entscheidungSendet = false;
+              aufgabeZeigen();
+            }
+            continue;
           }
-          if (daten.fertig || aufgabenIndex >= meineAufgaben.length) {
+
+          const daten = await res.json();
+          if (item.spiel !== meinSpielId) continue;
+
+          if (daten.gesperrt) {
+            if (typeof Ton !== 'undefined') Ton.falsch();
+            blitz(false);
+            if (daten.aufgabeNeu) {
+              meineAufgaben = [daten.aufgabeNeu];
+              aufgabenIndex = 0;
+            }
+            sperreAktivieren(daten.restSek || 3);
+            if (item.entscheidung) {
+              entscheidungSendet = false;
+              aufgabeZeigen();
+            }
+            continue;
+          }
+
+          if (daten.ignoriert) {
+            if (daten.fertig) {
+              zeigeScreen('screen-warten');
+              $('#warten-status').textContent = 'Du hast alle Aufgaben gelöst! Warte auf das Rundenende …';
+            } else if (antwortWarteschlange.length === 0 && typeof daten.aktuellerIndex === 'number') {
+              aufgabenIndex = daten.aktuellerIndex;
+              if (daten.naechste) meineAufgaben[aufgabenIndex] = daten.naechste;
+              if (aufgabenIndex >= meineAufgaben.length) {
+                zeigeScreen('screen-warten');
+                $('#warten-status').textContent = 'Geschafft! Warte auf das Rundenende …';
+              } else if ($('#screen-rechnen').classList.contains('aktiv')) {
+                aufgabeZeigen();
+              }
+            }
+            if (item.entscheidung) entscheidungSendet = false;
+            continue;
+          }
+
+          if (daten.richtig === true) {
+            meinRichtig++;
+            if (typeof Ton !== 'undefined') Ton.richtig();
+            blitz(true);
+          } else if (daten.richtig === false) {
+            meinFalsch++;
+            if (typeof Ton !== 'undefined') Ton.falsch();
+            blitz(false);
+          }
+
+          if (!item.entscheidung && !istZeitModusAktiv()) {
+            const p = $$('#fortschritt .punkt')[item.index];
+            if (p) p.classList.add(daten.richtig ? 'richtig' : 'falsch');
+          }
+          if (istZeitModusAktiv() && $('#screen-rechnen').classList.contains('aktiv')) {
+            zaehlerAktualisieren();
+          }
+
+          if (daten.naechste && typeof daten.index === 'number') {
+            meineAufgaben[daten.index] = daten.naechste;
+          }
+
+          if (daten.entscheidungGewonnen || daten.fertig) {
             zeigeScreen('screen-warten');
-            $('#warten-status').textContent = 'Geschafft! Warte auf das Rundenende …';
-          } else {
+            $('#warten-status').textContent = daten.entscheidungGewonnen
+              ? 'Geschafft! Auswertung läuft …'
+              : 'Du hast alle Aufgaben gelöst! Warte auf das Rundenende …';
+          }
+          if (item.entscheidung) entscheidungSendet = false;
+        } catch (err) {
+          if (item.entscheidung) {
+            entscheidungSendet = false;
             aufgabeZeigen();
           }
         }
-        sendetGerade = false;
-        return;
       }
-
-      if (daten.richtig === true) {
-        if (typeof Ton !== 'undefined') Ton.richtig();
-        karte.classList.add('ok');
-      } else if (daten.richtig === false) {
-        if (typeof Ton !== 'undefined') Ton.falsch();
-        karte.classList.add('nok');
-      }
-
-      setTimeout(() => {
-        karte.classList.remove('ok', 'nok');
-        aufgabenIndex++;
-        if (daten.naechste) {
-          meineAufgaben[aufgabenIndex] = daten.naechste;
-        }
-        if (daten.fertig || aufgabenIndex >= meineAufgaben.length) {
-          zeigeScreen('screen-warten');
-          $('#warten-status').textContent = 'Geschafft! Warte auf das Rundenende …';
-        } else {
-          aufgabeZeigen();
-        }
-        sendetGerade = false;
-      }, 150);
-    } catch (e) {
-      sendetGerade = false;
+    } finally {
+      warteschlangeAktiv = false;
+      entscheidungSendet = false;
     }
   }
 
@@ -1070,6 +1506,87 @@
     } catch (e) {}
   }
 
+  function leitungStorageLoeschen() {
+    try {
+      localStorage.removeItem('turnier-leitung');
+      sessionStorage.removeItem('turnier-leitung');
+    } catch (e) {}
+  }
+
+  async function turnierExistenzPruefen(code) {
+    if (!code) return 'nicht_gefunden';
+    try {
+      const res = await fetch(`/api/turnier/${encodeURIComponent(code)}`, { cache: 'no-store' });
+      if (res.status === 404) return 'nicht_gefunden';
+      return res.ok ? 'ok' : 'netzwerk';
+    } catch (e) {
+      return 'netzwerk';
+    }
+  }
+
+  function allesZuruecksetzen(zuBeitritt = false, hinweis = '') {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    if (rundenLiveTimer) {
+      clearInterval(rundenLiveTimer);
+      rundenLiveTimer = null;
+    }
+    countdownStoppen();
+    sperreAufheben();
+    spielStaende.clear();
+    challengeAnzeigeVerstecken();
+    antwortWarteschlange = [];
+    warteschlangeAktiv = false;
+    entscheidungSendet = false;
+    istEntscheidung = false;
+
+    const offlineBalken = $('#offline-balken');
+    if (offlineBalken) offlineBalken.classList.add('versteckt');
+
+    leitungStorageLoeschen();
+    storageLoeschen();
+
+    rolle = 'gast';
+    turnierCode = null;
+    leitungSchluessel = null;
+    meinTeilnehmer = null;
+    aktuellerZustand = null;
+    meinSpielId = null;
+    meineAufgaben = [];
+    aufgabenIndex = 0;
+    aktuelleEingabe = '';
+
+    if (location.hash) {
+      try {
+        history.replaceState(null, '', '/turnier');
+      } catch (e) {
+        location.hash = '';
+      }
+    }
+
+    if (zuBeitritt) {
+      const codeBox = $('#box-code-eingabe');
+      if (codeBox) codeBox.classList.remove('versteckt');
+      const codeEingabe = $('#kind-code');
+      if (codeEingabe) codeEingabe.value = '';
+      const fehlerBox = $('#beitritt-fehler');
+      if (fehlerBox) {
+        if (hinweis) {
+          fehlerBox.textContent = hinweis;
+          fehlerBox.classList.remove('versteckt');
+        } else {
+          fehlerBox.textContent = '';
+          fehlerBox.classList.add('versteckt');
+        }
+      }
+      zeigeScreen('screen-beitreten');
+    } else {
+      zeigeScreen('screen-erstellen');
+    }
+  }
+
   async function appStarten() {
     initKatalog();
     initEmojiRaster();
@@ -1081,38 +1598,59 @@
       $('#feld-zeit').classList.toggle('versteckt', !zeit);
     });
 
-    // Tastatur-Events (Kind)
-    $('#tastatur').addEventListener('pointerdown', (ev) => {
+    // Tastatur-Events (Kind) – identisch zu app.js mit Touch/Pointer-Fallback
+    const tastaturEl = $('#tastatur');
+    function tasteVerarbeiten(btn) {
+      if (!btn) return;
+      if (btn.id === 'ueberspringen') {
+        aufgabeUeberspringen();
+      } else if (btn.id === 'zurueck') {
+        zifferZurueck();
+      } else if (btn.dataset.z !== undefined) {
+        zifferTippen(btn.dataset.z);
+      }
+    }
+
+    if ('PointerEvent' in window) {
+      tastaturEl.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+        const btn = ev.target.closest('button');
+        if (!btn) return;
+        ev.preventDefault();
+        tasteVerarbeiten(btn);
+      });
+    } else {
+      tastaturEl.addEventListener('touchstart', (ev) => {
+        const btn = ev.target.closest('button');
+        if (!btn) return;
+        ev.preventDefault();
+        tasteVerarbeiten(btn);
+      }, { passive: false });
+      tastaturEl.addEventListener('mousedown', (ev) => {
+        if (ev.button !== 0) return;
+        const btn = ev.target.closest('button');
+        if (!btn) return;
+        ev.preventDefault();
+        tasteVerarbeiten(btn);
+      });
+    }
+
+    // Tastaturbedienung per Fokus + Enter/Leertaste (Barrierefreiheit)
+    tastaturEl.addEventListener('click', (ev) => {
+      if (ev.detail !== 0) return;
       const btn = ev.target.closest('button');
       if (!btn) return;
-      ev.preventDefault();
-      const z = btn.dataset.z;
-      if (z !== undefined) {
-        zifferTippen(z);
-      } else if (btn.id === 'btn-zurueck') {
-        zifferZurueck();
-      } else if (btn.id === 'btn-ok') {
-        if (aktuelleEingabe) {
-          const w = aktuelleEingabe;
-          aktuelleEingabe = '';
-          antwortAbsenden(w);
-        }
-      }
+      tasteVerarbeiten(btn);
     });
 
     // Physische Tastatur unterstützen
-    window.addEventListener('keydown', (ev) => {
+    document.addEventListener('keydown', (ev) => {
       if (!$('#screen-rechnen').classList.contains('aktiv')) return;
-      if (ev.key >= '0' && ev.key <= '9') {
+      if (/^[0-9]$/.test(ev.key)) {
         zifferTippen(ev.key);
       } else if (ev.key === 'Backspace') {
+        ev.preventDefault();
         zifferZurueck();
-      } else if (ev.key === 'Enter') {
-        if (aktuelleEingabe) {
-          const w = aktuelleEingabe;
-          aktuelleEingabe = '';
-          antwortAbsenden(w);
-        }
       }
     });
 
@@ -1125,6 +1663,7 @@
       }
       const titel = $('#turnier-titel').value.trim();
       const einsetzen = $('#turnier-einsetzen').checked;
+      const challengeMode = Boolean($('#turnier-challenge') && $('#turnier-challenge').checked);
       const art = $('#turnier-art').value;
       const anzahl = Number($('#turnier-anzahl').value);
       const sekunden = Number($('#turnier-sekunden').value);
@@ -1136,7 +1675,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             titel,
-            einstellungen: { uebungen, einsetzen, art, anzahl, sekunden, format },
+            einstellungen: { uebungen, einsetzen, challengeMode, art, anzahl, sekunden, format },
           }),
         });
         if (!res.ok) throw new Error('Fehler beim Anlegen');
@@ -1163,13 +1702,35 @@
     $('#btn-runde-abbrechen').addEventListener('click', () => befehlSenden('abbrechen'));
     $('#btn-naechste-runde').addEventListener('click', () => befehlSenden('naechste'));
     $('#btn-neues-turnier-gleiche').addEventListener('click', () => befehlSenden('neues_turnier'));
-    $('#btn-turnier-beenden').addEventListener('click', () => {
-      if (confirm('Turnier wirklich beenden?')) {
-        localStorage.removeItem('turnier-leitung');
-        sessionStorage.removeItem('turnier-leitung');
-        location.href = '/turnier';
+
+    const ladenResetBtn = $('#btn-laden-reset');
+    if (ladenResetBtn) {
+      ladenResetBtn.addEventListener('click', () => allesZuruecksetzen(false));
+    }
+
+    function leitungTurnierZuruecksetzen() {
+      if (confirm('Turnier wirklich beenden und ein neues anlegen?')) {
+        allesZuruecksetzen(false);
       }
+    }
+    $$('.btn-turnier-reset').forEach((btn) => btn.addEventListener('click', leitungTurnierZuruecksetzen));
+    $('#btn-turnier-beenden').addEventListener('click', leitungTurnierZuruecksetzen);
+
+    $$('.btn-kind-verlassen').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Turnier wirklich verlassen?')) return;
+        if (turnierCode && meinTeilnehmer && meinTeilnehmer.schluessel) {
+          try {
+            await fetch(`/api/turnier/${encodeURIComponent(turnierCode)}/verlassen`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${meinTeilnehmer.schluessel}` },
+            });
+          } catch (e) {}
+        }
+        allesZuruecksetzen(true);
+      });
     });
+
     $('#btn-drucken').addEventListener('click', () => window.print());
 
     $('#btn-fullscreen').addEventListener('click', () => {
@@ -1241,26 +1802,53 @@
       turnierCode = hash;
       const gespeichertesKind = storageLaden('teilnehmer');
       if (gespeichertesKind && gespeichertesKind.code === turnierCode) {
-        meinTeilnehmer = gespeichertesKind;
-        rolle = 'kind';
-        sseVerbinden(turnierCode, meinTeilnehmer.schluessel);
+        const status = await turnierExistenzPruefen(turnierCode);
+        if (status === 'nicht_gefunden') {
+          allesZuruecksetzen(true, 'Dieses Turnier existiert nicht mehr – gib einen neuen Code ein.');
+        } else {
+          meinTeilnehmer = gespeichertesKind;
+          rolle = 'kind';
+          sseVerbinden(turnierCode, meinTeilnehmer.schluessel);
+        }
       } else if (istZuschauer) {
-        rolle = 'zuschauer';
-        sseVerbinden(turnierCode, null);
+        const status = await turnierExistenzPruefen(turnierCode);
+        if (status === 'nicht_gefunden') {
+          allesZuruecksetzen(true, 'Dieses Turnier existiert nicht mehr.');
+        } else {
+          rolle = 'zuschauer';
+          sseVerbinden(turnierCode, null);
+        }
       } else {
         // Neu beitreten
-        $('#kind-code').value = turnierCode;
-        $('#box-code-eingabe').classList.add('versteckt');
-        zeigeScreen('screen-beitreten');
+        const status = await turnierExistenzPruefen(turnierCode);
+        if (status === 'nicht_gefunden') {
+          $('#kind-code').value = '';
+          $('#box-code-eingabe').classList.remove('versteckt');
+          const fehlerBox = $('#beitritt-fehler');
+          if (fehlerBox) {
+            fehlerBox.textContent = 'Dieses Turnier existiert nicht mehr – gib einen neuen Code ein.';
+            fehlerBox.classList.remove('versteckt');
+          }
+          zeigeScreen('screen-beitreten');
+        } else {
+          $('#kind-code').value = turnierCode;
+          $('#box-code-eingabe').classList.add('versteckt');
+          zeigeScreen('screen-beitreten');
+        }
       }
     } else {
       // Kein Hash: Prüfen, ob wir eine aktive Leitungssitzung haben
       const gespeicherteLeitung = storageLaden('leitung');
       if (gespeicherteLeitung && gespeicherteLeitung.code && gespeicherteLeitung.leitung) {
-        turnierCode = gespeicherteLeitung.code;
-        leitungSchluessel = gespeicherteLeitung.leitung;
-        rolle = 'leitung';
-        sseVerbinden(turnierCode, leitungSchluessel);
+        const status = await turnierExistenzPruefen(gespeicherteLeitung.code);
+        if (status === 'nicht_gefunden') {
+          allesZuruecksetzen(false);
+        } else {
+          turnierCode = gespeicherteLeitung.code;
+          leitungSchluessel = gespeicherteLeitung.leitung;
+          rolle = 'leitung';
+          sseVerbinden(turnierCode, leitungSchluessel);
+        }
       } else {
         zeigeScreen('screen-erstellen');
       }

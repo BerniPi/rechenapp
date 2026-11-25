@@ -4,12 +4,12 @@
 .turnier-body {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
+  min-height: 100%;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg, #f4f6f9);
-  color: var(--text, #1e293b);
-  font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -41,8 +41,10 @@
   padding: 0.6rem;
   font-weight: bold;
   font-size: 0.95rem;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
@@ -459,16 +461,6 @@
   font-weight: bold;
 }
 
-.leiste-uhr {
-  font-family: monospace;
-  font-weight: bold;
-  background: #1e293b;
-  color: #38bdf8;
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.4rem;
-  font-size: 0.9rem;
-}
-
 .duell-balken-mitte {
   display: flex;
   align-items: center;
@@ -586,122 +578,132 @@
 .turnier-tabelle th { background: #f8fafc; font-weight: 600; text-align: left; }
 
 /* ========================================================
-   HANDY-RECHEN-ANSICHT (KIND)
+   HANDY-RECHEN-ANSICHT (KIND) – nutzt Layout & Tastatur aus style.css
    ======================================================== */
-.rechnen-layout {
+body.rechnen-aktiv {
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+body.rechnen-aktiv #app-container {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#screen-rechnen.aktiv {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  max-width: 820px;
+  margin: 0 auto;
   overflow: hidden;
-  box-sizing: border-box;
 }
 
-.gegner-leiste {
-  display: flex;
+.gegner-badge {
+  background: var(--karte);
+  box-shadow: var(--schatten);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  font-size: 18px;
+  min-height: 44px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 1rem;
-  background: white;
-  border-bottom: 2px solid #e2e8f0;
-  font-size: 1rem;
-  font-weight: 600;
+  gap: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.mini-fortschritt {
-  flex: 1;
-  max-width: 140px;
-  height: 12px;
-  background: #f1f5f9;
-  border-radius: 6px;
-  overflow: hidden;
-  display: flex;
-  margin: 0 0.8rem;
+.gegner-badge:empty {
+  visibility: hidden;
+  padding: 0;
+  min-width: 44px;
+  box-shadow: none;
+  background: transparent;
 }
 
-.mini-balken.gruen { background: #22c55e; }
-.mini-balken.blau { background: #3b82f6; }
-
-.rechnen-mitte {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.aufgabe-karte {
-  background: white;
-  border-radius: 1.5rem;
-  padding: 2rem 2.5rem;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
-  font-size: 2.8rem;
-  font-weight: bold;
-  letter-spacing: 0.1rem;
-  transition: all 0.15s;
-}
-
-.aufgabe-karte.ok {
-  background: #dcfce7;
-  border: 3px solid #22c55e;
-}
-
-.aufgabe-karte.nok {
-  background: #fee2e2;
-  border: 3px solid #ef4444;
-}
-
-.luecke {
-  display: inline-block;
-  min-width: 1.8ch;
-  border-bottom: 4px solid #3b82f6;
-  color: #2563eb;
+.entscheidung-hinweis {
+  font-weight: 900;
+  color: var(--blau);
+  font-size: 18px;
   text-align: center;
 }
 
-/* Bildschirmtastatur */
-.tastatur {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  padding: 0.8rem;
-  background: white;
-  border-top: 2px solid #e2e8f0;
+.challenge-anzeige {
+  align-self: center;
+  max-width: 100%;
+  background: var(--karte);
+  color: var(--text);
+  box-shadow: var(--schatten);
+  border-radius: 999px;
+  padding: 6px 16px;
+  margin: 0 0 8px;
+  font-weight: 800;
+  font-size: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
-
-.tastatur button {
-  height: 64px;
-  font-size: 1.8rem;
-  font-weight: bold;
-  border: none;
-  border-radius: 0.8rem;
-  background: #f1f5f9;
-  color: #1e293b;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: background 0.1s, transform 0.05s;
-}
-
-.tastatur button:active {
-  background: #cbd5e1;
-  transform: scale(0.96);
-}
-
-.tastatur .nebenknopf {
-  font-size: 1.5rem;
-  color: #64748b;
-  background: #e2e8f0;
-}
-
-.tastatur .ok-knopf {
-  background: #22c55e;
-  color: white;
-}
-.tastatur .ok-knopf:active { background: #16a34a; }
 
 .tastatur.gesperrt {
   pointer-events: none;
   opacity: 0.35;
+}
+
+@media (max-height: 640px) {
+  #screen-rechnen.aktiv {
+    padding: max(8px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom));
+  }
+  #screen-rechnen .runde-kopf {
+    margin-bottom: 6px;
+  }
+  #screen-rechnen .aufgabe-karte {
+    padding: 14px 10px 8px;
+    margin: 4px 0 8px;
+  }
+  #screen-rechnen .challenge-anzeige {
+    padding: 4px 12px;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  #screen-rechnen .tastatur {
+    gap: 8px;
+  }
+  #screen-rechnen .tastatur button {
+    min-height: clamp(50px, 10dvh, 72px);
+  }
+}
+
+@media (max-height: 500px) {
+  #screen-rechnen .aufgabe-karte {
+    padding: 8px 8px 6px;
+    margin: 2px 0 6px;
+  }
+  #screen-rechnen .aufgabe {
+    font-size: clamp(32px, 10vw, 56px);
+  }
+  #screen-rechnen .challenge-anzeige {
+    padding: 3px 10px;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  #screen-rechnen .tastatur {
+    gap: 6px;
+  }
+  #screen-rechnen .tastatur button {
+    min-height: clamp(42px, 9.5dvh, 58px);
+    font-size: clamp(24px, 6vw, 34px);
+  }
+  #screen-rechnen .tastatur .nebenknopf {
+    font-size: 22px;
+  }
 }
 
 /* Druck-Stylesheet für die Siegerehrung der Lehrkraft */

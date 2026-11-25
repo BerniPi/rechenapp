@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Turnier · RechenArena</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/turnier.css">
@@ -20,6 +20,7 @@
       <div class="turnier-karte text-mitte">
         <div class="spin-emoji">🏆</div>
         <h2>Lade Turniermodus …</h2>
+        <button id="btn-laden-reset" class="knopf klein grau mt-2">Abbrechen / Zurücksetzen</button>
       </div>
     </section>
 
@@ -45,6 +46,13 @@
           <label class="checkbox-label">
             <input type="checkbox" id="turnier-einsetzen">
             <span>Einsetzaufgaben einbeziehen (z. B. 3 + __ = 8)</span>
+          </label>
+        </div>
+
+        <div class="feld-gruppe">
+          <label class="checkbox-label">
+            <input type="checkbox" id="turnier-challenge">
+            <span>Challenge-Mode (zeigt beim Rechnen den Stand des Gegners bzw. Führenden)</span>
           </label>
         </div>
 
@@ -107,6 +115,7 @@
           <div class="beamer-aktionen">
             <button id="btn-fullscreen" class="knopf klein grau" title="Vollbild">⛶ Vollbild</button>
             <button id="btn-beitritt-toggle" class="knopf klein gruen">Beitritt: Offen</button>
+            <button class="knopf klein rot btn-turnier-reset" title="Turnier beenden und neu starten">Turnier beenden</button>
           </div>
         </header>
 
@@ -143,6 +152,7 @@
           </div>
           <div class="beamer-aktionen">
             <button id="btn-neu-mischen" class="knopf grau">🎲 Neu mischen</button>
+            <button class="knopf klein rot btn-turnier-reset" title="Turnier beenden und neu starten">Turnier beenden</button>
           </div>
         </header>
 
@@ -190,6 +200,7 @@
           </div>
           <div class="beamer-aktionen">
             <button id="btn-naechste-runde" class="knopf riesig gruen">Nächste Runde ➔</button>
+            <button class="knopf klein rot btn-turnier-reset" title="Turnier beenden und neu starten">Turnier beenden</button>
           </div>
         </header>
 
@@ -283,48 +294,30 @@
           <div id="warten-gegner-info" class="gegner-box versteckt"></div>
         </div>
         <p id="warten-zaehler" class="grau klein mt-2">Du bist dabei!</p>
+        <button class="knopf klein grau mt-2 btn-kind-verlassen">Turnier verlassen</button>
       </div>
     </section>
 
     <!-- ============ KIND: RECHNEN ============ -->
     <section id="screen-rechnen" class="screen">
-      <div class="rechnen-layout">
-        <!-- Blitz-Effekt bei richtig / falsch -->
-        <div id="blitz" class="blitz"></div>
+      <header class="kopf runde-kopf">
+        <div id="turnier-gegner-badge" class="gegner-badge" aria-live="polite"></div>
+        <div id="fortschritt" class="fortschritt"></div>
+        <div id="uhr" class="uhr">0:00</div>
+      </header>
 
-        <!-- Gegner-Leiste oben -->
-        <div id="kind-gegner-leiste" class="gegner-leiste">
-          <span id="leiste-ich">Du: 0</span>
-          <div class="mini-fortschritt">
-            <div id="balken-ich" class="mini-balken gruen" style="width: 0%"></div>
-            <div id="balken-gegner" class="mini-balken blau" style="width: 0%"></div>
-          </div>
-          <span id="leiste-gegner">Gegner: 0</span>
-          <span id="leiste-uhr" class="leiste-uhr"></span>
-        </div>
+      <div id="aufgabe-karte" class="aufgabe-karte">
+        <div id="aufgabe" class="aufgabe"></div>
+        <div id="zaehler" class="zaehler"></div>
+      </div>
 
-        <!-- Aufgaben-Karte -->
-        <div class="rechnen-mitte">
-          <div id="aufgabe-karte" class="aufgabe-karte">
-            <div id="turnier-aufgabe" class="aufgabe-anzeige">
-              <span id="teil-a">?</span>
-              <span id="teil-op">+</span>
-              <span id="teil-b">?</span>
-              <span id="teil-gleich">=</span>
-              <span id="teil-c" class="luecke">?</span>
-            </div>
-          </div>
-        </div>
+      <div id="challenge-anzeige" class="challenge-anzeige versteckt" aria-live="polite"></div>
 
-        <!-- Bildschirmtastatur unten -->
-        <div id="tastatur" class="tastatur">
-          <button data-z="7">7</button><button data-z="8">8</button><button data-z="9">9</button>
-          <button data-z="4">4</button><button data-z="5">5</button><button data-z="6">6</button>
-          <button data-z="1">1</button><button data-z="2">2</button><button data-z="3">3</button>
-          <button id="btn-zurueck" class="nebenknopf" aria-label="Letzte Ziffer löschen">⌫</button>
-          <button data-z="0">0</button>
-          <button id="btn-ok" class="nebenknopf ok-knopf" aria-label="Eingabe bestätigen">✓</button>
-        </div>
+      <div id="tastatur" class="tastatur">
+        <button data-z="7">7</button><button data-z="8">8</button><button data-z="9">9</button>
+        <button data-z="4">4</button><button data-z="5">5</button><button data-z="6">6</button>
+        <button data-z="1">1</button><button data-z="2">2</button><button data-z="3">3</button>
+        <button id="zurueck" class="nebenknopf" aria-label="Letzte Ziffer löschen">⌫<small>Zurück</small></button><button data-z="0">0</button><button id="ueberspringen" class="nebenknopf ueberspringen" aria-label="Überspringen">⏭️<small>Überspringen</small></button>
       </div>
     </section>
 
@@ -338,10 +331,13 @@
         <div id="kind-ergebnis-details" class="status-kasten mt-2"></div>
 
         <button id="btn-kind-weiter" class="knopf gruen mt-2">Zum Wartebereich ➔</button>
+        <button class="knopf klein grau mt-2 btn-kind-verlassen">Turnier verlassen</button>
       </div>
     </section>
 
   </main>
+
+  <div id="blitz" class="blitz"></div>
 
   <script src="/vendor/qrcode.js"></script>
   <script src="/js/aufgaben.js"></script>

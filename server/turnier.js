@@ -59,6 +59,7 @@ function einstellungenNormalisieren(e = {}) {
     gruppenRunden,
     weiterProGruppe,
     platz3: e.platz3 !== false,
+    challengeMode: Boolean(e.challengeMode),
   };
 }
 
@@ -1230,7 +1231,7 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
       };
     }
 
-    const istRichtig = Number(wert) === spiel.entscheidung.aufgabe.loesung;
+    const istRichtig = wert !== null && wert !== '' && Number.isFinite(Number(wert)) && Number(wert) === spiel.entscheidung.aufgabe.loesung;
     if (istRichtig) {
       spiel.entscheidung.geloestVon = tn.id;
       spiel.ergebnis = wertungSpiel(spiel, t.einstellungen.art, t.einstellungen, runde.start, runde.dauerMs);
@@ -1325,7 +1326,7 @@ function antworten(t, teilnehmerSchluessel, { spiel: spielId, index, wert }, jet
     return { ignoriert: true, fertig: true, richtig: null, naechste: null };
   }
 
-  const istRichtig = Number(wert) === aufgabe.loesung;
+  const istRichtig = wert !== null && wert !== '' && Number.isFinite(Number(wert)) && Number(wert) === aufgabe.loesung;
   if (istRichtig) {
     st.richtig++;
     st.letzterPunktUm = jetzt;
