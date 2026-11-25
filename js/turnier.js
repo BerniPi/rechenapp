@@ -487,7 +487,7 @@
   // Teilnehmerliste & Chips
   // -------------------------------------------------------------------
   function wartenZaehlerText(n) {
-    return n === 1 ? '1 Kind ist dabei' : `${n} Kinder sind dabei`;
+    return n === 1 ? '1 Teilnehmer ist dabei' : `${n} Teilnehmer sind dabei`;
   }
 
   function teilnehmerRendern(teilnehmer) {
@@ -498,7 +498,7 @@
     }
     const raster = $('#lobby-teilnehmer-raster');
     const zaehler = $('#lobby-zaehler');
-    if (zaehler) zaehler.textContent = `${teilnehmer.length} ${teilnehmer.length === 1 ? 'Kind' : 'Kinder'} da`;
+    if (zaehler) zaehler.textContent = `${teilnehmer.length} Teilnehmer da`;
     if ($('#btn-turnier-starten')) {
       $('#btn-turnier-starten').disabled = teilnehmer.length < 2;
     }
@@ -1566,6 +1566,14 @@
       }
     }
 
+    const startCode = $('#start-code-eingabe');
+    if (startCode) startCode.value = '';
+    const startCodeFehler = $('#start-code-fehler');
+    if (startCodeFehler) {
+      startCodeFehler.textContent = '';
+      startCodeFehler.classList.add('versteckt');
+    }
+
     if (zuBeitritt) {
       const codeBox = $('#box-code-eingabe');
       if (codeBox) codeBox.classList.remove('versteckt');
@@ -1790,6 +1798,59 @@
     $('#btn-kind-weiter').addEventListener('click', () => {
       zeigeScreen('screen-warten');
     });
+
+    async function mitCodeWeiter() {
+      const codeInput = $('#start-code-eingabe');
+      const fehlerBox = $('#start-code-fehler');
+      const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
+      if (code.length !== 4) {
+        if (fehlerBox) {
+          fehlerBox.textContent = 'Bitte einen 4-stelligen Turnier-Code eingeben.';
+          fehlerBox.classList.remove('versteckt');
+        }
+        return;
+      }
+      const status = await turnierExistenzPruefen(code);
+      if (status === 'nicht_gefunden') {
+        if (fehlerBox) {
+          fehlerBox.textContent = 'Turnier mit diesem Code nicht gefunden.';
+          fehlerBox.classList.remove('versteckt');
+        }
+        return;
+      }
+      if (fehlerBox) {
+        fehlerBox.textContent = '';
+        fehlerBox.classList.add('versteckt');
+      }
+      turnierCode = code;
+      if ($('#kind-code')) $('#kind-code').value = code;
+      if ($('#box-code-eingabe')) $('#box-code-eingabe').classList.remove('versteckt');
+      const beitrittFehler = $('#beitritt-fehler');
+      if (beitrittFehler) {
+        beitrittFehler.textContent = '';
+        beitrittFehler.classList.add('versteckt');
+      }
+      try {
+        history.replaceState(null, '', `/turnier#${code}`);
+      } catch (e) {
+        location.hash = `#${code}`;
+      }
+      zeigeScreen('screen-beitreten');
+      if ($('#kind-name')) $('#kind-name').focus();
+    }
+
+    const btnMitCodeWeiter = $('#btn-mit-code-weiter');
+    if (btnMitCodeWeiter) btnMitCodeWeiter.addEventListener('click', mitCodeWeiter);
+    const startCodeEingabe = $('#start-code-eingabe');
+    if (startCodeEingabe) {
+      startCodeEingabe.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') mitCodeWeiter();
+      });
+    }
+    const btnBeitrittZurueck = $('#btn-beitritt-zurueck');
+    if (btnBeitrittZurueck) {
+      btnBeitrittZurueck.addEventListener('click', () => allesZuruecksetzen(false));
+    }
 
     // -----------------------------------------------------------------
     // Routing beim Laden

@@ -113,6 +113,37 @@
   text-transform: uppercase;
 }
 
+.beitreten-schnell h2 {
+  margin: 0 0 0.8rem 0;
+  font-size: 1.35rem;
+}
+
+.code-beitritt-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  align-items: stretch;
+}
+
+.code-beitritt-zeile input[type="text"] {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 0.65rem 1rem;
+  border: 2px solid #cbd5e1;
+  border-radius: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.code-beitritt-zeile input[type="text"]:focus {
+  border-color: #3b82f6;
+}
+
+.beitreten-schnell .fehlermeldung {
+  margin-top: 0.8rem;
+  margin-bottom: 0;
+}
+
 .checkbox-label {
   flex-direction: row !important;
   align-items: center;

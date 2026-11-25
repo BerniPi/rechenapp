@@ -26,6 +26,15 @@
 
     <!-- ============ LEHRKRAFT: TURNIER ERSTELLEN ============ -->
     <section id="screen-erstellen" class="screen">
+      <div class="turnier-karte breite-box beitreten-schnell">
+        <h2>👋 Einem Turnier beitreten</h2>
+        <div class="code-beitritt-zeile">
+          <input type="text" id="start-code-eingabe" class="grosser-code" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="4-stelliger Turnier-Code">
+          <button id="btn-mit-code-weiter" class="knopf gross blau">Mitmachen ➔</button>
+        </div>
+        <div id="start-code-fehler" class="fehlermeldung versteckt"></div>
+      </div>
+
       <div class="turnier-karte breite-box">
         <h1>🏆 Neues Turnier</h1>
         <p class="untertitel">Veranstalte ein Rechen-Turnier in der Klasse. Ohne Anmeldung, ohne Installation.</p>
@@ -128,7 +137,7 @@
           <div class="lobby-teilnehmer-kasten">
             <div class="teilnehmer-kopf">
               <h2>Mitspieler</h2>
-              <span id="lobby-zaehler" class="zaehler-badge">0 Kinder da</span>
+              <span id="lobby-zaehler" class="zaehler-badge">0 Teilnehmer da</span>
             </div>
             <div id="lobby-teilnehmer-raster" class="kinder-raster">
               <!-- Dynamisch mit Emojis und Namen -->
@@ -249,7 +258,7 @@
 
         <footer class="beamer-fuss">
           <button id="btn-drucken" class="knopf blau">🖨️ Ergebnis drucken / PDF</button>
-          <button id="btn-neues-turnier-gleiche" class="knopf gruen">Neues Turnier mit denselben Kindern 🔄</button>
+          <button id="btn-neues-turnier-gleiche" class="knopf gruen">Neues Turnier mit denselben Teilnehmern 🔄</button>
           <button id="btn-turnier-beenden" class="knopf grau">Turnier beenden</button>
         </footer>
       </div>
@@ -281,6 +290,7 @@
         <div id="beitritt-fehler" class="fehlermeldung versteckt"></div>
 
         <button id="btn-kind-beitreten" class="knopf gross gruen volle-breite">Mitmachen ➔</button>
+        <button id="btn-beitritt-zurueck" class="knopf klein grau volle-breite mt-2">⬅ Zurück</button>
       </div>
     </section>
 
