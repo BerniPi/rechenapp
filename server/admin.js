@@ -122,7 +122,10 @@ async function codesErzeugen(req, res) {
 
 function spielerRunden(res, id) {
   if (!q.einSpieler.get(id)) return H.fehler(res, 404, 'Spieler gibt es nicht');
-  const runden = q.runden.all(id).map((x) => ({ ...x, text: x.uebungen ? H.Aufgaben.uebungenText(x.uebungen) : '' }));
+  const runden = q.runden.all(id).map((x) => ({
+    ...x,
+    text: x.ops && x.raum ? H.Aufgaben.opsText(x.ops, x.raum, Boolean(x.negativ)) : (x.uebungen || ''),
+  }));
   // Runden pro Tag der letzten 30 Tage
   const start = heuteBeginn() - 29 * 864e5;
   const tage = {};

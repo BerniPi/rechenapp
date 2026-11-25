@@ -45,34 +45,9 @@
   }
 
   // ---------- Formular-Helfer (Setup & Bearbeiten teilen dieselbe Logik) ----------
-  function uebungenBauen(container) {
-    const gruppen = [...new Set(Aufgaben.UEBUNGEN.map((u) => u.gruppe))];
-    container.innerHTML = '';
-    gruppen.forEach((g) => {
-      const h = document.createElement('h3');
-      h.textContent = g;
-      container.appendChild(h);
-
-      const chips = document.createElement('div');
-      chips.className = 'chips uebung-chips';
-      chips.dataset.feld = 'uebungen';
-      Aufgaben.UEBUNGEN.filter((u) => u.gruppe === g).forEach((u) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.dataset.wert = u.id;
-        b.append(document.createTextNode(u.name));
-        const sm = document.createElement('small');
-        sm.textContent = u.beispiel;
-        b.appendChild(sm);
-        chips.appendChild(b);
-      });
-      container.appendChild(chips);
-    });
-  }
-
   function formularController(opts) {
     const {
-      root, titelInput, uebungenBox, laengeEl, wenigerBtn, mehrBtn,
+      root, titelInput, laengeEl, wenigerBtn, mehrBtn,
       strafeBox, strafeSelect, fehlerEl, initial, onChange,
     } = opts;
 
@@ -81,19 +56,19 @@
       art: initial.art || 'aufgaben',
       anzahl: initial.anzahl || 10,
       minuten: initial.minuten || 1,
-      uebungen: [...(initial.uebungen || ['plus10'])],
+      ops: [...(initial.ops || ['+'])],
+      raum: initial.raum || 10,
+      negativ: Boolean(initial.negativ),
       einsetzen: Boolean(initial.einsetzen),
       strafe: initial.strafe ?? 3,
     };
-
-    uebungenBauen(uebungenBox);
 
     function zeichnen() {
       root.querySelectorAll('.chips').forEach((ch) => {
         const feld = ch.dataset.feld;
         ch.querySelectorAll('button').forEach((b) => {
           const v = b.dataset.wert;
-          const an = feld === 'uebungen' ? zustand.uebungen.includes(v) : String(zustand[feld]) === v;
+          const an = feld === 'ops' ? zustand.ops.includes(v) : String(zustand[feld]) === v;
           b.classList.toggle('an', an);
         });
       });
@@ -116,7 +91,9 @@
       zustand.art = einstellungen.art || 'aufgaben';
       zustand.anzahl = einstellungen.anzahl || 10;
       zustand.minuten = einstellungen.minuten || 1;
-      zustand.uebungen = [...(einstellungen.uebungen || ['plus10'])];
+      zustand.ops = [...(einstellungen.ops || ['+'])];
+      zustand.raum = einstellungen.raum || 10;
+      zustand.negativ = Boolean(einstellungen.negativ);
       zustand.einsetzen = Boolean(einstellungen.einsetzen);
       zustand.strafe = einstellungen.strafe ?? 3;
       fehlerEl.textContent = '';
@@ -131,14 +108,15 @@
       if (typeof Ton !== 'undefined') Ton.klick();
       const feld = ch.dataset.feld;
       let v = b.dataset.wert;
-      if (feld === 'uebungen') {
-        const l = zustand.uebungen;
+      if (feld === 'ops') {
+        const l = zustand.ops;
         if (l.includes(v)) {
           if (l.length > 1) l.splice(l.indexOf(v), 1);
         } else {
           l.push(v);
         }
       } else {
+        if ('zahl' in ch.dataset) v = Number(v);
         if ('bool' in ch.dataset) v = v === 'true';
         zustand[feld] = v;
       }
@@ -174,7 +152,9 @@
           art: zustand.art,
           anzahl: zustand.anzahl,
           minuten: zustand.minuten,
-          uebungen: [...zustand.uebungen],
+          ops: [...zustand.ops],
+          raum: zustand.raum,
+          negativ: zustand.negativ,
           einsetzen: zustand.einsetzen,
           strafe: zustand.strafe,
         },
@@ -258,7 +238,7 @@
       e.art === 'zeit'
         ? `⏱️ ${e.minuten} ${e.minuten === 1 ? 'Minute' : 'Minuten'}`
         : `🔢 ${e.anzahl} Aufgaben`,
-      Aufgaben.uebungenText(Aufgaben.uebungenTeil(e.uebungen)),
+      Aufgaben.opsText(e.ops, e.raum, e.negativ),
     ];
     if (e.einsetzen) badges.push('🧩 Einsetzen');
     const infoBox = $('#beamer-info');
@@ -477,14 +457,13 @@
     const setupCtrl = formularController({
       root: $('#setup-form'),
       titelInput: $('#tdot-titel'),
-      uebungenBox: $('#tdot-uebungen'),
       laengeEl: $('#tdot-laenge'),
       wenigerBtn: $('#tdot-weniger'),
       mehrBtn: $('#tdot-mehr'),
       strafeBox: $('#tdot-strafe-box'),
       strafeSelect: $('#tdot-strafe'),
       fehlerEl: $('#setup-fehler'),
-      initial: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, uebungen: ['plus10'], einsetzen: false, strafe: 3 },
+      initial: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, ops: ['+'], raum: 10, negativ: false, einsetzen: false, strafe: 3 },
     });
 
     const editDialog = $('#dialog-einstellungen');
@@ -492,14 +471,13 @@
     const editCtrl = formularController({
       root: $('#edit-form'),
       titelInput: $('#edit-titel'),
-      uebungenBox: $('#edit-uebungen'),
       laengeEl: $('#edit-laenge'),
       wenigerBtn: $('#edit-weniger'),
       mehrBtn: $('#edit-mehr'),
       strafeBox: $('#edit-strafe-box'),
       strafeSelect: $('#edit-strafe'),
       fehlerEl: $('#edit-fehler'),
-      initial: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, uebungen: ['plus10'], einsetzen: false, strafe: 3 },
+      initial: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, ops: ['+'], raum: 10, negativ: false, einsetzen: false, strafe: 3 },
       onChange: () => {
         if (!editAusgangsSettings) return;
         const aktuell = editCtrl.lesen().einstellungen;
@@ -565,7 +543,7 @@
       if (!aktuelleStation || rolle !== 'leitung') return;
       editAusgangsSettings = {
         ...aktuelleStation.einstellungen,
-        uebungen: [...aktuelleStation.einstellungen.uebungen],
+        ops: [...(aktuelleStation.einstellungen.ops || ['+'])],
       };
       editCtrl.setzen(aktuelleStation.einstellungen, aktuelleStation.titel);
       $('#edit-liste-leeren').checked = false;

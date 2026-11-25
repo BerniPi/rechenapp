@@ -29,7 +29,14 @@ const Zahlwort = (() => {
     hundertt: 100, hunderd: 100,
   };
 
-  function wort(w) {
+  const HUNDERTER = {
+    hundert: 100, einhundert: 100, zweihundert: 200, zwohundert: 200, dreihundert: 300,
+    vierhundert: 400, fünfhundert: 500, fuenfhundert: 500, sechshundert: 600,
+    siebenhundert: 700, achthundert: 800, neunhundert: 900,
+    tausend: 1000, eintausend: 1000,
+  };
+
+  function unterHundert(w) {
     if (w in EINER) return EINER[w];
     if (w in ZEHNER) return ZEHNER[w];
     if (w in AEHNLICH) return AEHNLICH[w];
@@ -38,20 +45,70 @@ const Zahlwort = (() => {
     return null;
   }
 
-  // Liefert die letzte Zahl im Text (Kinder sagen oft "drei plus vier ist sieben").
+  function wort(w) {
+    if (w in HUNDERTER) return HUNDERTER[w];
+    const u = unterHundert(w);
+    if (u !== null) return u;
+    const hm = w.match(/^((?:ein|zwei|zwo|drei|vier|fünf|fuenf|sechs|sieben|acht|neun)?hundert)(?:und)?(.+)$/);
+    if (hm && hm[1] in HUNDERTER) {
+      const rest = unterHundert(hm[2]);
+      if (rest !== null && rest > 0 && rest < 100) return HUNDERTER[hm[1]] + rest;
+    }
+    return null;
+  }
+
+  // Liefert die letzte Zahl im Text (inkl. "minus ..." und Zahlen bis 1000).
   function parse(text) {
     if (!text) return null;
     let t = text.toLowerCase().replace(/[.,!?;:"]/g, ' ');
-    // "drei und zwanzig" -> "dreiundzwanzig"
+    // "drei und zwanzig" -> "dreiundzwanzig", "zwei hundert" -> "zweihundert"
     t = t.replace(/(\S+)\s+und\s+(\S*zig|dreißig|dreissig)\b/g, '$1und$2');
+    t = t.replace(/\b(ein|zwei|zwo|drei|vier|fünf|fuenf|sechs|sieben|acht|neun)\s+(hundert|tausend)\b/g, '$1$2');
     const woerter = t.split(/\s+/).filter(Boolean);
     let letzte = null;
+    let neg = false;
+    let hunderterBasis = null;
+    let hunderterSign = 1;
+
     for (const w of woerter) {
-      if (/^\d+$/.test(w)) { letzte = parseInt(w, 10); continue; }
+      if (w === 'minus' || w === '-' || w === '−') {
+        neg = true;
+        hunderterBasis = null;
+        continue;
+      }
+      if (/^[-−]?\d+$/.test(w)) {
+        const num = parseInt(w.replace('−', '-'), 10);
+        const sign = (neg || num < 0) ? -1 : 1;
+        letzte = sign * Math.abs(num);
+        neg = false;
+        hunderterBasis = null;
+        continue;
+      }
+      if (hunderterBasis !== null && w === 'und') continue;
+
       const n = wort(w);
-      if (n !== null) letzte = n;
+      if (n !== null) {
+        if (!neg && hunderterBasis !== null && n > 0 && n < 100) {
+          letzte = hunderterSign * (hunderterBasis + n);
+          hunderterBasis = null;
+        } else {
+          const sign = neg ? -1 : 1;
+          letzte = sign * n;
+          if (w in HUNDERTER && n >= 100 && n <= 900) {
+            hunderterBasis = n;
+            hunderterSign = sign;
+          } else {
+            hunderterBasis = null;
+          }
+          neg = false;
+        }
+        continue;
+      }
+
+      neg = false;
+      hunderterBasis = null;
     }
-    return letzte;
+    return letzte === 0 ? 0 : letzte;
   }
 
   return { parse };
@@ -234,7 +291,8 @@ const Sprache = (() => {
   function googleZuhoeren({ loesung, onZahl, onText, onStatus }) {
     let aktiv = true;
     let rec = null;
-    const sofortOk = loesung === 0 || loesung >= 10;
+    const abs = Math.abs(loesung);
+    const sofortOk = loesung === 0 || (abs >= 10 && abs < 100);
 
     function pruefe(ergebnis, istFinal) {
       const alternativen = [];

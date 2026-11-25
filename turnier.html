@@ -27,7 +27,7 @@
     <!-- ============ LEHRKRAFT: TURNIER ERSTELLEN ============ -->
     <section id="screen-erstellen" class="screen">
       <div class="turnier-karte breite-box beitreten-schnell">
-        <h2>👋 Einem Turnier beitreten</h2>
+        <h1>👋 Einem Turnier beitreten</h1>
         <div class="code-beitritt-zeile">
           <input type="text" id="start-code-eingabe" class="grosser-code" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="4-stelliger Turnier-Code">
           <button id="btn-mit-code-weiter" class="knopf gross blau">Mitmachen ➔</button>
@@ -44,11 +44,36 @@
           <input type="text" id="turnier-titel" placeholder="z. B. 3b Einmaleins-Cup" maxlength="40">
         </div>
 
-        <div class="feld-gruppe">
-          <label>Übungen auswählen</label>
-          <div id="uebungen-katalog" class="chips-raster">
-            <!-- Wird dynamisch aus Aufgaben.UEBUNGEN befüllt -->
+        <div class="einstellungen-raster">
+          <div class="feld-gruppe">
+            <label>Rechenarten</label>
+            <div id="turnier-ops" class="chips-raster turnier-ops-chips">
+              <div class="chip gewaehlt" data-op="+">+</div>
+              <div class="chip" data-op="-">−</div>
+              <div class="chip" data-op="*">·</div>
+              <div class="chip" data-op="/">:</div>
+            </div>
           </div>
+
+          <div class="feld-gruppe">
+            <label for="turnier-raum">Zahlenraum</label>
+            <select id="turnier-raum">
+              <option value="10" selected>bis 10</option>
+              <option value="20">bis 20</option>
+              <option value="50">bis 50</option>
+              <option value="100">bis 100</option>
+              <option value="200">bis 200</option>
+              <option value="500">bis 500</option>
+              <option value="1000">bis 1000</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="feld-gruppe">
+          <label class="checkbox-label">
+            <input type="checkbox" id="turnier-negativ">
+            <span>Negative Zahlen einbeziehen (z. B. 3 − 8 = −5)</span>
+          </label>
         </div>
 
         <div class="feld-gruppe">
@@ -324,6 +349,7 @@
       <div id="challenge-anzeige" class="challenge-anzeige versteckt" aria-live="polite"></div>
 
       <div id="tastatur" class="tastatur">
+        <button id="minus-taste" class="nebenknopf minus-taste versteckt" aria-label="Minus-Vorzeichen">−<small>Minus</small></button>
         <button data-z="7">7</button><button data-z="8">8</button><button data-z="9">9</button>
         <button data-z="4">4</button><button data-z="5">5</button><button data-z="6">6</button>
         <button data-z="1">1</button><button data-z="2">2</button><button data-z="3">3</button>

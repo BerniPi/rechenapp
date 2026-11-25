@@ -1057,6 +1057,41 @@
     challengeAnzeigeAktualisieren();
   }
 
+  function istNegativAktiv() {
+    return Boolean(aktuellerZustand && aktuellerZustand.einstellungen && aktuellerZustand.einstellungen.negativ);
+  }
+
+  function aufgabeEinpassen() {
+    const el = $('#aufgabe');
+    if (!el) return;
+    el.style.fontSize = '';
+    const verfuegbar = el.clientWidth;
+    if (!verfuegbar) return;
+    const aktuell = parseFloat(getComputedStyle(el).fontSize);
+    if (el.scrollWidth > verfuegbar && aktuell > 20) {
+      const neu = Math.max(20, Math.floor(aktuell * (verfuegbar / el.scrollWidth) * 0.96));
+      el.style.fontSize = `${neu}px`;
+    }
+  }
+
+  function eingabeAnzeigen() {
+    const l = $('#luecke');
+    if (l) l.textContent = aktuelleEingabe.replace('-', '−');
+    const minusBtn = $('#minus-taste');
+    if (minusBtn) minusBtn.classList.toggle('an', aktuelleEingabe.startsWith('-'));
+    aufgabeEinpassen();
+  }
+
+  function vorzeichenToggeln() {
+    if (tastaturGesperrt || !istNegativAktiv()) return;
+    const screen = $('#screen-rechnen');
+    if (!screen || !screen.classList.contains('aktiv')) return;
+    if (istEntscheidung && entscheidungSendet) return;
+    aktuelleEingabe = aktuelleEingabe.startsWith('-') ? aktuelleEingabe.slice(1) : `-${aktuelleEingabe}`;
+    eingabeAnzeigen();
+    if (typeof Ton !== 'undefined') Ton.klick();
+  }
+
   function rechnenVorbereiten() {
     sperreAufheben();
     antwortWarteschlange = [];
@@ -1072,6 +1107,12 @@
     const einstellungen = (aktuellerZustand && aktuellerZustand.einstellungen) || {};
     const zeitModus = istZeitModusAktiv();
     rundeAufgabenAnzahl = Number(einstellungen.anzahl) || meineAufgaben.length || 10;
+
+    const minusBtn = $('#minus-taste');
+    if (minusBtn) {
+      minusBtn.classList.toggle('versteckt', !istNegativAktiv());
+      minusBtn.classList.remove('an');
+    }
 
     const fort = $('#fortschritt');
     if (fort) {
@@ -1134,11 +1175,12 @@
 
     const luecke = `<span class="luecke" id="luecke">${aktuelleEingabe}</span>`;
     const zeichen = Aufgaben.ZEICHEN[auf.op] || auf.op;
-    const zahl = (n) => (n === null ? luecke : n);
+    const zahl = (n, mitKlammer = false) => (n === null ? luecke : Aufgaben.zahlText(n, mitKlammer));
     const aufgEl = $('#aufgabe');
     if (aufgEl) {
-      aufgEl.innerHTML = `${zahl(auf.a)} ${zeichen} ${zahl(auf.b)} = ${zahl(auf.c)}`;
+      aufgEl.innerHTML = `${zahl(auf.a, false)} ${zeichen} ${zahl(auf.b, true)} = ${zahl(auf.c, false)}`;
     }
+    eingabeAnzeigen();
 
     if (!istEntscheidung && !zeitModus) {
       $$('#fortschritt .punkt').forEach((p, i) => p.classList.toggle('jetzt', i === aufgabenIndex));
@@ -1176,15 +1218,16 @@
     if (!auf) return;
 
     aktuelleEingabe += String(z);
-    const l = $('#luecke');
-    if (l) l.textContent = aktuelleEingabe;
+    eingabeAnzeigen();
 
     if (typeof Ton !== 'undefined') Ton.klick();
 
     const zielStellen = Math.max(1, Number(auf.stellen) || 1);
-    if (aktuelleEingabe.length >= zielStellen) {
-      const wert = Number(aktuelleEingabe);
+    if (aktuelleEingabe.replace('-', '').length >= zielStellen) {
+      const roh = Number(aktuelleEingabe);
+      const wert = roh === 0 ? 0 : roh;
       aktuelleEingabe = '';
+      eingabeAnzeigen();
       eingabeAbschicken(wert);
     }
   }
@@ -1197,8 +1240,7 @@
     if (!aktuelleEingabe) return;
 
     aktuelleEingabe = aktuelleEingabe.slice(0, -1);
-    const l = $('#luecke');
-    if (l) l.textContent = aktuelleEingabe;
+    eingabeAnzeigen();
   }
 
   function aufgabeUeberspringen() {
@@ -1209,6 +1251,7 @@
     if (!auf) return;
 
     aktuelleEingabe = '';
+    eingabeAnzeigen();
     if (typeof Ton !== 'undefined') Ton.klick();
     eingabeAbschicken(null);
   }
@@ -1449,19 +1492,15 @@
   // -------------------------------------------------------------------
   // Initialisierung & UI-Events
   // -------------------------------------------------------------------
-  function initKatalog() {
-    const kasten = $('#uebungen-katalog');
-    if (!kasten || typeof Aufgaben === 'undefined') return;
-    kasten.innerHTML = '';
-    Aufgaben.UEBUNGEN.forEach((u, i) => {
-      const chip = document.createElement('div');
-      chip.className = `chip ${i === 0 ? 'gewaehlt' : ''}`;
-      chip.dataset.id = u.id;
-      chip.textContent = `${u.name} (${u.beispiel})`;
+  function initRechenarten() {
+    const kasten = $('#turnier-ops');
+    if (!kasten) return;
+    kasten.querySelectorAll('.chip').forEach((chip) => {
       chip.addEventListener('click', () => {
+        const aktiv = kasten.querySelectorAll('.chip.gewaehlt');
+        if (chip.classList.contains('gewaehlt') && aktiv.length <= 1) return;
         chip.classList.toggle('gewaehlt');
       });
-      kasten.appendChild(chip);
     });
   }
 
@@ -1596,7 +1635,7 @@
   }
 
   async function appStarten() {
-    initKatalog();
+    initRechenarten();
     initEmojiRaster();
 
     // Modus-Umschalter für Rundenlänge
@@ -1614,6 +1653,8 @@
         aufgabeUeberspringen();
       } else if (btn.id === 'zurueck') {
         zifferZurueck();
+      } else if (btn.id === 'minus-taste') {
+        vorzeichenToggeln();
       } else if (btn.dataset.z !== undefined) {
         zifferTippen(btn.dataset.z);
       }
@@ -1656,19 +1697,28 @@
       if (!$('#screen-rechnen').classList.contains('aktiv')) return;
       if (/^[0-9]$/.test(ev.key)) {
         zifferTippen(ev.key);
+      } else if (ev.key === '-') {
+        ev.preventDefault();
+        vorzeichenToggeln();
       } else if (ev.key === 'Backspace') {
         ev.preventDefault();
         zifferZurueck();
       }
     });
 
+    window.addEventListener('resize', () => {
+      if ($('#screen-rechnen').classList.contains('aktiv')) aufgabeEinpassen();
+    });
+
     // Knöpfe der Lehrkraft
     $('#btn-turnier-anlegen').addEventListener('click', async () => {
-      const uebungen = $$('#uebungen-katalog .chip.gewaehlt').map((c) => c.dataset.id);
-      if (!uebungen.length) {
-        alert('Bitte mindestens eine Übung auswählen.');
+      const ops = $$('#turnier-ops .chip.gewaehlt').map((c) => c.dataset.op);
+      if (!ops.length) {
+        alert('Bitte mindestens eine Rechenart auswählen.');
         return;
       }
+      const raum = Number($('#turnier-raum').value) || 10;
+      const negativ = Boolean($('#turnier-negativ') && $('#turnier-negativ').checked);
       const titel = $('#turnier-titel').value.trim();
       const einsetzen = $('#turnier-einsetzen').checked;
       const challengeMode = Boolean($('#turnier-challenge') && $('#turnier-challenge').checked);
@@ -1683,7 +1733,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             titel,
-            einstellungen: { uebungen, einsetzen, challengeMode, art, anzahl, sekunden, format },
+            einstellungen: { ops, raum, negativ, einsetzen, challengeMode, art, anzahl, sekunden, format },
           }),
         });
         if (!res.ok) throw new Error('Fehler beim Anlegen');

@@ -8,7 +8,7 @@ const Speicher = {
   standard() {
     return {
       // art: 'aufgaben' (anzahl Aufgaben auf Zeit) oder 'zeit' (minuten lang so viele wie möglich)
-      settings: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, uebungen: ['plus10'], einsetzen: false, ton: true },
+      settings: { modus: 'schrift', art: 'aufgaben', anzahl: 10, minuten: 1, ops: ['+'], raum: 10, negativ: false, einsetzen: false, ton: true },
       sterne: 0,
       rekorde: {},
       verlauf: [],
@@ -95,29 +95,38 @@ const Speicher = {
     if (st.art === 'zehn') { st.art = 'aufgaben'; st.anzahl = 10; }
     if (st.art === 'm1' || st.art === 'm5') { st.minuten = st.art === 'm5' ? 5 : 1; st.art = 'zeit'; }
     if (!(this.data.eltern.preis >= 1)) this.data.eltern.preis = 10;
+    if (d.settings && d.settings.uebungen && !d.settings.ops) delete this.data.settings.ops;
     this.uebungenUmstellen(this.data);
     return this.data;
   },
 
-  // Früher Rechenarten × Zahlenraum, jetzt Übungen: Einstellung und Rekord-Schlüssel umstellen.
+  // Rechenarten × Zahlenraum × Negative Zahlen normalisieren; ältere Übungs-IDs umstellen.
   uebungenUmstellen(d) {
     const st = d.settings;
-    if (st.ops) {
-      st.uebungen = Aufgaben.alteUebungen(st.ops, st.raum);
-      delete st.ops; delete st.raum;
+    if (!st.ops && st.uebungen) {
+      const alt = Aufgaben.ausUebungen(st.uebungen);
+      st.ops = alt.ops;
+      st.raum = alt.raum;
+      delete st.uebungen;
+    } else {
+      delete st.uebungen;
     }
-    st.uebungen = (st.uebungen || []).filter((id) => Aufgaben.NACH_ID[id]);
-    if (!st.uebungen.length) st.uebungen = ['plus10'];
+    st.ops = [...Aufgaben.opsTeil(st.ops)];
+    st.raum = Aufgaben.raumGueltig(st.raum) ? Number(st.raum) : 10;
+    st.negativ = Boolean(st.negativ);
+
     const umstellen = (rek, klein) => {
+      if (!rek) return;
       Object.keys(rek).forEach((k) => {
-        if (!Aufgaben.istAlterSchluessel(k)) return;
-        const r = rek[k];
-        delete rek[k];
-        // null = alte Aufgaben waren nicht vergleichbar → Rekord verfällt
-        const neu = Aufgaben.alterSchluessel(k);
-        if (!neu) return;
-        const alt = rek[neu];
-        if (!alt || (klein(neu) ? r.wert < alt.wert : r.wert > alt.wert)) rek[neu] = r;
+        const teile = String(k || '').split('|');
+        if (teile.length === 4 && ['schrift', 'sprache'].includes(teile[0]) && ['zehn', 'a20', 'm1', 'm5'].includes(teile[1])) {
+          const r = rek[k];
+          delete rek[k];
+          const alt = Aufgaben.ausUebungen(teile[2]);
+          const neu = `${teile[0]}|${teile[1]}|${Aufgaben.opsTeil(alt.ops)}|${alt.raum}|${teile[3] === 'E' ? 'E' : ''}`;
+          const bisher = rek[neu];
+          if (!bisher || (klein(neu) ? r.wert < bisher.wert : r.wert > bisher.wert)) rek[neu] = r;
+        }
       });
     };
     const klein = (k) => ['zehn', 'a20'].includes(k.split('|')[1]);

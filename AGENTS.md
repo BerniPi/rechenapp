@@ -42,7 +42,7 @@ Rechentrainer für die Volksschule als PWA. Kinder rechnen (tippen oder sprechen
 | Icons | `node tools/icon.js` |
 | Stimme neu | `python tools/stimme.py` (Azure mit `AZURE_SPEECH_KEY`/`_REGION`, sonst edge-tts) |
 
-`tools/test.js` prüft: Aufgaben-Generator je Übung (keine negativen Ergebnisse, keine Reste, eindeutige Lücken, Zehnerübergang wie angegeben), Rekord-Schlüssel und Umstellung alter Schlüssel (auch `Speicher.uebungenUmstellen`, dafür exportiert `speicher.js` für Node), Zahlwort-Parser, Jonas-Schnipsel vollständig, Level-Generatoren Schrauben/Unblock, Server-Helfer (`hilfe.js`: Benutzername, Mail, Klassen-CSV, Passwort-Hash), Turnier-Logik (`turnier.js`: Gruppen, K.-o.-Baum, Wertung, Zustandsautomat, Aufgabenfilter, Durchspielen), Tag-der-offenen-Tür-Logik (`tdot.js`: Stationen, Wertung, Bestwert, Pause/Löschen). Kein Test für HTTP-Routen oder UI.
+`tools/test.js` prüft: Aufgaben-Generator je Rechenart/Zahlenraum/Negativ (Grenzen, keine Reste, eindeutige Lücken, Klammern/Vorlesesatz), Rekord-Schlüssel und Umstellung alter Schlüssel (auch `Speicher.uebungenUmstellen`, dafür exportiert `speicher.js` für Node), Zahlwort-Parser (inkl. „minus“ und bis 1000), Vosk-Grammatik (`VoskErkennung.WOERTER`), Jonas-Schnipsel vollständig, Level-Generatoren Schrauben/Unblock, Server-Helfer (`hilfe.js`: Benutzername, Mail, Klassen-CSV, Rekord-Schlüssel, Passwort-Hash), Turnier-Logik (`turnier.js`: Gruppen, K.-o.-Baum, Wertung, Zustandsautomat, Aufgabenfilter, Durchspielen), Tag-der-offenen-Tür-Logik (`tdot.js`: Stationen, Wertung, Bestwert, Pause/Löschen). Kein Test für HTTP-Routen oder UI.
 
 ## Frontend
 
@@ -55,9 +55,9 @@ Einstieg: `index.html` lädt der Reihe nach `speicher → online → aufgaben �
 | `js/app.js` | gesamte UI in einer IIFE: Bildschirme, Rechenrunde, Auswertung/Sterne, Rekorde, Spiele-Auswahl, Eltern-Bereich + PIN, Online-UI, Anmelde-Bildschirm, Spielerwahl. Abschnitte mit `// ---------- … ----------` |
 | `js/speicher.js` | `Speicher`: localStorage je Spieler, Standardwerte (`standard()`), Migrationen alter Daten in `laden()` |
 | `js/online.js` | `Online`: Server-Anfragen, Verbinden (Code/Konto/SSO), Warteschlange für offline, `senden()` = `POST /api/sync` |
-| `js/aufgaben.js` | `Aufgaben`: Übungs-Katalog `UEBUNGEN`, Generator `erzeuger({uebungen, einsetzen})`, `alsText`, `alsSatz`, `zielzeit(auf, sprechen)`, `sterne({gestellt, falsch, zeit, ziel})`, Umstellung alter Schlüssel `alterSchluessel`/`alteUebungen`. Wird auch vom Server per `require('../js/aufgaben.js')` genutzt |
-| `js/sprache.js` | `Zahlwort` (Parser Wörter→Zahl, inkl. Verhörer „nein“→9), `Jonas` (Ersatz-Stimme aus Schnipseln), `Sprache` (Vorlesen/Erkennen) |
-| `js/vosk-erkennung.js` | Offline-Erkennung, Grammatik nur Zahlwörter 0–100 |
+| `js/aufgaben.js` | `Aufgaben`: `OPS` (`+-*/`), `RAEUME` (`10..1000`), Generator `erzeuger({ops, raum, negativ, einsetzen})`, `alsText`, `alsSatz`, `zielzeit(auf, sprechen)`, `sterne({gestellt, falsch, zeit, ziel})`, Abwärtskompatibilität `ausUebungen`. Wird auch vom Server per `require('../js/aufgaben.js')` genutzt |
+| `js/sprache.js` | `Zahlwort` (Parser Wörter→Zahl bis ±1000, inkl. „minus“ und Verhörer „nein“→9), `Jonas` (Ersatz-Stimme aus Schnipseln), `Sprache` (Vorlesen/Erkennen) |
+| `js/vosk-erkennung.js` | Offline-Erkennung, Grammatik für Zahlwörter 0–1000 inkl. `minus` |
 | `js/ton.js` | Töne per WebAudio |
 | `js/spiele/spiele.js` | `Spiele.registrieren(def)`, Schnittstelle der Spiele (siehe Kommentar dort), `spielCanvas`, `levelBilanz` |
 
@@ -129,9 +129,8 @@ Auth: `Authorization: Bearer <schluessel>`; gespeichert wird nur `sha256` in Tab
 
 ## Fachliche Regeln und Fallstricke
 
-- **Übungen** statt Rechenart × Zahlenraum: Einträge in `Aufgaben.UEBUNGEN` mit `id`, `gruppe` (Klasse), `name`, `beispiel`, `ziel` (Zielzeit s), `erzeuge()` → `[a, op, b, c]`. Startbildschirm baut die Chips daraus. Neue Übung = neuer Eintrag + Grenzen in `tools/test.js` (`GRENZE`). Die **`id` nie ändern**, Rekorde hängen daran. Geplant: negative Zahlen, Brüche, Klapustri (Klammer vor Punkt vor Strich); dafür Aufgaben-Format und Tastatur erweitern.
-- **Rekord-Key** `modus|art|uebungen|E` (z. B. `schrift|zehn|plus20,plus20u|`), Übungen sortiert, ohne Doppelte, mit Komma (`Aufgaben.uebungenTeil`). Aufbau in `app.js` `schluessel()`, Prüfung in `hilfe.js` `rekordKey()` (nutzt denselben Katalog).
-- Alte Schlüssel `modus|art|ops|raum|E` (erkennt `Aufgaben.istAlterSchluessel`) stellt `Aufgaben.alterSchluessel` um: im Gerät (`Speicher.uebungenUmstellen`), beim Serverstart (`db.js`, auch `runden.uebungen`) und bei jedem `/sync` älterer App-Versionen. Fallen Schlüssel zusammen, bleibt der bessere Wert. **Nicht vergleichbare** alte Rekorde verfallen (`alterSchluessel` → `null`): Plus/Minus bis 50 und Mal/Geteilt unter 100 (damals nur Produkte ≤ Zahlenraum). Einstellungen und alte Runden werden trotzdem über `alteUebungen` zugeordnet.
+- **Aufgabenauswahl:** Rechenarten `Aufgaben.OPS` (`+`, `-`, `*`, `/`) × Zahlenraum `Aufgaben.RAEUME` (`10, 20, 50, 100, 200, 500, 1000`) × `negativ` (`false`/`true`, Bereich `−raum` bis `+raum`). Ist `negativ` aktiv, blendet die Tastatur über `7 8 9` die breite `− Minus`-Taste ein; Auto-Submit zählt nur Ziffern ohne `-`. Geplant: Brüche, Klapustri.
+- **Rekord-Key** `modus|art|ops|raum|flags` (z. B. `schrift|zehn|+-|20|`, `sprache|m1|*|100|EN`), `ops` in kanonischer Reihenfolge `+-*/` (`Aufgaben.opsTeil`), `flags` ∈ `'' | 'E' | 'N' | 'EN'`. Aufbau in `app.js` `schluessel()`, Prüfung in `hilfe.js` `rekordKey()`. Alte `uebungen`-Einstellungen und 4-teilige Rekord-Keys stellt `Speicher.uebungenUmstellen` über `Aufgaben.ausUebungen` um.
 - Dockerfile kopiert `js/aufgaben.js` nach `/app/js`, damit der Server ihn findet.
 - Rekorde nur für feste Längen: `zehn` (10 Aufgaben), `a20` (20 Aufgaben) → kleinere Zeit besser; `m1`, `m5` (1/5 Minuten) → mehr Punkte besser. Server-Grenzen in `rekordWert()`.
 - **Emoji-Liste** existiert doppelt: `server/hilfe.js` `EMOJIS` und `js/app.js` `BILDER`. Neue Bilder in beiden eintragen, sonst lehnt der Server sie ab.

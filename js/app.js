@@ -39,22 +39,13 @@
   }
 
   // ---------- Startbildschirm ----------
-  // Übungen nach Klassen gruppiert; mehrere wählbar, dann gemischt.
-  (function uebungenBauen() {
-    const gruppen = [...new Set(Aufgaben.UEBUNGEN.map((u) => u.gruppe))];
-    $('#uebungen').innerHTML = gruppen.map((g) => `<h3>${g}</h3><div class="chips uebung-chips" data-feld="uebungen">`
-      + Aufgaben.UEBUNGEN.filter((u) => u.gruppe === g)
-        .map((u) => `<button data-wert="${u.id}">${u.name}<small>${u.beispiel}</small></button>`).join('')
-      + '</div>').join('');
-  }());
-
   function chipsAnzeigen() {
     const s = d.settings;
     $$('.chips').forEach((ch) => {
       const feld = ch.dataset.feld;
       ch.querySelectorAll('button').forEach((b) => {
         const v = b.dataset.wert;
-        const an = feld === 'uebungen' ? s.uebungen.includes(v) : String(s[feld]) === v;
+        const an = feld === 'ops' ? s.ops.includes(v) : String(s[feld]) === v;
         b.classList.toggle('an', an);
       });
     });
@@ -107,8 +98,8 @@
       Ton.klick();
       const feld = ch.dataset.feld;
       let v = b.dataset.wert;
-      if (feld === 'uebungen') {
-        const l = d.settings.uebungen;
+      if (feld === 'ops') {
+        const l = d.settings.ops;
         if (l.includes(v)) { if (l.length > 1) l.splice(l.indexOf(v), 1); } else l.push(v);
       } else {
         if ('zahl' in ch.dataset) v = Number(v);
@@ -122,7 +113,8 @@
 
   function schluessel(s, art) {
     const ein = s.einsetzen ? 'E' : '';
-    return `${s.modus}|${art}|${Aufgaben.uebungenTeil(s.uebungen)}|${ein}`;
+    const neg = s.negativ ? 'N' : '';
+    return `${s.modus}|${art}|${Aufgaben.opsTeil(s.ops)}|${s.raum}|${ein}${neg}`;
   }
   // null = für diese Länge gibt es keinen Rekord
   function rekordSchluessel(s) {
@@ -230,7 +222,7 @@
   async function rundeStarten() {
     if (laedt) return;
     Ton.init();
-    const s = { ...d.settings, uebungen: [...d.settings.uebungen] };
+    const s = { ...d.settings, ops: [...d.settings.ops] };
     if (s.modus === 'sprache') {
       if (!Sprache.kannHoeren) {
         alert('Dieser Browser kann leider keine Sprache erkennen. Bitte Chrome verwenden – jetzt geht es mit Tippen weiter.');
@@ -291,6 +283,8 @@
 
     const sprache = s.modus === 'sprache';
     $('#tastatur').classList.toggle('versteckt', !R.tastatur);
+    $('#minus-taste').classList.toggle('versteckt', !s.negativ);
+    $('#minus-taste').classList.remove('an');
     $('#sprach-bereich').classList.toggle('versteckt', !sprache);
     $('#sprach-knoepfe').classList.toggle('versteckt', !sprache || R.tastatur);
 
@@ -347,35 +341,66 @@
     if (R.s.modus === 'sprache') frageVorlesen();
   }
 
+  function aufgabeEinpassen() {
+    const el = $('#aufgabe');
+    if (!el) return;
+    el.style.fontSize = '';
+    const verfuegbar = el.clientWidth;
+    if (!verfuegbar) return;
+    const aktuell = parseFloat(getComputedStyle(el).fontSize);
+    if (el.scrollWidth > verfuegbar && aktuell > 20) {
+      const neu = Math.max(20, Math.floor(aktuell * (verfuegbar / el.scrollWidth) * 0.96));
+      el.style.fontSize = `${neu}px`;
+    }
+  }
+
+  function eingabeZeigen() {
+    const l = $('#luecke');
+    if (l) l.textContent = R.eingabe.replace('-', '−');
+    const m = $('#minus-taste');
+    if (m) m.classList.toggle('an', R.eingabe.startsWith('-'));
+    aufgabeEinpassen();
+  }
+
   function aufgabeZeigen() {
-    const luecke = `<span class="luecke" id="luecke">${R.eingabe}</span>`;
+    const luecke = `<span class="luecke" id="luecke">${R.eingabe.replace('-', '−')}</span>`;
+    const m = $('#minus-taste');
+    if (m) m.classList.toggle('an', R.eingabe.startsWith('-'));
     // Im Sprechmodus wird die Aufgabe nur vorgelesen, nicht angezeigt.
     if (R.s.modus === 'sprache') {
       $('#aufgabe').innerHTML = R.tastatur ? `👂 = ${luecke}` : '👂';
+      aufgabeEinpassen();
       return;
     }
     const t = Aufgaben.teile(R.auf);
-    const zahl = (n) => (n === null ? luecke : n);
-    $('#aufgabe').innerHTML = `${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${zahl(t.c)}`;
+    const zahl = (n, klammer) => (n === null ? luecke : Aufgaben.zahlText(n, klammer));
+    $('#aufgabe').innerHTML = `${zahl(t.a, false)} ${t.zeichen} ${zahl(t.b, true)} = ${zahl(t.c, false)}`;
+    aufgabeEinpassen();
+  }
+
+  function vorzeichen() {
+    if (!R || !R.aktiv || !R.tastatur || !R.s.negativ) return;
+    R.eingabe = R.eingabe.startsWith('-') ? R.eingabe.slice(1) : `-${R.eingabe}`;
+    eingabeZeigen();
   }
 
   function ziffer(z) {
     if (!R || !R.aktiv || !R.tastatur) return;
-    const ziel = String(R.auf.loesung);
+    const zielZiffern = String(Math.abs(R.auf.loesung));
     const neu = R.eingabe + z;
     R.eingabe = neu;
-    const l = $('#luecke');
-    if (l) l.textContent = neu;
-    // Erst bewerten, wenn so viele Ziffern getippt sind, wie die Lösung Stellen hat –
-    // sonst landet die zweite Ziffer einer falschen Eingabe in der nächsten Aufgabe.
-    if (neu.length >= ziel.length) bewerte(neu === ziel, Number(neu));
+    eingabeZeigen();
+    // Erst bewerten, wenn so viele Ziffern getippt sind, wie der Betrag der Lösung Stellen hat.
+    if (neu.replace('-', '').length >= zielZiffern.length) {
+      const wert = Number(neu) === 0 ? 0 : Number(neu);
+      bewerte(wert === R.auf.loesung, wert);
+    }
   }
 
   function zurueck() {
     if (!R || !R.aktiv || !R.tastatur || !R.eingabe) return;
     R.eingabe = R.eingabe.slice(0, -1);
-    const l = $('#luecke');
-    if (l) l.textContent = R.eingabe;
+    eingabeZeigen();
   }
 
   function bewerte(ok, gegeben) {
@@ -481,12 +506,17 @@
     ev.preventDefault();
     if (b.id === 'ueberspringen') { if (R && R.aktiv) bewerte(false, null); return; }
     if (b.id === 'zurueck') { zurueck(); return; }
+    if (b.id === 'minus-taste') { Ton.klick(); vorzeichen(); return; }
     ziffer(b.dataset.z);
   });
   document.addEventListener('keydown', (ev) => {
     if (!$('#runde').classList.contains('aktiv')) return;
     if (/^[0-9]$/.test(ev.key)) ziffer(ev.key);
+    else if (ev.key === '-') { ev.preventDefault(); vorzeichen(); }
     else if (ev.key === 'Backspace') { ev.preventDefault(); zurueck(); }
+  });
+  window.addEventListener('resize', () => {
+    if ($('#runde').classList.contains('aktiv')) aufgabeEinpassen();
   });
 
   $('#abbrechen').addEventListener('click', () => {
@@ -570,10 +600,10 @@
     $('#erg-fehler').innerHTML = fehler.length
       ? '<h3>Das üben wir noch</h3><div class="fehler-liste">' + fehler.map((x) => {
         const t = Aufgaben.teile(x.auf);
-        const g = x.gegeben === null ? '⏭️' : x.gegeben;
-        const luecke = `<span class="falsch">${g}</span> <span class="loesung">${x.auf.loesung}</span>`;
-        const zahl = (n) => (n === null ? luecke : n);
-        return `<div class="fehler-zeile">${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${zahl(t.c)}</div>`;
+        const g = x.gegeben === null ? '⏭️' : Aufgaben.zahlText(x.gegeben, false);
+        const luecke = `<span class="falsch">${g}</span> <span class="loesung">${Aufgaben.zahlText(x.auf.loesung, false)}</span>`;
+        const zahl = (n, klammer) => (n === null ? luecke : Aufgaben.zahlText(n, klammer));
+        return `<div class="fehler-zeile">${zahl(t.a, false)} ${t.zeichen} ${zahl(t.b, true)} = ${zahl(t.c, false)}</div>`;
       }).join('') + '</div>'
       : '';
   }
@@ -613,7 +643,7 @@
 
     const eintrag = {
       t: Date.now(), modus: s.modus, art: s.art, anzahl: s.anzahl, minuten: s.minuten,
-      uebungen: Aufgaben.uebungenTeil(s.uebungen),
+      ops: Aufgaben.opsTeil(s.ops), raum: s.raum, negativ: Boolean(s.negativ),
       einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch,
       zeit: Math.round((istAufgaben(s) ? R.zeit / 1000 : R.dauer)), sterne: gewinn,
     };
@@ -621,7 +651,8 @@
     d.verlauf = d.verlauf.slice(0, 300);
     Online.merkeRunde(d, {
       typ: 'rechnen', t: eintrag.t, modus: s.modus, art: s.art, laenge: istAufgaben(s) ? s.anzahl : s.minuten,
-      uebungen: eintrag.uebungen, einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch, zeit: eintrag.zeit, sterne: gewinn,
+      ops: eintrag.ops, raum: eintrag.raum, negativ: eintrag.negativ,
+      einsetzen: s.einsetzen, richtig: R.richtig, falsch: R.falsch, zeit: eintrag.zeit, sterne: gewinn,
     });
     Speicher.speichern();
     sterneAnzeigen();
@@ -733,11 +764,17 @@
   }
 
   // ---------- Highscores: alle Kategorien vom Server ----------
-  // Kategorie = Rekord-Schlüssel „modus|art|uebungen|E", z. B. „schrift|zehn|plus20,plus20u|"
+  // Kategorie = Rekord-Schlüssel „modus|art|ops|raum|flags", z. B. „schrift|zehn|+-|20|EN"
   const REKORD_ART = { zehn: '10 Aufgaben', a20: '20 Aufgaben', m1: '1 Minute', m5: '5 Minuten' };
   function kategorieText(key) {
-    const [modus, art, uebungen, ein] = (Aufgaben.alterSchluessel(key) || key).split('|');
-    return `${modus === 'sprache' ? '🎤' : '⌨️'} ${REKORD_ART[art]}: ${Aufgaben.uebungenText(uebungen)}${ein ? ', Einsetzen' : ''}`;
+    const teile = String(key || '').split('|');
+    const [modus, art] = teile;
+    if (teile.length >= 5) {
+      const [, , ops, raum, flags = ''] = teile;
+      return `${modus === 'sprache' ? '🎤' : '⌨️'} ${REKORD_ART[art]}: ${Aufgaben.opsText(ops, Number(raum), flags.includes('N'))}${flags.includes('E') ? ', Einsetzen' : ''}`;
+    }
+    const alt = Aufgaben.ausUebungen(teile[2]);
+    return `${modus === 'sprache' ? '🎤' : '⌨️'} ${REKORD_ART[art]}: ${Aufgaben.opsText(alt.ops, alt.raum, false)}${teile[3] ? ', Einsetzen' : ''}`;
   }
   const kategorieWert = (key, wert) => (['zehn', 'a20'].includes(key.split('|')[1]) ? fmt(wert) : `${wert} Punkte`);
 
@@ -1001,7 +1038,13 @@
     const zeilen = v.slice(0, 100).map((x) => {
       const dt = new Date(x.t);
       const datum = `${dt.getDate()}.${dt.getMonth() + 1}. ${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`;
-      const was = x.uebungen ? Aufgaben.uebungenText(x.uebungen) : `${[...x.ops].map((o) => OP_NAME[o]).join(' ')} bis ${x.raum}`;
+      let was;
+      if (x.ops && x.raum) {
+        was = Aufgaben.opsText(x.ops, x.raum, Boolean(x.negativ));
+      } else {
+        const alt = Aufgaben.ausUebungen(x.uebungen);
+        was = Aufgaben.opsText(alt.ops, alt.raum, false);
+      }
       const art = ART_NAME[x.art] || laengeText(x);
       return `<tr><td>${datum}</td><td>${x.modus === 'sprache' ? '🎤' : '⌨️'} ${art}</td>`
         + `<td>${was}${x.einsetzen ? ' (E)' : ''}</td>`
@@ -1567,7 +1610,15 @@
     d.settings.art = st.art;
     d.settings.anzahl = st.anzahl;
     d.settings.minuten = st.minuten;
-    d.settings.uebungen = [...st.uebungen];
+    if (st.ops) {
+      d.settings.ops = [...Aufgaben.opsTeil(st.ops)];
+      d.settings.raum = Aufgaben.raumGueltig(st.raum) ? Number(st.raum) : 10;
+    } else {
+      const alt = Aufgaben.ausUebungen(st.uebungen);
+      d.settings.ops = alt.ops;
+      d.settings.raum = alt.raum;
+    }
+    d.settings.negativ = Boolean(st.negativ);
     d.settings.einsetzen = Boolean(st.einsetzen);
     e.strafe = st.strafe;
     Sprache.setzeMotor(e.erkennung);
@@ -1633,7 +1684,9 @@
     const es = st.einstellungen;
     const modusText = es.modus === 'sprache' ? '🎤 Sprechen' : '⌨️ Tippen';
     const artText = es.art === 'zeit' ? `⏱️ ${es.minuten} ${es.minuten === 1 ? 'Minute' : 'Minuten'}` : `🔢 ${es.anzahl} Aufgaben`;
-    const uebText = Aufgaben.uebungenText(Aufgaben.uebungenTeil(es.uebungen));
+    const uebText = es.ops && es.raum
+      ? Aufgaben.opsText(es.ops, es.raum, Boolean(es.negativ))
+      : (() => { const alt = Aufgaben.ausUebungen(es.uebungen); return Aufgaben.opsText(alt.ops, alt.raum, Boolean(es.negativ)); })();
     const infoEl = $('#tdot-info');
     infoEl.textContent = `${modusText} · ${artText}`;
     const sm = document.createElement('small');

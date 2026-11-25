@@ -1,17 +1,19 @@
 // Spracherkennung mit Vosk (läuft offline im Browser, WebAssembly).
-// Die Erkennung ist auf eine Wortliste mit den Zahlen 0–100 beschränkt,
+// Die Erkennung ist auf eine Wortliste mit Zahlwörtern (inkl. "minus" und Hunderter/Tausend) beschränkt,
 // dadurch kann nur eine Zahl herauskommen ("neun" wird nicht zu "nein").
 const VoskErkennung = (() => {
   const MODELL = 'models/vosk-model-small-de-0.15.tar.gz';
   const BIBLIOTHEK = 'vendor/vosk.js';
 
-  // Wortliste: alle Zahlwörter 0–100 + [unk] für alles andere.
+  // Wortliste: alle Zahlwörter 0–100, "minus", Hunderter bis "tausend" + [unk] für alles andere.
   // Nur zusammengeschrieben ("dreiundzwanzig") – getrennte Formen machen "und" zu einem eigenen Treffer.
   const WOERTER = (() => {
     const E = ['null', 'eins', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun'];
     const Z = ['', '', 'zwanzig', 'dreißig', 'vierzig', 'fünfzig', 'sechzig', 'siebzig', 'achtzig', 'neunzig'];
-    const w = [...E, 'zwo', 'zehn', 'elf', 'zwölf', 'dreizehn', 'vierzehn', 'fünfzehn', 'sechzehn',
-      'siebzehn', 'achtzehn', 'neunzehn', 'hundert', 'einhundert'];
+    const H = ['zweihundert', 'dreihundert', 'vierhundert', 'fünfhundert', 'sechshundert',
+      'siebenhundert', 'achthundert', 'neunhundert', 'tausend', 'eintausend'];
+    const w = ['minus', ...E, 'zwo', 'zehn', 'elf', 'zwölf', 'dreizehn', 'vierzehn', 'fünfzehn', 'sechzehn',
+      'siebzehn', 'achtzehn', 'neunzehn', 'hundert', 'einhundert', ...H];
     for (let t = 2; t <= 9; t++) {
       w.push(Z[t]);
       for (let e = 1; e <= 9; e++) {
@@ -121,7 +123,8 @@ const VoskErkennung = (() => {
   function zuhoeren({ loesung, onZahl, onText, onStatus }) {
     let aktiv = true;
     let rec = null;
-    const sofortOk = loesung === 0 || loesung >= 10;
+    const abs = Math.abs(loesung);
+    const sofortOk = loesung === 0 || (abs >= 10 && abs < 100);
 
     function aufraeumen() {
       aktiv = false;
@@ -177,3 +180,5 @@ const VoskErkennung = (() => {
     WOERTER,
   };
 })();
+
+if (typeof module !== 'undefined') module.exports = VoskErkennung;

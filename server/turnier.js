@@ -31,10 +31,16 @@ function codeErzeugen() {
 
 // Standard-Einstellungen bereinigen
 function einstellungenNormalisieren(e = {}) {
-  const uebungen = Array.isArray(e.uebungen)
-    ? e.uebungen.filter((id) => Aufgaben.NACH_ID[id])
-    : [];
-  if (!uebungen.length) uebungen.push('plus10');
+  let ops = Array.isArray(e.ops) ? e.ops : (typeof e.ops === 'string' ? [...e.ops] : null);
+  let raum = Aufgaben.raumGueltig(e.raum) ? Number(e.raum) : null;
+  if ((!ops || !ops.length) && Array.isArray(e.uebungen) && e.uebungen.length) {
+    const alt = Aufgaben.ausUebungen(e.uebungen);
+    ops = alt.ops;
+    if (!raum) raum = alt.raum;
+  }
+  const opsListe = [...Aufgaben.opsTeil(ops)];
+  if (!raum) raum = 10;
+  const negativ = Boolean(e.negativ);
 
   const art = e.art === 'zeit' ? 'zeit' : 'aufgaben';
   const anzahl = [5, 10, 20].includes(Number(e.anzahl)) ? Number(e.anzahl) : 10;
@@ -47,7 +53,9 @@ function einstellungenNormalisieren(e = {}) {
   const strafe = Number.isFinite(e.strafe) && e.strafe >= 0 ? Number(e.strafe) : 5;
 
   return {
-    uebungen,
+    ops: opsListe,
+    raum,
+    negativ,
     einsetzen: Boolean(e.einsetzen),
     art,
     anzahl,
@@ -72,8 +80,7 @@ function aufgabenFuerKind(auf) {
     b: auf.luecke === 'b' ? null : auf.b,
     c: auf.luecke === 'c' ? null : auf.c,
     luecke: auf.luecke,
-    stellen: String(auf.loesung).length,
-    uebung: auf.uebung,
+    stellen: String(Math.abs(auf.loesung)).length,
   };
 }
 const aufgabeFuerKind = aufgabenFuerKind;
@@ -254,11 +261,12 @@ function gruppenKoSetzung(gruppen, teilnehmerMap, weiterProGruppe = 2) {
 
 // Aufgaben für ein Spiel erzeugen
 function aufgabenErzeugen(einstellungen = {}, anzahlExtra = 0) {
+  const norm = einstellungenNormalisieren(einstellungen);
   const gen = Aufgaben.erzeuger({
-    uebungen: (einstellungen && Array.isArray(einstellungen.uebungen) && einstellungen.uebungen.length > 0)
-      ? einstellungen.uebungen
-      : ['plus10', 'minus10', 'plus20'],
-    einsetzen: Boolean(einstellungen && einstellungen.einsetzen),
+    ops: norm.ops,
+    raum: norm.raum,
+    negativ: norm.negativ,
+    einsetzen: norm.einsetzen,
   });
   const anzahl = (einstellungen && einstellungen.art === 'zeit')
     ? Math.max(40, Math.ceil((einstellungen.sekunden || 30) / 1.5) + 20)

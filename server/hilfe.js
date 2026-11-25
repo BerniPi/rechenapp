@@ -129,12 +129,11 @@ function klassenCsv(text, domain) {
   return { zeilen, fehler };
 }
 
-// Rekord-Schlüssel wie schluessel() in js/app.js: modus|art|uebungen|E (uebungen sortiert, mit Komma).
-// Alte Schlüssel modus|art|ops|raum|E (ältere App-Versionen) werden umgestellt.
-const KEY = /^(schrift|sprache)\|(zehn|a20|m1|m5)\|([a-z0-9,]{1,300})\|(E?)$/;
+// Rekord-Schlüssel wie schluessel() in js/app.js: modus|art|ops|raum|E?N? (ops in Reihenfolge '+-*/').
+const KEY = /^(schrift|sprache)\|(zehn|a20|m1|m5)\|([+\-*/]{1,4})\|(10|20|50|100|200|500|1000)\|(E?N?)$/;
 function rekordKey(k) {
-  const m = KEY.exec(Aufgaben.alterSchluessel(k) || String(k || ''));
-  if (!m || !Aufgaben.uebungenGueltig(m[3])) return null;
+  const m = KEY.exec(String(k || ''));
+  if (!m || !Aufgaben.opsGueltig(m[3]) || !Aufgaben.raumGueltig(m[4])) return null;
   return { key: m[0], art: m[2] };
 }
 // Lesbarer Text für Admin-Seite
@@ -142,8 +141,10 @@ const ART_TEXT = { zehn: '10 Aufgaben', a20: '20 Aufgaben', m1: '1 Minute', m5: 
 function kategorieText(key) {
   const k = rekordKey(key);
   if (!k) return String(key);
-  const [modus, art, uebungen, e] = k.key.split('|');
-  return `${modus === 'sprache' ? '🎤' : '⌨️'} ${ART_TEXT[art]} · ${Aufgaben.uebungenText(uebungen)}${e ? ' · Einsetzen' : ''}`;
+  const [modus, art, ops, raum, flags] = k.key.split('|');
+  const neg = flags.includes('N');
+  const ein = flags.includes('E');
+  return `${modus === 'sprache' ? '🎤' : '⌨️'} ${ART_TEXT[art]} · ${Aufgaben.opsText(ops, Number(raum), neg)}${ein ? ' · Einsetzen' : ''}`;
 }
 // Bei Aufgaben zählt die kleinste Zeit, bei Zeit die meisten Punkte.
 const kleinerBesser = (art) => art === 'zehn' || art === 'a20';

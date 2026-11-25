@@ -2,6 +2,7 @@
 const assert = require('assert');
 const A = require('../js/aufgaben.js');
 const { Zahlwort, Jonas } = require('../js/sprache.js');
+const VoskErkennung = require('../js/vosk-erkennung.js');
 const Schrauben = require('../js/spiele/schrauben.js');
 const Unblock = require('../js/spiele/unblock.js');
 
@@ -9,102 +10,117 @@ let fehler = 0;
 const pruefe = (name, f) => { try { f(); console.log('ok  ', name); } catch (e) { fehler++; console.log('FAIL', name, '-', e.message); } };
 
 // ---- Aufgaben ----
-// Grenzen je Übung: höchste Zahl, Zehnerübergang (true/false/undefined)
-const GRENZE = {
-  plus10: [10], minus10: [10], plus20: [20, false], plus20u: [20, true], minus20: [20, false], minus20u: [20, true],
-  zehner: [100], plus100: [100, false], plus100u: [100, true], minus100: [100, false], minus100u: [100, true],
-  mal2510: [100], mal: [100], geteilt: [100],
-};
-const ueber = (op, a, b) => (op === '+' ? (a % 10) + (b % 10) >= 10 : (a % 10) < (b % 10));
-pruefe('Jede Übung hat Grenzen im Test', () => {
-  A.UEBUNGEN.forEach((u) => assert(GRENZE[u.id], `Test fehlt für ${u.id}`));
-});
-for (const u of A.UEBUNGEN) {
-  for (const uebungen of [[u.id]]) {
-    const [raum, ueb] = GRENZE[u.id] || [100];
-    for (const einsetzen of [false, true]) {
-      pruefe(`Aufgaben ${u.id}${einsetzen ? ' E' : ''}`, () => {
-        const gen = A.erzeuger({ uebungen, einsetzen });
-        for (let i = 0; i < 10000; i++) {
-          const t = gen();
-          const { a, b, c, op } = t;
-          [a, b, c].forEach((n) => assert(Number.isInteger(n) && n >= 0, `negativ/keine Zahl: ${A.alsText(t, true)}`));
-          if (op === '+') assert(a + b === c && c <= raum, A.alsText(t, true));
-          if (op === '-') assert(a - b === c && a <= raum, A.alsText(t, true));
-          if (op === '*') assert(a * b === c && c <= raum && a <= 10 && b <= 10, A.alsText(t, true));
-          if (op === '/') assert(b > 0 && b * c === a && a <= raum, A.alsText(t, true));
-          if (!einsetzen) assert(t.luecke === 'c');
-          assert.strictEqual(t.uebung, u.id);
-          if (ueb !== undefined) assert.strictEqual(ueber(op, a, b), ueb, `Übergang: ${A.alsText(t, true)}`);
-          if (u.id === 'zehner') assert(a % 10 === 0 && b % 10 === 0, A.alsText(t, true));
-          if (u.id === 'mal2510') assert([2, 5, 10].includes(a) || [2, 5, 10].includes(b), A.alsText(t, true));
-          assert(t.loesung === t[t.luecke]);
-          // Eindeutigkeit der Lücke: keine andere Zahl 0..raum erfüllt die Gleichung
-          if (t.luecke !== 'c') {
-            const passt = [];
-            for (let x = 0; x <= Math.max(raum, 100); x++) {
-              const aa = t.luecke === 'a' ? x : a;
-              const bb = t.luecke === 'b' ? x : b;
-              const r = op === '+' ? aa + bb : op === '-' ? aa - bb : op === '*' ? aa * bb : bb ? aa / bb : NaN;
-              if (r === c) passt.push(x);
+for (const op of A.OPS) {
+  for (const raum of A.RAEUME) {
+    for (const negativ of [false, true]) {
+      for (const einsetzen of [false, true]) {
+        pruefe(`Aufgaben ${op} bis ${raum}${negativ ? ' N' : ''}${einsetzen ? ' E' : ''}`, () => {
+          const gen = A.erzeuger({ ops: [op], raum, negativ, einsetzen });
+          let hatNeg = false;
+          for (let i = 0; i < 600; i++) {
+            const t = gen();
+            const { a, b, c } = t;
+            assert.strictEqual(t.op, op);
+            [a, b, c].forEach((n) => {
+              assert(Number.isInteger(n), `keine Ganzzahl: ${A.alsText(t, true)}`);
+              if (!negativ) assert(n >= 0 && n <= raum, `außerhalb [0,${raum}]: ${A.alsText(t, true)}`);
+              else assert(Math.abs(n) <= raum, `außerhalb [-${raum},${raum}]: ${A.alsText(t, true)}`);
+              if (n < 0) hatNeg = true;
+            });
+            if (op === '+') assert(a + b === c, A.alsText(t, true));
+            if (op === '-') assert(a - b === c, A.alsText(t, true));
+            if (op === '*') assert(a * b === c, A.alsText(t, true));
+            if (op === '/') assert(b !== 0 && (negativ || b > 0) && b * c === a, A.alsText(t, true));
+            if (!einsetzen) assert(t.luecke === 'c');
+            assert.strictEqual(t.loesung, t[t.luecke]);
+            if (b < 0 && t.luecke !== 'b') {
+              assert(A.alsText(t, true).includes(`(−${Math.abs(b)})`), `Klammer fehlt: ${A.alsText(t, true)}`);
             }
-            assert(passt.length === 1, `mehrdeutig: ${A.alsText(t)} -> ${passt}`);
+            if ((a < 0 && t.luecke !== 'a') || (b < 0 && t.luecke !== 'b')) {
+              assert(A.alsSatz(t).includes('minus '), `Satz ohne minus: ${A.alsSatz(t)}`);
+            }
+            // Eindeutigkeit der Lücke
+            if (t.luecke !== 'c') {
+              const minX = negativ ? -raum : 0;
+              const passt = [];
+              for (let x = minX; x <= raum; x++) {
+                const aa = t.luecke === 'a' ? x : a;
+                const bb = t.luecke === 'b' ? x : b;
+                const r = op === '+' ? aa + bb : op === '-' ? aa - bb : op === '*' ? aa * bb : bb ? aa / bb : NaN;
+                if (r === c) passt.push(x);
+              }
+              assert(passt.length === 1, `mehrdeutig: ${A.alsText(t)} -> ${passt}`);
+            }
           }
-        }
-      });
+          if (negativ) assert(hatNeg, `keine negativen Zahlen bei ${op} bis ${raum}`);
+        });
+      }
     }
   }
 }
 pruefe('keine direkte Wiederholung', () => {
-  const gen = A.erzeuger({ uebungen: ['plus20', 'plus20u'], einsetzen: false });
+  const gen = A.erzeuger({ ops: ['+'], raum: 20, einsetzen: false });
   const l = Array.from({ length: 10 }, gen).map((t) => t.key);
   assert(new Set(l).size === 10, l.join(' '));
 });
 
-// ---- Zielzeit und Sterne ----
+// ---- Zielzeit, Rekord-Schlüssel und Sterne ----
+const H = require('../server/hilfe.js');
 pruefe('Zielzeit je Aufgabe', () => {
-  const z = (uebung, luecke = 'c', sp = false) => A.zielzeit({ uebung, luecke }, sp);
-  assert.strictEqual(z('plus10'), 3);
-  assert.strictEqual(z('plus20'), 3);
-  assert.strictEqual(z('plus20u'), 4);
-  assert.strictEqual(z('minus100'), 5);
-  assert.strictEqual(z('plus100u'), 7);
-  assert.strictEqual(z('mal'), 4);
-  assert.strictEqual(z('geteilt'), 5);
-  assert.strictEqual(z('plus10', 'a'), 5);       // Einsetzen
-  assert.strictEqual(z('plus10', 'c', true), 4.5); // gesprochene Antwort
+  const z = (a, op, b, c, luecke = 'c', sp = false) => A.zielzeit({ a, op, b, c, luecke }, sp);
+  assert.strictEqual(z(3, '+', 4, 7), 3);
+  assert.strictEqual(z(12, '+', 5, 17), 3);
+  assert.strictEqual(z(8, '+', 7, 15), 4);
+  assert.strictEqual(z(84, '-', 21, 63), 5);
+  assert.strictEqual(z(45, '+', 38, 83), 7);
+  assert.strictEqual(z(340, '+', 180, 520), 7);
+  assert.strictEqual(z(345, '+', 187, 532), 9);
+  assert.strictEqual(z(6, '*', 7, 42), 4);
+  assert.strictEqual(z(12, '*', 15, 180), 6);
+  assert.strictEqual(z(56, '/', 7, 8), 5);
+  assert.strictEqual(z(360, '/', 9, 40), 7);
+  assert.strictEqual(z(-3, '*', 4, -12), 5.5);
+  assert.strictEqual(z(3, '+', 4, 7, 'a'), 5);       // Einsetzen
+  assert.strictEqual(z(3, '+', 4, 7, 'c', true), 4.5); // gesprochene Antwort
 });
-pruefe('Übungen im Rekord-Schlüssel und alte Schlüssel', () => {
-  assert.strictEqual(A.uebungenTeil(['plus20u', 'plus20', 'plus20']), 'plus20,plus20u');
-  assert(A.uebungenGueltig('plus20,plus20u'));
-  assert(!A.uebungenGueltig('plus20u,plus20'));   // unsortiert
-  assert(!A.uebungenGueltig('plus20,plus20'));    // doppelt
-  assert(!A.uebungenGueltig('quatsch'));
-  assert(!A.uebungenGueltig(''));
-  assert.strictEqual(A.alterSchluessel('schrift|zehn|+|10|'), 'schrift|zehn|plus10|');
-  assert.strictEqual(A.alterSchluessel('sprache|m1|*+-|100|E'), 'sprache|m1|mal,minus100,minus100u,plus100,plus100u|E');
-  assert.strictEqual(A.alterSchluessel('schrift|a20|-|20|'), 'schrift|a20|minus20,minus20u|');
-  // nicht vergleichbar: bis 50 und Mal/Geteilt unter 100 waren leichter → Rekord verfällt
-  assert.strictEqual(A.alterSchluessel('schrift|zehn|+|50|'), null);
-  assert.strictEqual(A.alterSchluessel('schrift|zehn|*|10|'), null);
-  assert.strictEqual(A.alterSchluessel('schrift|zehn|+/|20|'), null);
-  assert(A.istAlterSchluessel('schrift|zehn|*|10|'));
-  assert.strictEqual(A.alterSchluessel('schrift|zehn|plus10|'), null);
-  assert(!A.istAlterSchluessel('schrift|zehn|plus10|'));
-  // Gerät: alte Schlüssel umstellen, nicht vergleichbare löschen, besserer Wert gewinnt
+pruefe('Rechenarten, Rekord-Schlüssel und Speicher-Migration', () => {
+  assert.strictEqual(A.opsTeil(['-', '+', '-']), '+-');
+  assert(A.opsGueltig('+-*/'));
+  assert(!A.opsGueltig('-+'));
+  assert(!A.opsGueltig('++'));
+  assert(!A.opsGueltig(''));
+  assert(A.raumGueltig(1000));
+  assert(!A.raumGueltig(15));
+  assert.strictEqual(A.opsText('+-', 200, false), '+ − bis 200');
+  assert.strictEqual(A.opsText('+-', 200, true), '+ − (−200 bis 200)');
+  assert.deepStrictEqual(A.ausUebungen(['plus20u', 'mal']), { ops: ['+', '*'], raum: 100 });
+
+  assert.deepStrictEqual(H.rekordKey('schrift|zehn|+|10|'), { key: 'schrift|zehn|+|10|', art: 'zehn' });
+  assert.deepStrictEqual(H.rekordKey('sprache|m5|+-*/|1000|EN'), { key: 'sprache|m5|+-*/|1000|EN', art: 'm5' });
+  assert.deepStrictEqual(H.rekordKey('schrift|a20|-*|200|N'), { key: 'schrift|a20|-*|200|N', art: 'a20' });
+  assert.strictEqual(H.rekordKey('schrift|zehn|-+|10|'), null);
+  assert.strictEqual(H.rekordKey('schrift|zehn|+|15|'), null);
+  assert.strictEqual(H.rekordKey('schrift|zehn|+|10|NE'), null);
+  assert(H.kategorieText('sprache|m1|+-|200|EN').includes('−200 bis 200'));
+  assert(H.kategorieText('sprache|m1|+-|200|EN').includes('Einsetzen'));
+
   global.Aufgaben = A;
   const S = require('../js/speicher.js');
-  const geraet = { settings: { ops: ['*'], raum: 10 }, rekorde: {
-    'schrift|zehn|*|10|': { wert: 9 }, 'schrift|zehn|*|100|': { wert: 30 }, 'schrift|zehn|mal|': { wert: 25 },
-    'schrift|m1|+|20|': { wert: 12 },
-  } };
+  const geraet = {
+    settings: { uebungen: ['plus20u', 'minus20'] },
+    rekorde: {
+      'schrift|zehn|plus10|': { wert: 15 },
+      'schrift|zehn|+|10|': { wert: 12 },
+      'sprache|a20|mal|E': { wert: 40 },
+    },
+  };
   S.uebungenUmstellen(geraet);
-  assert.deepStrictEqual(geraet.settings.uebungen, ['mal']);
-  assert.deepStrictEqual(Object.keys(geraet.rekorde).sort(), ['schrift|m1|plus20,plus20u|', 'schrift|zehn|mal|']);
-  assert.strictEqual(geraet.rekorde['schrift|zehn|mal|'].wert, 25);
-  const ids = A.UEBUNGEN.map((u) => u.id);
-  assert.strictEqual(new Set(ids).size, ids.length, 'ids doppelt');
-  ids.forEach((id) => assert(/^[a-z0-9]{2,12}$/.test(id), `id ${id}`));
+  assert.deepStrictEqual(geraet.settings.ops, ['+', '-']);
+  assert.strictEqual(geraet.settings.raum, 20);
+  assert.strictEqual(geraet.settings.negativ, false);
+  assert.strictEqual(geraet.settings.uebungen, undefined);
+  assert.deepStrictEqual(Object.keys(geraet.rekorde).sort(), ['schrift|zehn|+|10|', 'sprache|a20|*|100|E']);
+  assert.strictEqual(geraet.rekorde['schrift|zehn|+|10|'].wert, 12);
 });
 pruefe('Sterne nach Genauigkeit und Tempo', () => {
   const st = (gestellt, falsch, zeit, ziel = 30) => A.sterne({ gestellt, falsch, zeit, ziel });
@@ -120,17 +136,28 @@ pruefe('Sterne nach Genauigkeit und Tempo', () => {
   assert.strictEqual(st(0, 0, 60), 0);
 });
 
-// ---- Zahlwörter ----
+// ---- Zahlwörter & Vosk-Grammatik ----
 const FAELLE = {
   'sieben': 7, 'siebzehn': 17, 'dreiundvierzig': 43, 'drei und vierzig': 43, 'hundert': 100,
   'zwo': 2, 'null': 0, 'elf': 11, 'zwölf': 12, 'einundzwanzig': 21, 'neunundneunzig': 99,
   'dreißig': 30, '42': 42, 'das ist 8': 8, 'drei plus vier ist sieben': 7, 'Fünfzehn.': 15,
   'achtundfünfzig': 58, 'eins': 1, 'sechzig': 60, 'hallo': null, '': null,
   'nein': 9, 'Neu': 9, 'nine': 9, 'Nein.': 9, 'neun': 9, 'sex': 6, 'frei': 3,
+  'minus fünf': -5, 'minus dreiundzwanzig': -23, '-12': -12, '−7': -7, 'minus nein': -9, 'minus null': 0,
+  'drei minus acht ist minus fünf': -5, 'sieben minus zwei ist fünf': 5,
+  'zweihundert': 200, 'zweihundertfünfzig': 250, 'dreihundert und vier': 304,
+  'neunhundertneunundneunzig': 999, 'tausend': 1000, 'eintausend': 1000,
+  'minus zweihundertfünfzig': -250, 'minus tausend': -1000,
 };
 for (const [t, z] of Object.entries(FAELLE)) {
   pruefe(`Zahlwort "${t}"`, () => assert.strictEqual(Zahlwort.parse(t), z));
 }
+pruefe('Vosk-Grammatik enthält minus und bis 1000', () => {
+  assert(Array.isArray(VoskErkennung.WOERTER));
+  assert(VoskErkennung.WOERTER.includes('minus'));
+  assert(VoskErkennung.WOERTER.includes('zweihundert'));
+  assert(VoskErkennung.WOERTER.includes('tausend'));
+});
 pruefe('alle Zahlen 0-100 als Wort', () => {
   const E = ['null', 'eins', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun'];
   const T = { 10: 'zehn', 11: 'elf', 12: 'zwölf', 13: 'dreizehn', 14: 'vierzehn', 15: 'fünfzehn', 16: 'sechzehn', 17: 'siebzehn', 18: 'achtzehn', 19: 'neunzehn' };
@@ -155,12 +182,14 @@ pruefe('Jonas zerlegt Vorlese-Sätze', () => {
   assert.deepStrictEqual(Jonas.zerlegen('23 durch wie viel ergibt 1?'), ['z23', 'durch', 'wieviel', 'ergibt', 'f1']);
   assert.strictEqual(Jonas.zerlegen('Hallo Welt'), null);
 });
-pruefe('Jonas hat Schnipsel für alle Aufgaben', () => {
-  const gen = A.erzeuger({ uebungen: A.UEBUNGEN.map((u) => u.id), einsetzen: true });
-  for (let i = 0; i < 20000; i++) {
-    const namen = Jonas.zerlegen(A.alsSatz(gen()));
-    assert.ok(namen);
-    for (const n of namen) assert.ok(fs.existsSync(path.join(__dirname, '..', 'audio', 'jonas', n + '.mp3')), n);
+pruefe('Jonas hat Schnipsel für alle Aufgaben bis 100', () => {
+  for (const negativ of [false, true]) {
+    const gen = A.erzeuger({ ops: A.OPS, raum: 100, negativ, einsetzen: true });
+    for (let i = 0; i < 5000; i++) {
+      const namen = Jonas.zerlegen(A.alsSatz(gen()));
+      assert.ok(namen);
+      for (const n of namen) assert.ok(fs.existsSync(path.join(__dirname, '..', 'audio', 'jonas', n + '.mp3')), n);
+    }
   }
 });
 
@@ -194,7 +223,6 @@ pruefe('Unblock-Levels 1-30', () => {
 });
 
 // ---- Server: Konten und Klassen-Import ----
-const H = require('../server/hilfe.js');
 pruefe('Benutzername und Adresse', () => {
   assert.strictEqual(H.benutzername(' lena.m '), 'lena.m');
   assert.strictEqual(H.benutzername('max mustermann'), null);
@@ -348,6 +376,10 @@ pruefe('Turnier-Aufgaben für Kinder ohne Lösung', () => {
   assert.strictEqual(gefiltertA.a, null);
   assert.strictEqual(gefiltertA.c, 10);
   assert.strictEqual(gefiltertA.stellen, 1);
+
+  const neg = { a: 3, op: '-', b: 8, c: -5, luecke: 'c', loesung: -5 };
+  const gefiltertNeg = Turnier.aufgabenFuerKind(neg);
+  assert.strictEqual(gefiltertNeg.stellen, 1);
 });
 
 pruefe('Turnier-Zustandsautomat und doppelte Antwort', () => {
@@ -971,7 +1003,9 @@ pruefe('Tdot: Station anlegen, Code-Format und Einstellungen normalisieren', () 
       art: 'aufgaben',
       anzahl: 13,
       minuten: 99,
-      uebungen: ['plus20u', 'quatsch', 'plus10', 'plus10'],
+      ops: ['-', '+'],
+      raum: 200,
+      negativ: true,
       einsetzen: true,
       strafe: 5,
     },
@@ -983,16 +1017,26 @@ pruefe('Tdot: Station anlegen, Code-Format und Einstellungen normalisieren', () 
   assert.strictEqual(station.aktiv, true);
   assert.strictEqual(station.einstellungen.anzahl, 15);
   assert.strictEqual(station.einstellungen.minuten, 10);
-  assert.deepStrictEqual(station.einstellungen.uebungen, ['plus10', 'plus20u']);
+  assert.deepStrictEqual(station.einstellungen.ops, ['+', '-']);
+  assert.strictEqual(station.einstellungen.raum, 200);
+  assert.strictEqual(station.einstellungen.negativ, true);
   assert.strictEqual(station.einstellungen.einsetzen, true);
   assert.strictEqual(station.einstellungen.strafe, 5);
+
+  const fallback = dienst.anlegen({
+    titel: 'Alt-Format',
+    einstellungen: { uebungen: ['plus20u', 'mal'] },
+  });
+  assert.deepStrictEqual(fallback.station.einstellungen.ops, ['+', '*']);
+  assert.strictEqual(fallback.station.einstellungen.raum, 100);
+  assert.strictEqual(fallback.station.einstellungen.negativ, false);
 });
 
 pruefe('Tdot: Aufgaben-Modus Wertung, Bestwert je Person und Schwelle', () => {
   const { dienst } = erstelleTestTdot();
   const { code } = dienst.anlegen({
     titel: 'Aufgaben-Station',
-    einstellungen: { modus: 'schrift', art: 'aufgaben', anzahl: 10, uebungen: ['plus10'], strafe: 3 },
+    einstellungen: { modus: 'schrift', art: 'aufgaben', anzahl: 10, ops: ['+'], raum: 10, strafe: 3 },
   });
 
   // Unter 50 % richtig -> nicht gewertet
@@ -1030,7 +1074,7 @@ pruefe('Tdot: Aufgaben-Modus Wertung, Bestwert je Person und Schwelle', () => {
 pruefe('Tdot: Zeit-Modus Wertung (richtig - floor(falsch/4))', () => {
   const { dienst } = erstelleTestTdot();
   const { code } = dienst.anlegen({
-    einstellungen: { modus: 'schrift', art: 'zeit', minuten: 1, uebungen: ['mal'] },
+    einstellungen: { modus: 'schrift', art: 'zeit', minuten: 1, ops: ['*'], raum: 100 },
   });
 
   const nullPunkte = dienst.ergebnisEintragen(code, { name: 'Lea', emoji: '🐱', richtig: 1, falsch: 4, zeitMs: 60000 });
@@ -1075,11 +1119,12 @@ pruefe('Tdot: Pause, Berechtigung, Löschen und Station beenden', () => {
 
   // Einstellungen mit Liste leeren
   const nachReset = dienst.aktualisieren(code, leitung, {
-    einstellungen: { art: 'zeit', minuten: 2, uebungen: ['plus100'] },
+    einstellungen: { art: 'zeit', minuten: 2, ops: ['+'], raum: 100, negativ: true },
     listeLeeren: true,
   });
   assert.strictEqual(nachReset.gesamt, 0);
   assert.strictEqual(nachReset.station.einstellungen.art, 'zeit');
+  assert.strictEqual(nachReset.station.einstellungen.negativ, true);
 
   // Station löschen entfernt auch verknüpfte Ergebnisse per CASCADE
   dienst.ergebnisEintragen(code, { name: 'Tim', emoji: '🐶', richtig: 15, falsch: 0, zeitMs: 120000 });

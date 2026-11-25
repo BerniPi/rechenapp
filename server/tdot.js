@@ -41,6 +41,11 @@ function initSchema(database) {
 
     CREATE INDEX IF NOT EXISTS tdot_ergebnisse_station ON tdot_ergebnisse(station_code);
   `);
+
+  const spalten = database.prepare('PRAGMA table_info(tdot_stationen)').all().map((s) => s.name);
+  if (!spalten.includes('ops')) database.exec('ALTER TABLE tdot_stationen ADD COLUMN ops TEXT');
+  if (!spalten.includes('raum')) database.exec('ALTER TABLE tdot_stationen ADD COLUMN raum INTEGER');
+  if (!spalten.includes('negativ')) database.exec('ALTER TABLE tdot_stationen ADD COLUMN negativ INTEGER NOT NULL DEFAULT 0');
 }
 
 function einstellungenNormalisieren(e = {}) {
@@ -54,17 +59,23 @@ function einstellungenNormalisieren(e = {}) {
   const minuten = Number.isFinite(rohMinuten)
     ? Math.min(10, Math.max(1, Math.round(rohMinuten)))
     : 1;
-  const gewaehlt = Array.isArray(e.uebungen)
-    ? e.uebungen.filter((id) => Aufgaben.NACH_ID[id])
-    : [];
-  const uebungen = Aufgaben.uebungenTeil(gewaehlt.length ? gewaehlt : ['plus10']).split(',');
+  let ops = e.ops ? [...Aufgaben.opsTeil(e.ops)] : null;
+  let raum = Aufgaben.raumGueltig(e.raum) ? Number(e.raum) : null;
+  if ((!ops || !raum) && e.uebungen) {
+    const alt = Aufgaben.ausUebungen(e.uebungen);
+    if (!ops) ops = alt.ops;
+    if (!raum) raum = alt.raum;
+  }
+  ops = ops || ['+'];
+  raum = raum || 10;
+  const negativ = Boolean(e.negativ);
   const einsetzen = Boolean(e.einsetzen);
   const rohStrafe = Number(e.strafe);
   const strafe = Number.isFinite(rohStrafe)
     ? Math.min(30, Math.max(0, Math.round(rohStrafe)))
     : 3;
 
-  return { modus, art, anzahl, minuten, uebungen, einsetzen, strafe };
+  return { modus, art, anzahl, minuten, ops, raum, negativ, einsetzen, strafe };
 }
 
 function titelBereinigen(t) {
@@ -87,6 +98,10 @@ function fehlerMitStatus(status, meldung) {
 
 function oeffentlich(row) {
   if (!row) return null;
+  const alt = Aufgaben.ausUebungen(row.uebungen);
+  const ops = row.ops ? [...Aufgaben.opsTeil(row.ops)] : alt.ops;
+  const raum = Aufgaben.raumGueltig(row.raum) ? Number(row.raum) : alt.raum;
+  const negativ = Boolean(row.negativ);
   return {
     code: row.code,
     titel: row.titel,
@@ -96,7 +111,9 @@ function oeffentlich(row) {
       art: row.art,
       anzahl: row.anzahl,
       minuten: row.minuten,
-      uebungen: String(row.uebungen || 'plus10').split(',').filter((id) => Aufgaben.NACH_ID[id]),
+      ops,
+      raum,
+      negativ,
       einsetzen: Boolean(row.einsetzen),
       strafe: row.strafe,
     },
@@ -111,12 +128,12 @@ function erstelleDienst(database, tx) {
   const q = {
     codeExistiert: database.prepare('SELECT 1 FROM tdot_stationen WHERE code = ?'),
     stationNeu: database.prepare(`INSERT INTO tdot_stationen
-      (code, leitung_hash, titel, aktiv, modus, art, anzahl, minuten, uebungen, einsetzen, strafe, erstellt, aktualisiert)
-      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+      (code, leitung_hash, titel, aktiv, modus, art, anzahl, minuten, uebungen, ops, raum, negativ, einsetzen, strafe, erstellt, aktualisiert)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
     stationHolen: database.prepare('SELECT * FROM tdot_stationen WHERE code = ?'),
     leitungHolen: database.prepare('SELECT leitung_hash FROM tdot_stationen WHERE code = ?'),
     stationUpdate: database.prepare(`UPDATE tdot_stationen
-      SET titel = ?, aktiv = ?, modus = ?, art = ?, anzahl = ?, minuten = ?, uebungen = ?, einsetzen = ?, strafe = ?, aktualisiert = ?
+      SET titel = ?, aktiv = ?, modus = ?, art = ?, anzahl = ?, minuten = ?, uebungen = ?, ops = ?, raum = ?, negativ = ?, einsetzen = ?, strafe = ?, aktualisiert = ?
       WHERE code = ?`),
     stationLoeschen: database.prepare('DELETE FROM tdot_stationen WHERE code = ?'),
     listeAufgaben: database.prepare(`SELECT id, teilnehmer_key, name, emoji, wert, zeit_ms, richtig, falsch, versuche, datum
@@ -234,7 +251,10 @@ function erstelleDienst(database, tx) {
       e.art,
       e.anzahl,
       e.minuten,
-      Aufgaben.uebungenTeil(e.uebungen),
+      Aufgaben.opsText(e.ops, e.raum, e.negativ),
+      Aufgaben.opsTeil(e.ops),
+      e.raum,
+      e.negativ ? 1 : 0,
       e.einsetzen ? 1 : 0,
       e.strafe,
       jetzt,
@@ -364,7 +384,10 @@ function erstelleDienst(database, tx) {
         e.art,
         e.anzahl,
         e.minuten,
-        Aufgaben.uebungenTeil(e.uebungen),
+        Aufgaben.opsText(e.ops, e.raum, e.negativ),
+        Aufgaben.opsTeil(e.ops),
+        e.raum,
+        e.negativ ? 1 : 0,
         e.einsetzen ? 1 : 0,
         e.strafe,
         Date.now(),
