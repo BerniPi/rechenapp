@@ -1108,6 +1108,8 @@
     const zeitModus = istZeitModusAktiv();
     rundeAufgabenAnzahl = Number(einstellungen.anzahl) || meineAufgaben.length || 10;
 
+    const tastatur = $('#tastatur');
+    if (tastatur) tastatur.classList.toggle('mit-minus', istNegativAktiv());
     const minusBtn = $('#minus-taste');
     if (minusBtn) {
       minusBtn.classList.toggle('versteckt', !istNegativAktiv());

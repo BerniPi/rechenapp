@@ -755,10 +755,6 @@ body.rechnen-aktiv #app-container {
   #screen-rechnen .tastatur button {
     min-height: clamp(50px, 10dvh, 72px);
   }
-  #screen-rechnen .tastatur .minus-taste {
-    min-height: 40px;
-    font-size: 22px;
-  }
 }
 
 @media (max-height: 500px) {
@@ -783,10 +779,6 @@ body.rechnen-aktiv #app-container {
   }
   #screen-rechnen .tastatur .nebenknopf {
     font-size: 22px;
-  }
-  #screen-rechnen .tastatur .minus-taste {
-    min-height: 34px;
-    font-size: 18px;
   }
 }
 

@@ -201,11 +201,12 @@ button {
 
 .tastatur {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(12, 1fr);
   gap: 10px;
   margin-top: auto;
 }
 .tastatur button {
+  grid-column: span 4;
   background: var(--karte);
   border-radius: var(--rund);
   box-shadow: var(--schatten);
@@ -226,16 +227,20 @@ button {
 }
 .tastatur .nebenknopf small { font-size: 13px; font-weight: 700; }
 .tastatur .minus-taste {
-  grid-column: 1 / -1;
-  flex-direction: row;
-  gap: 8px;
-  min-height: 48px;
-  font-size: 28px;
-  order: -1;
+  background: var(--grau);
+  order: 11;
 }
 .tastatur .minus-taste.an { background: var(--blau); color: #fff; }
-.tastatur button[data-z="0"] { order: 11; }
-.tastatur .ueberspringen { order: 12; }
+.tastatur button[data-z="0"] { order: 12; }
+.tastatur .ueberspringen { order: 13; }
+.tastatur.mit-minus #zurueck,
+.tastatur.mit-minus .minus-taste,
+.tastatur.mit-minus button[data-z="0"],
+.tastatur.mit-minus .ueberspringen {
+  grid-column: span 3;
+}
+.tastatur.mit-minus .nebenknopf { padding: 0 2px; }
+.tastatur.mit-minus .nebenknopf small { font-size: 11px; }
 
 .sprach-bereich { text-align: center; margin: 10px 0; }
 .mikro {

@@ -283,6 +283,7 @@
 
     const sprache = s.modus === 'sprache';
     $('#tastatur').classList.toggle('versteckt', !R.tastatur);
+    $('#tastatur').classList.toggle('mit-minus', Boolean(s.negativ));
     $('#minus-taste').classList.toggle('versteckt', !s.negativ);
     $('#minus-taste').classList.remove('an');
     $('#sprach-bereich').classList.toggle('versteckt', !sprache);

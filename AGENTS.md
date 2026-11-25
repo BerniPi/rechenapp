@@ -129,7 +129,7 @@ Auth: `Authorization: Bearer <schluessel>`; gespeichert wird nur `sha256` in Tab
 
 ## Fachliche Regeln und Fallstricke
 
-- **Aufgabenauswahl:** Rechenarten `Aufgaben.OPS` (`+`, `-`, `*`, `/`) × Zahlenraum `Aufgaben.RAEUME` (`10, 20, 50, 100, 200, 500, 1000`) × `negativ` (`false`/`true`, Bereich `−raum` bis `+raum`). Ist `negativ` aktiv, blendet die Tastatur über `7 8 9` die breite `− Minus`-Taste ein; Auto-Submit zählt nur Ziffern ohne `-`. Geplant: Brüche, Klapustri.
+- **Aufgabenauswahl:** Rechenarten `Aufgaben.OPS` (`+`, `-`, `*`, `/`) × Zahlenraum `Aufgaben.RAEUME` (`10, 20, 50, 100, 200, 500, 1000`) × `negativ` (`false`/`true`, Bereich `−raum` bis `+raum`). Ist `negativ` aktiv, erscheint in der unteren Tastenreihe neben `0` die kompakte `−`-Taste (4er-Reihe); Auto-Submit zählt nur Ziffern ohne `-`. Geplant: Brüche, Klapustri.
 - **Rekord-Key** `modus|art|ops|raum|flags` (z. B. `schrift|zehn|+-|20|`, `sprache|m1|*|100|EN`), `ops` in kanonischer Reihenfolge `+-*/` (`Aufgaben.opsTeil`), `flags` ∈ `'' | 'E' | 'N' | 'EN'`. Aufbau in `app.js` `schluessel()`, Prüfung in `hilfe.js` `rekordKey()`. Alte `uebungen`-Einstellungen und 4-teilige Rekord-Keys stellt `Speicher.uebungenUmstellen` über `Aufgaben.ausUebungen` um.
 - Dockerfile kopiert `js/aufgaben.js` nach `/app/js`, damit der Server ihn findet.
 - Rekorde nur für feste Längen: `zehn` (10 Aufgaben), `a20` (20 Aufgaben) → kleinere Zeit besser; `m1`, `m5` (1/5 Minuten) → mehr Punkte besser. Server-Grenzen in `rekordWert()`.
