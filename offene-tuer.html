@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#4f7cff">
+  <title>Tag der offenen Tür · Rechenheld</title>
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/offene-tuer.css">
+</head>
+<body class="tdot-body">
+
+  <div id="offline-balken" class="offline-balken versteckt">
+    ⚠️ Verbindung weg – versuche es wieder …
+  </div>
+
+  <!-- ============ LEHRPERSON: EINRICHTEN ============ -->
+  <section id="screen-einrichten" class="screen">
+    <div class="tdot-setup-karte">
+      <header class="tdot-setup-kopf">
+        <h1>🏫 Tag der offenen Tür</h1>
+        <p class="tdot-untertitel">Rechenarten und Modus wählen, aktivieren und den QR-Code am Beamer zeigen. Schüler scannen mit ihrem Gerät und rechnen im normalen Rechner mit.</p>
+      </header>
+
+      <div class="einstellungen" id="setup-form">
+        <div class="gruppe">
+          <h2>Titel der Station</h2>
+          <input id="tdot-titel" class="tdot-text-eingabe" type="text" maxlength="50" value="Tag der offenen Tür" placeholder="z. B. Mathe-Challenge 2b" autocomplete="off">
+        </div>
+
+        <div class="gruppe">
+          <h2>Wie?</h2>
+          <div class="chips" data-feld="modus">
+            <button type="button" data-wert="schrift" class="an">⌨️ Tippen</button>
+            <button type="button" data-wert="sprache">🎤 Sprechen</button>
+          </div>
+        </div>
+
+        <div class="gruppe">
+          <h2>Spielart</h2>
+          <div class="chips" data-feld="art">
+            <button type="button" data-wert="aufgaben" class="an">🔢 Aufgaben</button>
+            <button type="button" data-wert="zeit">⏱️ Zeit</button>
+          </div>
+          <div class="stepper">
+            <button type="button" id="tdot-weniger" class="rund" aria-label="weniger">−</button>
+            <div id="tdot-laenge" class="laenge">10 Aufgaben</div>
+            <button type="button" id="tdot-mehr" class="rund" aria-label="mehr">+</button>
+          </div>
+          <label class="tdot-strafe-zeile" id="tdot-strafe-box">
+            <span>Strafzeit pro Fehler (Aufgaben-Modus)</span>
+            <select id="tdot-strafe">
+              <option value="0">0 s (keine)</option>
+              <option value="3" selected>3 s (Standard)</option>
+              <option value="5">5 s</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="gruppe">
+          <h2>Übungen (Rechenarten)</h2>
+          <div id="tdot-uebungen" class="uebungen"></div>
+        </div>
+
+        <div class="gruppe">
+          <h2>Einsetzaufgaben</h2>
+          <div class="chips" data-feld="einsetzen" data-bool>
+            <button type="button" data-wert="false" class="an">Nein</button>
+            <button type="button" data-wert="true">Ja: 7 − __ = 2</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="setup-fehler" class="sprach-hinweis"></p>
+
+      <div class="aktionen tdot-setup-aktionen">
+        <button type="button" id="btn-tdot-aktivieren" class="knopf gross gruen">🏫 Aktivieren &amp; Beamer öffnen ➔</button>
+        <a href="/" class="knopf grau tdot-link-knopf">Zur App</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BEAMER: HIGHSCORES & QR-CODE ============ -->
+  <section id="screen-beamer" class="screen">
+    <header class="tdot-kopf">
+      <div class="tdot-kopf-links">
+        <div class="tdot-titel-zeile">
+          <h1 id="beamer-titel">Tag der offenen Tür</h1>
+          <span id="beamer-status" class="tdot-status-badge aktiv">🟢 Aktiv</span>
+        </div>
+        <div id="beamer-info" class="tdot-badges"></div>
+      </div>
+
+      <div class="tdot-aktionen">
+        <button type="button" id="btn-tdot-pause" class="knopf klein grau leitung-nur">⏸️ Pausieren</button>
+        <button type="button" id="btn-tdot-einstellungen" class="knopf klein blau leitung-nur">⚙️ Einstellungen</button>
+        <button type="button" id="btn-tdot-leeren" class="knopf klein grau leitung-nur">🗑️ Liste leeren</button>
+        <button type="button" id="btn-tdot-ton" class="rund klein" title="Ton aus" aria-label="Ton aus">🔊</button>
+        <button type="button" id="btn-tdot-vollbild" class="knopf klein grau" title="Vollbild">⛶ Vollbild</button>
+        <button type="button" id="btn-tdot-beenden" class="knopf klein rot leitung-nur">✖ Beenden</button>
+      </div>
+    </header>
+
+    <div class="tdot-haupt">
+      <!-- Linke Spalte: QR-Code & Mitmach-Infos -->
+      <aside class="tdot-qr-spalte">
+        <h2>📱 Scannen &amp; Mitspielen!</h2>
+        <div class="tdot-qr-kasten">
+          <div id="beamer-qr" class="tdot-qr-svg"></div>
+          <div id="beamer-pause-overlay" class="tdot-pause-overlay versteckt">
+            <span>⏸️ Station pausiert</span>
+          </div>
+        </div>
+        <div class="tdot-url-box">
+          <div id="beamer-url" class="tdot-url-text"></div>
+          <div class="tdot-code-zeile">
+            <span>Code: <strong id="beamer-code" class="tdot-code-badge">----</strong></span>
+            <button type="button" id="btn-tdot-kopieren" class="knopf klein grau">🔗 Link kopieren</button>
+          </div>
+        </div>
+        <div class="tdot-zaehler-reihe">
+          <span class="tdot-zaehler-chip" id="beamer-spieler-zahl">0 Mitspieler</span>
+          <span class="tdot-zaehler-chip" id="beamer-runden-zahl">0 Runden</span>
+        </div>
+        <p id="beamer-wertung-hinweis" class="tdot-wertung-hinweis"></p>
+      </aside>
+
+      <!-- Rechte Spalte: Live-Highscoreliste -->
+      <main class="tdot-hs-spalte">
+        <div class="tdot-hs-kopf">
+          <h2 id="tdot-hs-titel">🏆 Highscoreliste</h2>
+          <span class="tdot-hs-legende">Bestes Ergebnis je Spieler</span>
+        </div>
+
+        <p id="tdot-status" role="status" class="visually-hidden"></p>
+
+        <div id="tdot-leer" class="tdot-leer">
+          <div class="tdot-leer-emoji">🎯</div>
+          <p>Noch keine Ergebnisse – scanne den QR-Code und leg los!</p>
+        </div>
+
+        <div id="tdot-tabelle-wrap" tabindex="0" role="region" aria-labelledby="tdot-hs-titel" class="tdot-tabelle-wrap versteckt">
+          <table class="tdot-tabelle">
+            <thead>
+              <tr>
+                <th>Platz</th>
+                <th>Spieler</th>
+                <th>Ergebnis</th>
+                <th>Aufgaben</th>
+                <th class="spalte-aktion"><span class="visually-hidden">Aktion</span></th>
+              </tr>
+            </thead>
+            <tbody id="tdot-tbody"></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============ DIALOG: EINSTELLUNGEN BEARBEITEN ============ -->
+  <dialog id="dialog-einstellungen" class="tdot-dialog">
+    <form method="dialog" class="tdot-dialog-inhalt">
+      <div class="tdot-dialog-kopf">
+        <h2>⚙️ Station bearbeiten</h2>
+        <button type="button" id="btn-edit-schliessen" class="rund klein" aria-label="Schließen">✖</button>
+      </div>
+
+      <div class="einstellungen" id="edit-form">
+        <div class="gruppe">
+          <h2>Titel der Station</h2>
+          <input id="edit-titel" class="tdot-text-eingabe" type="text" maxlength="50" autocomplete="off">
+        </div>
+
+        <div class="gruppe">
+          <h2>Wie?</h2>
+          <div class="chips" data-feld="modus">
+            <button type="button" data-wert="schrift">⌨️ Tippen</button>
+            <button type="button" data-wert="sprache">🎤 Sprechen</button>
+          </div>
+        </div>
+
+        <div class="gruppe">
+          <h2>Spielart</h2>
+          <div class="chips" data-feld="art">
+            <button type="button" data-wert="aufgaben">🔢 Aufgaben</button>
+            <button type="button" data-wert="zeit">⏱️ Zeit</button>
+          </div>
+          <div class="stepper">
+            <button type="button" id="edit-weniger" class="rund" aria-label="weniger">−</button>
+            <div id="edit-laenge" class="laenge">10 Aufgaben</div>
+            <button type="button" id="edit-mehr" class="rund" aria-label="mehr">+</button>
+          </div>
+          <label class="tdot-strafe-zeile" id="edit-strafe-box">
+            <span>Strafzeit pro Fehler (Aufgaben-Modus)</span>
+            <select id="edit-strafe">
+              <option value="0">0 s (keine)</option>
+              <option value="3">3 s (Standard)</option>
+              <option value="5">5 s</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="gruppe">
+          <h2>Übungen (Rechenarten)</h2>
+          <div id="edit-uebungen" class="uebungen"></div>
+        </div>
+
+        <div class="gruppe">
+          <h2>Einsetzaufgaben</h2>
+          <div class="chips" data-feld="einsetzen" data-bool>
+            <button type="button" data-wert="false">Nein</button>
+            <button type="button" data-wert="true">Ja: 7 − __ = 2</button>
+          </div>
+        </div>
+
+        <label class="tdot-checkbox-zeile">
+          <input type="checkbox" id="edit-liste-leeren">
+          <span>Highscoreliste dabei leeren (empfohlen bei geänderter Spielart/Übung)</span>
+        </label>
+      </div>
+
+      <p id="edit-fehler" class="sprach-hinweis"></p>
+
+      <div class="tdot-dialog-aktionen">
+        <button type="button" id="btn-edit-abbrechen" class="knopf grau">Abbrechen</button>
+        <button type="button" id="btn-edit-speichern" class="knopf gruen">Speichern ✅</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/vendor/qrcode.js"></script>
+  <script src="/js/aufgaben.js"></script>
+  <script src="/js/ton.js"></script>
+  <script src="/js/offene-tuer.js"></script>
+</body>
+</html>

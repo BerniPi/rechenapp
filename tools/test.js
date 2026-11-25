@@ -912,7 +912,235 @@ pruefe('B8: Antwort auf eine schon fertige Aufgabenliste liefert ignoriert: true
   assert.strictEqual(rExtra.richtig, null);
 });
 
+pruefe('Turnier: Überspringen (wert: null) zählt als falsch auch bei Lösung 0', () => {
+  const { code, leitung, turnier: t } = Turnier.anlegen({
+    titel: 'Skip-Test',
+    einstellungen: { format: 'sprint', anzahl: 5 },
+  });
+  const k1 = Turnier.beitreten(code, { name: 'SkipKind', emoji: '🦊' });
+  Turnier.beitreten(code, { name: 'Partner', emoji: '🐻' });
+
+  Turnier.starten(t, leitung);
+  Turnier.rundeStarten(t, leitung, 1000);
+  Turnier.rundeAktivieren(t, 4000);
+
+  const sp = t.runden[0].spiele[0];
+  sp.aufgaben[0] = { a: 5, op: '-', b: 5, c: 0, luecke: 'c', loesung: 0, uebung: 'minus10' };
+
+  const res = Turnier.antworten(t, k1.schluessel, { spiel: sp.id, index: 0, wert: null }, 5000);
+  assert.strictEqual(res.richtig, false);
+  assert.strictEqual(res.index, 1);
+
+  const st = sp.stand[k1.id];
+  assert.strictEqual(st.richtig, 0);
+  assert.strictEqual(st.falsch, 1);
+  assert.strictEqual(st.index, 1);
+});
+
+pruefe('Turnier: Challenge-Mode Standard false und aktivierbar', () => {
+  const { turnier: tStd } = Turnier.anlegen({ titel: 'Standard' });
+  assert.strictEqual(tStd.einstellungen.challengeMode, false);
+
+  const { turnier: tCh } = Turnier.anlegen({
+    titel: 'Challenge',
+    einstellungen: { challengeMode: true, format: 'sprint' },
+  });
+  assert.strictEqual(tCh.einstellungen.challengeMode, true);
+});
+
+// ---- Tag der offenen Tür (server/tdot.js) ----
+const { DatabaseSync } = require('node:sqlite');
+const Tdot = require('../server/tdot.js');
+
+function erstelleTestTdot() {
+  const memDb = new DatabaseSync(':memory:');
+  memDb.exec('PRAGMA foreign_keys = ON;');
+  const tx = (fn) => {
+    memDb.exec('BEGIN IMMEDIATE');
+    try { const r = fn(); memDb.exec('COMMIT'); return r; } catch (e) { memDb.exec('ROLLBACK'); throw e; }
+  };
+  return { memDb, dienst: Tdot.erstelleDienst(memDb, tx) };
+}
+
+pruefe('Tdot: Station anlegen, Code-Format und Einstellungen normalisieren', () => {
+  const { dienst } = erstelleTestTdot();
+  const { code, leitung, station } = dienst.anlegen({
+    titel: '  Mathe-Tag 2026  ',
+    einstellungen: {
+      modus: 'schrift',
+      art: 'aufgaben',
+      anzahl: 13,
+      minuten: 99,
+      uebungen: ['plus20u', 'quatsch', 'plus10', 'plus10'],
+      einsetzen: true,
+      strafe: 5,
+    },
+  });
+  assert(/^[2-9A-HJ-NP-Z]{4}$/.test(code), `Code ungültig: ${code}`);
+  assert(dienst.istLeitung(code, leitung));
+  assert(!dienst.istLeitung(code, 'falsch'));
+  assert.strictEqual(station.titel, 'Mathe-Tag 2026');
+  assert.strictEqual(station.aktiv, true);
+  assert.strictEqual(station.einstellungen.anzahl, 15);
+  assert.strictEqual(station.einstellungen.minuten, 10);
+  assert.deepStrictEqual(station.einstellungen.uebungen, ['plus10', 'plus20u']);
+  assert.strictEqual(station.einstellungen.einsetzen, true);
+  assert.strictEqual(station.einstellungen.strafe, 5);
+});
+
+pruefe('Tdot: Aufgaben-Modus Wertung, Bestwert je Person und Schwelle', () => {
+  const { dienst } = erstelleTestTdot();
+  const { code } = dienst.anlegen({
+    titel: 'Aufgaben-Station',
+    einstellungen: { modus: 'schrift', art: 'aufgaben', anzahl: 10, uebungen: ['plus10'], strafe: 3 },
+  });
+
+  // Unter 50 % richtig -> nicht gewertet
+  const unter = dienst.ergebnisEintragen(code, { name: 'Max', emoji: '🦊', richtig: 4, falsch: 6, zeitMs: 12000 });
+  assert.strictEqual(unter.gewertet, false);
+
+  // Anna: 10 richtig in 15.000 ms -> wert 15000
+  const r1 = dienst.ergebnisEintragen(code, { name: 'Anna', emoji: '🦄', richtig: 10, falsch: 0, zeitMs: 15000 });
+  assert.strictEqual(r1.gewertet, true);
+  assert.strictEqual(r1.neu, true);
+  assert.strictEqual(r1.platz, 1);
+
+  // Ben: 9 richtig, 1 falsch in 11.000 ms -> 11000 + 3000 = 14000 -> Platz 1 vor Anna
+  const r2 = dienst.ergebnisEintragen(code, { name: 'Ben', emoji: '🚀', richtig: 9, falsch: 1, zeitMs: 11000 });
+  assert.strictEqual(r2.platz, 1);
+  assert.strictEqual(r2.besterWert, 14000);
+
+  // Anna spielt schlechter (18.000 ms) -> alter Bestwert (15000) bleibt, versuche = 2
+  const r3 = dienst.ergebnisEintragen(code, { name: 'anna', emoji: '🦄', richtig: 10, falsch: 0, zeitMs: 18000 });
+  assert.strictEqual(r3.neu, false);
+  assert.strictEqual(r3.verbessert, false);
+  assert.strictEqual(r3.besterWert, 15000);
+  assert.strictEqual(r3.eintrag.versuche, 2);
+  assert.strictEqual(r3.platz, 2);
+
+  // Anna verbessert sich auf 12.000 ms -> neuer Platz 1, versuche = 3
+  const r4 = dienst.ergebnisEintragen(code, { name: 'Anna', emoji: '🦄', richtig: 10, falsch: 0, zeitMs: 12000 });
+  assert.strictEqual(r4.verbessert, true);
+  assert.strictEqual(r4.besterWert, 12000);
+  assert.strictEqual(r4.eintrag.versuche, 3);
+  assert.strictEqual(r4.platz, 1);
+  assert.strictEqual(r4.rundenGesamt, 4);
+});
+
+pruefe('Tdot: Zeit-Modus Wertung (richtig - floor(falsch/4))', () => {
+  const { dienst } = erstelleTestTdot();
+  const { code } = dienst.anlegen({
+    einstellungen: { modus: 'schrift', art: 'zeit', minuten: 1, uebungen: ['mal'] },
+  });
+
+  const nullPunkte = dienst.ergebnisEintragen(code, { name: 'Lea', emoji: '🐱', richtig: 1, falsch: 4, zeitMs: 60000 });
+  assert.strictEqual(nullPunkte.gewertet, false);
+
+  const p1 = dienst.ergebnisEintragen(code, { name: 'Lea', emoji: '🐱', richtig: 18, falsch: 5, zeitMs: 60000 });
+  assert.strictEqual(p1.gewertet, true);
+  assert.strictEqual(p1.besterWert, 17);
+
+  const p2 = dienst.ergebnisEintragen(code, { name: 'Tom', emoji: '🦁', richtig: 20, falsch: 0, zeitMs: 60000 });
+  assert.strictEqual(p2.platz, 1);
+  assert.strictEqual(p2.besterWert, 20);
+});
+
+pruefe('Tdot: Pause, Berechtigung, Löschen und Station beenden', () => {
+  const { memDb, dienst } = erstelleTestTdot();
+  const { code, leitung } = dienst.anlegen({ titel: 'Test-Station' });
+
+  const erg = dienst.ergebnisEintragen(code, { name: 'Mia', emoji: '🐼', richtig: 10, falsch: 0, zeitMs: 14000 });
+  assert.strictEqual(erg.gesamt, 1);
+
+  // Falsches Secret -> 403
+  assert.throws(() => dienst.aktualisieren(code, 'falsch', { aktiv: false }), (err) => err.status === 403);
+
+  // Pausieren -> neue Ergebnisse werden mit 403 abgelehnt
+  const pause = dienst.aktualisieren(code, leitung, { aktiv: false });
+  assert.strictEqual(pause.station.aktiv, false);
+  assert.throws(
+    () => dienst.ergebnisEintragen(code, { name: 'Tim', emoji: '🐶', richtig: 10, falsch: 0, zeitMs: 13000 }),
+    (err) => err.status === 403,
+  );
+
+  // Wieder aktivieren -> Ergebnis wird wieder angenommen
+  dienst.aktualisieren(code, leitung, { aktiv: true });
+  const erg2 = dienst.ergebnisEintragen(code, { name: 'Tim', emoji: '🐶', richtig: 10, falsch: 0, zeitMs: 13000 });
+  assert.strictEqual(erg2.gesamt, 2);
+
+  // Einzelnen Eintrag löschen
+  const nachDel = dienst.eintragLoeschen(code, leitung, erg.eintrag.id);
+  assert.strictEqual(nachDel.geloescht, true);
+  assert.strictEqual(nachDel.gesamt, 1);
+
+  // Einstellungen mit Liste leeren
+  const nachReset = dienst.aktualisieren(code, leitung, {
+    einstellungen: { art: 'zeit', minuten: 2, uebungen: ['plus100'] },
+    listeLeeren: true,
+  });
+  assert.strictEqual(nachReset.gesamt, 0);
+  assert.strictEqual(nachReset.station.einstellungen.art, 'zeit');
+
+  // Station löschen entfernt auch verknüpfte Ergebnisse per CASCADE
+  dienst.ergebnisEintragen(code, { name: 'Tim', emoji: '🐶', richtig: 15, falsch: 0, zeitMs: 120000 });
+  assert.strictEqual(memDb.prepare('SELECT COUNT(*) AS n FROM tdot_ergebnisse WHERE station_code = ?').get(code).n, 1);
+  dienst.stationLoeschen(code, leitung);
+  assert.strictEqual(dienst.finden(code), null);
+  assert.strictEqual(memDb.prepare('SELECT COUNT(*) AS n FROM tdot_ergebnisse WHERE station_code = ?').get(code).n, 0);
+});
+
 (async () => {
+  const { Readable } = require('node:stream');
+  async function simuliereAntwort(code, schluessel, bodyObj) {
+    const req = Readable.from([Buffer.from(JSON.stringify(bodyObj))]);
+    req.method = 'POST';
+    req.headers = { authorization: `Bearer ${schluessel}`, 'content-type': 'application/json' };
+    req.socket = { remoteAddress: '127.0.0.1' };
+    let status = 0;
+    const res = {
+      setHeader() {},
+      writeHead(s) { status = s; },
+      end() {},
+    };
+    await TurnierRouten.anfrage(req, res, new URL(`http://localhost/api/turnier/${code}/antwort`));
+    return status;
+  }
+
+  for (const challengeMode of [false, true]) {
+    const { code, leitung, turnier: t } = Turnier.anlegen({
+      titel: `SSE-Challenge-${challengeMode}`,
+      einstellungen: { format: 'sprint', anzahl: 5, challengeMode },
+    });
+    const k1 = Turnier.beitreten(code, { name: 'KindEins', emoji: '🦊' });
+    const k2 = Turnier.beitreten(code, { name: 'KindZwei', emoji: '🐻' });
+    const logLeitung = [];
+    const logK2 = [];
+    TurnierRouten.verbindungen.set(code, new Set([
+      { res: { write: (m) => logLeitung.push(m) }, rolle: 'leitung', schluessel: leitung, teilnehmerId: null },
+      { res: { write: (m) => logK2.push(m) }, rolle: 'kind', schluessel: k2.schluessel, teilnehmerId: k2.id },
+    ]));
+
+    const jetzt = Date.now();
+    Turnier.starten(t, leitung);
+    Turnier.rundeStarten(t, leitung, jetzt - 5000);
+    Turnier.rundeAktivieren(t, jetzt);
+
+    const sp = t.runden[0].spiele[0];
+    const st = await simuliereAntwort(code, k1.schluessel, {
+      spiel: sp.id,
+      index: 0,
+      wert: sp.aufgaben[0].loesung,
+    });
+    TurnierRouten.verbindungen.delete(code);
+
+    pruefe(`Turnier: fortschritt SSE bei challengeMode=${challengeMode}`, () => {
+      assert.strictEqual(st, 200);
+      assert(logLeitung.some((m) => m.includes('event: fortschritt')), 'Leitung muss fortschritt immer erhalten');
+      const k2BekamFortschritt = logK2.some((m) => m.includes('event: fortschritt'));
+      assert.strictEqual(k2BekamFortschritt, challengeMode);
+    });
+  }
+
   const h = await H.pwHash('geheim123');
   pruefe('Passwort-Hash', () => assert(/^scrypt\$[\w-]+\$[\w-]+$/.test(h) && !h.includes('geheim123')));
   const [ja, nein, leer] = await Promise.all([H.pwPruefen('geheim123', h), H.pwPruefen('geheim124', h), H.pwPruefen('x', null)]);

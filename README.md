@@ -142,6 +142,14 @@ Unter `/turnier` kann jede Lehrkraft ohne Anmeldung ein Rechen-Turnier für die 
   }
   ```
 
+## Tag der offenen Tür
+
+Unter `/offene-tuer` (auch direkt im Eltern-Bereich verlinkt) richtet die Lehrperson eine Station mit Rechenarten, Modus (Tippen/Sprechen), Aufgabenanzahl oder Zeitlimit ein:
+
+- **Beamer**: Zeigt den QR-Code und die Live-Highscoreliste (über SSE unter `/api/tdot/`). Einstellungen lassen sich jederzeit anpassen, die Station pausieren oder einzelne Einträge bzw. die ganze Liste löschen.
+- **Schüler**: Scannen den QR-Code (`/?tdot=CODE`), wählen Spitznamen und Bild und spielen direkt im normalen Rechenheld-Rechner. Je Name zählt das beste Ergebnis; nach der Runde erscheinen Rang und Live-Top-5.
+- **Reverse-Proxy-Hinweis für SSE**: Analog zum Turniermodus auch `/api/tdot/` ohne Proxy-Pufferung weiterleiten (`proxy_buffering off;`).
+
 ## Fremde Bestandteile
 
 - `audio/jonas/` – Wortschnipsel der Microsoft-Stimme „Jonas" (de-AT-JonasNeural), erzeugt mit `tools/stimme.py`. Derzeit über edge-tts erzeugt; für eine öffentlich verteilte App über Azure AI Speech neu erzeugen.

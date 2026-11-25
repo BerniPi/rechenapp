@@ -591,3 +591,32 @@ button {
 .hs-listen { display: flex; flex-direction: column; gap: 18px; padding-bottom: 30px; }
 .hs-listen .bestenliste h3 { text-transform: none; letter-spacing: 0; }
 .hs-listen .bestenliste.meine h3 { color: var(--blau); }
+
+/* Tag der offenen Tür (Schüler-Beitritt im normalen Rechner) */
+.tdot-info-karte {
+  background: var(--karte);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text);
+}
+.tdot-info-karte small {
+  display: block;
+  margin-top: 4px;
+  color: var(--leise);
+  font-weight: 700;
+  font-size: 14px;
+}
+#tdot-vorschau {
+  display: flex;
+  justify-content: center;
+  margin: 4px auto 14px;
+  width: auto;
+  height: auto;
+  background: none;
+  box-shadow: none;
+}

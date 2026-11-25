@@ -1,0 +1,624 @@
+/* Tag der offenen Tür: Setup und 16:9 Beamer-Ansicht */
+
+.tdot-body {
+  min-height: 100dvh;
+}
+
+.offline-balken {
+  background: #f59e0b;
+  color: #451a03;
+  text-align: center;
+  padding: 8px 12px;
+  font-weight: 800;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Einrichten ---------- */
+#screen-einrichten {
+  max-width: 860px;
+  padding: 20px 16px 32px;
+}
+
+.tdot-setup-karte {
+  background: var(--karte);
+  border-radius: 26px;
+  box-shadow: var(--schatten);
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tdot-setup-kopf h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 36px);
+  color: var(--blau);
+}
+
+.tdot-untertitel {
+  margin: 6px 0 0;
+  color: var(--leise);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.tdot-text-eingabe {
+  width: 100%;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 800;
+  padding: 12px 14px;
+  border: 3px solid var(--grau);
+  border-radius: var(--rund);
+  background: var(--bg);
+  color: var(--text);
+  user-select: text;
+  -webkit-user-select: text;
+}
+.tdot-text-eingabe:focus {
+  outline: none;
+  border-color: var(--blau);
+}
+
+.tdot-strafe-zeile {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.tdot-strafe-zeile select {
+  font: inherit;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--grau);
+  background: var(--karte);
+}
+
+.tdot-setup-aktionen {
+  margin-top: 8px;
+}
+
+.tdot-link-knopf {
+  text-align: center;
+  text-decoration: none;
+}
+
+/* ---------- Beamer 16:9 ---------- */
+#screen-beamer {
+  max-width: none;
+  width: 100%;
+  min-height: 100dvh;
+  padding: 16px 24px 20px;
+  gap: 16px;
+}
+
+@media (min-width: 960px) {
+  #screen-beamer {
+    height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+.tdot-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 18px;
+  background: var(--karte);
+  border-radius: 22px;
+  box-shadow: var(--schatten);
+  padding: 12px 18px;
+}
+
+.tdot-kopf-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tdot-titel-zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tdot-titel-zeile h1 {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 34px);
+  color: var(--blau);
+}
+
+.tdot-status-badge {
+  font-size: 15px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tdot-status-badge.pausiert {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tdot-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tdot-badge {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.tdot-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tdot-body.ist-zuschauer .leitung-nur {
+  display: none !important;
+}
+
+.tdot-haupt {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(290px, 35%) 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 959px) {
+  .tdot-haupt {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Linke QR-Spalte */
+.tdot-qr-spalte {
+  background: var(--karte);
+  border-radius: 24px;
+  box-shadow: var(--schatten);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.tdot-qr-spalte h2 {
+  margin: 0;
+  font-size: clamp(20px, 2vw, 26px);
+  color: var(--text);
+}
+
+.tdot-qr-kasten {
+  position: relative;
+  background: #ffffff;
+  border: 4px solid var(--bg);
+  border-radius: 22px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tdot-qr-svg svg {
+  display: block;
+  width: min(320px, 34vh, 65vw);
+  height: auto;
+}
+
+.tdot-pause-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  font-weight: 900;
+  color: #92400e;
+  padding: 16px;
+}
+
+.tdot-url-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.tdot-url-text {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--leise);
+  overflow-wrap: anywhere;
+}
+
+.tdot-code-zeile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.tdot-code-badge {
+  display: inline-block;
+  background: #dfe7ff;
+  color: var(--blau);
+  padding: 4px 12px;
+  border-radius: 10px;
+  font-size: 24px;
+  letter-spacing: 3px;
+}
+
+.tdot-zaehler-reihe {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tdot-zaehler-chip {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 800;
+  font-size: 15px;
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
+.tdot-wertung-hinweis {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--leise);
+}
+
+/* Rechte Highscore-Spalte */
+.tdot-hs-spalte {
+  background: var(--karte);
+  border-radius: 24px;
+  box-shadow: var(--schatten);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tdot-hs-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.tdot-hs-kopf h2 {
+  margin: 0;
+  font-size: clamp(22px, 2.3vw, 30px);
+  color: var(--blau);
+}
+
+.tdot-hs-legende {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--leise);
+}
+
+.tdot-leer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--leise);
+  padding: 32px 16px;
+}
+
+.tdot-leer-emoji {
+  font-size: 64px;
+  margin-bottom: 10px;
+}
+
+.tdot-leer p {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* Responsive Tabelle + View Transitions */
+.tdot-tabelle-wrap {
+  flex: 1;
+  overflow: auto;
+  max-inline-size: 100%;
+  container-type: inline-size;
+  border-radius: 14px;
+}
+
+.tdot-tabelle {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  --label-1: "Platz";
+  --label-3: "Ergebnis";
+  --label-4: "Aufgaben";
+}
+
+.tdot-tabelle thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: var(--karte);
+}
+
+.tdot-tabelle thead th {
+  text-align: left;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--leise);
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--bg);
+  white-space: nowrap;
+}
+
+.tdot-tabelle tbody tr {
+  background: var(--karte);
+  view-transition-name: match-element;
+  transition: background-color 0.35s ease;
+}
+
+.tdot-tabelle tbody tr:nth-child(even) {
+  background: #f8faff;
+}
+
+.tdot-tabelle tbody tr.platz-1 {
+  background: #fff7d6;
+}
+.tdot-tabelle tbody tr.platz-2 {
+  background: #f1f5f9;
+}
+.tdot-tabelle tbody tr.platz-3 {
+  background: #ffedd5;
+}
+
+.tdot-tabelle tbody tr.neu-highlight {
+  background: #dcfce7 !important;
+}
+
+.tdot-tabelle tbody th,
+.tdot-tabelle tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--bg);
+  font-size: clamp(17px, 1.5vw, 22px);
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.tdot-tabelle tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  background: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tdot-platz-zelle {
+  width: 64px;
+  text-align: center;
+  font-size: clamp(20px, 1.8vw, 26px);
+}
+
+.tdot-spieler-zelle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tdot-spieler-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.tdot-wert-zelle {
+  color: var(--blau);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tdot-details-zelle {
+  font-size: 16px !important;
+  color: var(--leise);
+  white-space: nowrap;
+}
+
+.tdot-versuche-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 13px;
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.spalte-aktion {
+  width: 48px;
+  text-align: right;
+}
+
+.tdot-body.ist-zuschauer .spalte-aktion {
+  display: none;
+}
+
+.tdot-entfernen-btn {
+  background: transparent;
+  color: var(--leise);
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.tdot-entfernen-btn:hover {
+  background: #fee2e2;
+  color: var(--rot);
+}
+
+@container (width < 520px) {
+  .tdot-tabelle,
+  .tdot-tabelle thead,
+  .tdot-tabelle tbody,
+  .tdot-tabelle tr,
+  .tdot-tabelle th,
+  .tdot-tabelle td {
+    display: block;
+  }
+
+  .tdot-tabelle thead {
+    display: none;
+  }
+
+  .tdot-tabelle tbody tr {
+    margin-block-end: 12px;
+    border: 2px solid var(--bg);
+    border-radius: 16px;
+    padding: 8px 12px;
+  }
+
+  .tdot-tabelle tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    border-bottom: 1px solid var(--bg);
+  }
+
+  .tdot-tabelle tbody td {
+    border-bottom: 0;
+    padding: 4px 12px;
+    text-align: left;
+  }
+
+  .tdot-tabelle tbody td:nth-child(1)::before {
+    content: var(--label-1) ": ";
+    color: var(--leise);
+  }
+
+  .tdot-tabelle tbody td:nth-child(3)::before {
+    content: var(--label-3) ": ";
+    color: var(--leise);
+  }
+
+  .tdot-tabelle tbody td:nth-child(4)::before {
+    content: var(--label-4) ": ";
+    color: var(--leise);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+
+/* ---------- Dialog ---------- */
+.tdot-dialog {
+  border: 0;
+  border-radius: 26px;
+  padding: 0;
+  max-width: 720px;
+  width: min(94vw, 720px);
+  max-height: 90dvh;
+  background: var(--karte);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgba(20, 28, 50, 0.35);
+}
+
+.tdot-dialog::backdrop {
+  background: rgba(20, 28, 50, 0.55);
+}
+
+.tdot-dialog-inhalt {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tdot-dialog-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.tdot-dialog-kopf h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--blau);
+}
+
+.tdot-checkbox-zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #fff4cf;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.tdot-checkbox-zeile input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--blau);
+}
+
+.tdot-dialog-aktionen {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}

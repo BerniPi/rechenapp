@@ -490,10 +490,11 @@
   });
 
   $('#abbrechen').addEventListener('click', () => {
-    if (laedt) { laedt = false; chipsAnzeigen(); zeige('start'); return; }
+    if (laedt) { laedt = false; if (tdot) zeige('tdot-beitritt'); else { chipsAnzeigen(); zeige('start'); } return; }
     if (!R) return;
-    if (!confirm('Runde abbrechen? Dann gibt es keine Sterne.')) return;
+    if (!confirm(tdot ? 'Runde abbrechen?' : 'Runde abbrechen? Dann gibt es keine Sterne.')) return;
     rundeAufraeumen();
+    if (tdot) { zeige('tdot-beitritt'); return; }
     chipsAnzeigen();
     zeige('start');
   });
@@ -547,9 +548,40 @@
     return `🎯 Für 5 ⭐: ${n} Aufgaben ohne Fehler`;
   }
 
+  function ergebnisAnzeigen(st, s, zusatzHtml) {
+    $('#erg-titel').textContent = st >= 4 ? 'Super gemacht! 🎉' : st >= 2 ? 'Gut gemacht! 👍' : st === 1 ? 'Geschafft! 💪' : 'Probier es nochmal! 💪';
+    const sterneEl = $('#erg-sterne');
+    sterneEl.innerHTML = Array.from({ length: 5 }, () => '<span>⭐</span>').join('');
+    const spans = sterneEl.querySelectorAll('span');
+    for (let i = 0; i < st; i++) {
+      setTimeout(() => { spans[i].classList.add('an'); Ton.stern(i); }, 450 + i * 320);
+    }
+    const kachel = (zeichen, wert, text, art) => `<div class="erg-kachel ${art}"><b>${zeichen} ${wert}</b><small>${text}</small></div>`;
+    $('#erg-text').innerHTML = '<div class="erg-kacheln">'
+      + kachel('⏱️', istAufgaben(s) ? fmt(R.zeit / 1000) : laengeText(s), 'Zeit', 'zeit')
+      + kachel('✅', R.richtig, 'richtig', 'richtig')
+      + kachel('❌', R.falsch, 'falsch', 'falsch')
+      + '</div>'
+      + (istAufgaben(s) ? '' : punkteRechnung())
+      + zusatzHtml;
+
+    // Fehler: Aufgabe mit durchgestrichener Antwort und richtiger Lösung in der Lücke
+    const fehler = R.liste.filter((x) => !x.ok);
+    $('#erg-fehler').innerHTML = fehler.length
+      ? '<h3>Das üben wir noch</h3><div class="fehler-liste">' + fehler.map((x) => {
+        const t = Aufgaben.teile(x.auf);
+        const g = x.gegeben === null ? '⏭️' : x.gegeben;
+        const luecke = `<span class="falsch">${g}</span> <span class="loesung">${x.auf.loesung}</span>`;
+        const zahl = (n) => (n === null ? luecke : n);
+        return `<div class="fehler-zeile">${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${zahl(t.c)}</div>`;
+      }).join('') + '</div>'
+      : '';
+  }
+
   function rundeEnde() {
     if (!R || !R.aktiv) return;
     rundeAufraeumen();
+    if (tdot) { tdotRundeEnde(); return; }
     const s = R.s;
     const ziel = rundenZiel();
     const st = sterneBerechnen(s, ziel);
@@ -595,25 +627,11 @@
     sterneAnzeigen();
     const gesendet = Online.senden(Speicher.benutzer.aktiv);
 
-    // Anzeige
-    $('#erg-titel').textContent = st >= 4 ? 'Super gemacht! 🎉' : st >= 2 ? 'Gut gemacht! 👍' : st === 1 ? 'Geschafft! 💪' : 'Probier es nochmal! 💪';
-    const sterneEl = $('#erg-sterne');
-    sterneEl.innerHTML = Array.from({ length: 5 }, () => '<span>⭐</span>').join('');
-    const spans = sterneEl.querySelectorAll('span');
-    for (let i = 0; i < st; i++) {
-      setTimeout(() => { spans[i].classList.add('an'); Ton.stern(i); }, 450 + i * 320);
-    }
-    const kachel = (zeichen, wert, text, art) => `<div class="erg-kachel ${art}"><b>${zeichen} ${wert}</b><small>${text}</small></div>`;
     const faktorText = String(Math.round(faktor * 100) / 100).replace('.', ',');
-    $('#erg-text').innerHTML = '<div class="erg-kacheln">'
-      + kachel('⏱️', istAufgaben(s) ? fmt(R.zeit / 1000) : laengeText(s), 'Zeit', 'zeit')
-      + kachel('✅', R.richtig, 'richtig', 'richtig')
-      + kachel('❌', R.falsch, 'falsch', 'falsch')
-      + '</div>'
-      + (istAufgaben(s) ? '' : punkteRechnung())
-      + `<div class="erg-konto"><span class="gewinn">+${gewinn} ⭐</span>`
+    const kontoHtml = `<div class="erg-konto"><span class="gewinn">+${gewinn} ⭐</span>`
       + (faktor !== 1 && st > 0 ? `<small>${st} ⭐ × ${faktorText}</small>` : '')
       + `<span class="stand">Konto: ${d.sterne} ⭐</span></div>`;
+    ergebnisAnzeigen(st, s, kontoHtml);
     const rek = $('#erg-rekord');
     rek.textContent = geraeteRekord ? '👑 Neuer Geräte-Rekord!'
       : neuerRekord ? (alt ? '🏆 Neuer Rekord!' : '🏆 Erster Rekord!')
@@ -622,18 +640,6 @@
     $('#erg-tempo').textContent = zielText(s, ziel);
     bestenlisteZeigen(s, gesendet);
     if (neuerRekord) setTimeout(() => Ton.jubel(), 450 + st * 320 + 200);
-
-    // Fehler: Aufgabe mit durchgestrichener Antwort und richtiger Lösung in der Lücke
-    const fehler = R.liste.filter((x) => !x.ok);
-    $('#erg-fehler').innerHTML = fehler.length
-      ? '<h3>Das üben wir noch</h3><div class="fehler-liste">' + fehler.map((x) => {
-        const t = Aufgaben.teile(x.auf);
-        const g = x.gegeben === null ? '⏭️' : x.gegeben;
-        const luecke = `<span class="falsch">${g}</span> <span class="loesung">${x.auf.loesung}</span>`;
-        const zahl = (n) => (n === null ? luecke : n);
-        return `<div class="fehler-zeile">${zahl(t.a)} ${t.zeichen} ${zahl(t.b)} = ${zahl(t.c)}</div>`;
-      }).join('') + '</div>'
-      : '';
     zeige('ergebnis');
   }
 
@@ -648,7 +654,10 @@
     return `<div class="erg-punkte"><b>${rechnung}</b><small>Je ${FEHLER_PRO_PUNKT} Fehler gibt es 1 Punkt weniger.</small></div>`;
   }
 
-  $('#nochmal-runde').addEventListener('click', rundeStarten);
+  $('#nochmal-runde').addEventListener('click', () => {
+    if (tdot) { tdotNochmal(); return; }
+    rundeStarten();
+  });
   $('#erg-menue').addEventListener('click', () => { chipsAnzeigen(); zeige('start'); });
   $('#erg-spiele').addEventListener('click', spieleOeffnen);
 
@@ -1545,10 +1554,249 @@
     if (konten) anmeldungZeigen();
   });
 
+  // ---------- Tag der offenen Tür (Schüler im normalen Rechner) ----------
+  const tdotCode = (new URLSearchParams(location.search).get('tdot') || '').trim().toUpperCase();
+  let tdot = null; // { code, station, spieler: { name, emoji }, bild }
+
+  function tdotEinstellungenUebernehmen(station) {
+    tdot.station = station;
+    const st = station.einstellungen;
+    d = Speicher.standard();
+    e = d.eltern;
+    d.settings.modus = st.modus;
+    d.settings.art = st.art;
+    d.settings.anzahl = st.anzahl;
+    d.settings.minuten = st.minuten;
+    d.settings.uebungen = [...st.uebungen];
+    d.settings.einsetzen = Boolean(st.einsetzen);
+    e.strafe = st.strafe;
+    Sprache.setzeMotor(e.erkennung);
+  }
+
+  function tdotBildVorschau() {
+    const v = $('#tdot-vorschau');
+    if (!v || !tdot) return;
+    v.innerHTML = '';
+    v.appendChild(avatar({ bild: { art: 'emoji', wert: tdot.bild } }, 'riesig'));
+    $$('#tdot-bilder button').forEach((b) => b.classList.toggle('an', b.textContent === tdot.bild));
+  }
+
+  function tdotTonAnzeigen() {
+    const k = $('#tdot-ton');
+    if (!k) return;
+    k.textContent = Ton.an ? '🔊' : '🔇';
+    k.title = Ton.an ? 'Ton aus' : 'Ton an';
+    k.setAttribute('aria-label', k.title);
+  }
+
+  function tdotWertText(art, wert) {
+    if (art === 'zeit') return `${wert} ${wert === 1 ? 'Punkt' : 'Punkte'}`;
+    const sek = wert / 1000;
+    if (sek < 60) return `${sek.toFixed(1).replace('.', ',')} s`;
+    const min = Math.floor(sek / 60);
+    const rest = (sek % 60).toFixed(1).padStart(4, '0').replace('.', ',');
+    return `${min}:${rest}`;
+  }
+
+  async function tdotLaden() {
+    $('#tdot-info').textContent = '⏳ Station wird geladen …';
+    $('#tdot-formular').classList.add('versteckt');
+    $('#tdot-fehler-aktionen').classList.add('versteckt');
+    $('#tdot-fehler').textContent = '';
+    zeige('tdot-beitritt');
+
+    let j;
+    try {
+      const r = await fetch(`/api/tdot/${encodeURIComponent(tdot.code)}`, { cache: 'no-store' });
+      j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.station) {
+        $('#tdot-titel').textContent = 'Tag der offenen Tür';
+        $('#tdot-info').textContent = (j && j.fehler) || 'Diese Station gibt es nicht mehr.';
+        $('#tdot-fehler-aktionen').classList.remove('versteckt');
+        return;
+      }
+    } catch (err) {
+      $('#tdot-info').textContent = 'Server nicht erreichbar – bitte Internet prüfen.';
+      $('#tdot-fehler-aktionen').classList.remove('versteckt');
+      return;
+    }
+
+    const st = j.station;
+    $('#tdot-titel').textContent = st.titel;
+    if (!st.aktiv) {
+      $('#tdot-info').textContent = '⏸️ Diese Station ist gerade pausiert.';
+      $('#tdot-fehler-aktionen').classList.remove('versteckt');
+      return;
+    }
+
+    tdotEinstellungenUebernehmen(st);
+    const es = st.einstellungen;
+    const modusText = es.modus === 'sprache' ? '🎤 Sprechen' : '⌨️ Tippen';
+    const artText = es.art === 'zeit' ? `⏱️ ${es.minuten} ${es.minuten === 1 ? 'Minute' : 'Minuten'}` : `🔢 ${es.anzahl} Aufgaben`;
+    const uebText = Aufgaben.uebungenText(Aufgaben.uebungenTeil(es.uebungen));
+    const infoEl = $('#tdot-info');
+    infoEl.textContent = `${modusText} · ${artText}`;
+    const sm = document.createElement('small');
+    sm.textContent = `${uebText}${es.einsetzen ? ' · Einsetzen' : ''}`;
+    infoEl.appendChild(sm);
+
+    $('#tdot-formular').classList.remove('versteckt');
+    tdotBildVorschau();
+  }
+
+  function tdotStarten(code) {
+    let gemerkt = null;
+    try { gemerkt = JSON.parse(sessionStorage.getItem(`tdot-spieler:${code}`)); } catch (err) { gemerkt = null; }
+    const bild = (gemerkt && BILDER.includes(gemerkt.emoji))
+      ? gemerkt.emoji
+      : BILDER[Math.floor(Math.random() * BILDER.length)];
+    tdot = { code, station: null, spieler: null, bild };
+
+    const bilderBox = $('#tdot-bilder');
+    if (!bilderBox.childElementCount) {
+      BILDER.forEach((b) => {
+        const k = document.createElement('button');
+        k.textContent = b;
+        k.addEventListener('click', () => { Ton.klick(); tdot.bild = b; tdotBildVorschau(); });
+        bilderBox.appendChild(k);
+      });
+    }
+    if (gemerkt && gemerkt.name) $('#tdot-name').value = gemerkt.name;
+    tdotTonAnzeigen();
+    tdotLaden();
+  }
+
+  function tdotMitspielen() {
+    if (!tdot || !tdot.station || !tdot.station.aktiv) return;
+    const name = $('#tdot-name').value.replace(/\s+/g, ' ').trim();
+    if (!/^[\p{L}\p{N} ._-]{1,16}$/u.test(name)) {
+      Ton.falsch();
+      $('#tdot-fehler').textContent = 'Bitte einen Spitznamen eingeben (1–16 Buchstaben oder Ziffern).';
+      $('#tdot-name').focus();
+      return;
+    }
+    $('#tdot-fehler').textContent = '';
+    tdot.spieler = { name, emoji: tdot.bild };
+    try { sessionStorage.setItem(`tdot-spieler:${tdot.code}`, JSON.stringify(tdot.spieler)); } catch (err) {}
+    Ton.klick();
+    rundeStarten();
+  }
+
+  async function tdotNochmal() {
+    if (!tdot) return;
+    try {
+      const r = await fetch(`/api/tdot/${encodeURIComponent(tdot.code)}`, { cache: 'no-store' });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.station || !j.station.aktiv) {
+        tdotLaden();
+        return;
+      }
+      tdotEinstellungenUebernehmen(j.station);
+      rundeStarten();
+    } catch (err) {
+      rundeStarten();
+    }
+  }
+
+  async function tdotRundeEnde() {
+    const s = R.s;
+    const zeitMs = istAufgaben(s) ? Math.round(R.zeit) : R.dauer * 1000;
+    const ziel = rundenZiel();
+    const st = sterneBerechnen(s, ziel);
+
+    const strafHtml = istAufgaben(s) && R.falsch > 0 && e.strafe > 0
+      ? `<div class="erg-punkte"><b>Strafzeit: +${R.falsch * e.strafe} s (${R.falsch} × ${e.strafe} s)</b><small>Gesamtzeit für die Highscoreliste: ${tdotWertText('aufgaben', zeitMs + R.falsch * e.strafe * 1000)}</small></div>`
+      : '';
+    ergebnisAnzeigen(st, s, strafHtml);
+
+    const rek = $('#erg-rekord');
+    rek.classList.remove('neu');
+    rek.textContent = '⏳ Ergebnis wird an den Beamer gesendet …';
+    $('#erg-tempo').textContent = '';
+    $('#erg-bestenliste').innerHTML = '';
+    $('#erg-spiele').classList.add('versteckt');
+    $('#erg-menue').classList.add('versteckt');
+    $('#tdot-anderer-spieler').classList.remove('versteckt');
+    zeige('ergebnis');
+
+    try {
+      const r = await fetch(`/api/tdot/${encodeURIComponent(tdot.code)}/ergebnis`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: tdot.spieler.name,
+          emoji: tdot.spieler.emoji,
+          richtig: R.richtig,
+          falsch: R.falsch,
+          zeitMs,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        rek.textContent = `⚠️ ${j.fehler || 'Ergebnis konnte nicht gesendet werden.'}`;
+        return;
+      }
+      if (!j.gewertet) {
+        rek.textContent = j.grund || 'Ergebnis wurde nicht gewertet.';
+      } else {
+        if (j.neu) {
+          rek.textContent = `🎉 Platz ${j.platz} auf dem Beamer!`;
+        } else if (j.verbessert) {
+          rek.textContent = `🏆 Neuer Bestwert – Platz ${j.platz}!`;
+        } else {
+          rek.textContent = `Dein Bestwert bleibt: ${tdotWertText(s.art, j.besterWert)} (Platz ${j.platz})`;
+        }
+        rek.classList.toggle('neu', Boolean(j.verbessert));
+        if (j.verbessert) setTimeout(() => Ton.jubel(), 450 + st * 320 + 200);
+      }
+
+      if (Array.isArray(j.top) && j.top.length) {
+        const box = $('#erg-bestenliste');
+        const h = document.createElement('h3');
+        h.textContent = 'Highscoreliste';
+        const ol = document.createElement('ol');
+        const u = (x) => ({ bild: { art: 'emoji', wert: x.emoji } });
+        const meinId = j.ich && j.ich.id;
+        j.top.forEach((x) => listenEintrag(ol, x.platz, u(x), x.name, tdotWertText(s.art, x.wert), x.id === meinId));
+        if (j.ich && j.ich.platz > j.top.length) {
+          listenEintrag(ol, j.ich.platz, u(j.ich), j.ich.name, tdotWertText(s.art, j.ich.wert), true);
+        }
+        const info = document.createElement('p');
+        info.className = 'listen-info';
+        info.textContent = `${j.gesamt} ${j.gesamt === 1 ? 'Kind' : 'Kinder'} in dieser Liste`;
+        box.append(h, ol, info);
+      }
+    } catch (err) {
+      rek.textContent = '⚠️ Keine Verbindung zum Beamer.';
+    }
+  }
+
+  $('#tdot-ton').addEventListener('click', () => {
+    Ton.an = !Ton.an;
+    tdotTonAnzeigen();
+    Ton.klick();
+  });
+  $('#tdot-los').addEventListener('click', tdotMitspielen);
+  $('#tdot-name').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') tdotMitspielen(); });
+  $('#tdot-neu-laden').addEventListener('click', () => { Ton.klick(); tdotLaden(); });
+  $('#tdot-anderer-spieler').addEventListener('click', () => {
+    if (!tdot) return;
+    Ton.klick();
+    $('#tdot-name').value = '';
+    tdot.spieler = null;
+    tdot.bild = BILDER[Math.floor(Math.random() * BILDER.length)];
+    try { sessionStorage.removeItem(`tdot-spieler:${tdot.code}`); } catch (err) {}
+    tdotLaden();
+  });
+
   // ---------- Los ----------
-  benutzerZeigen();
-  ssoRueckkehr();
-  kontenPruefen();
+  if (tdotCode) {
+    tdotStarten(tdotCode);
+  } else {
+    benutzerZeigen();
+    ssoRueckkehr();
+    kontenPruefen();
+  }
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

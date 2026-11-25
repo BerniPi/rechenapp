@@ -12,9 +12,11 @@ Rechentrainer für die Volksschule als PWA. Kinder rechnen (tippen oder sprechen
 
 | Ordner/Datei | Inhalt |
 |---|---|
-| `index.html` | alle Bildschirme als `<section class="screen">`: `benutzer`, `neu`, `anmeldung`, `start`, `runde`, `ergebnis`, `spiele`, `spiel`, `highscores`, `pin`, `eltern` |
+| `index.html` | alle Bildschirme als `<section class="screen">`: `benutzer`, `neu`, `anmeldung`, `tdot-beitritt`, `start`, `runde`, `ergebnis`, `spiele`, `spiel`, `highscores`, `pin`, `eltern` |
 | `turnier.html` | Turniermodus (Lehrkraft-Lobby, Beamer-Live, Rechnen auf Handys) |
+| `offene-tuer.html` | Tag der offenen Tür (Lehrkraft-Setup, Beamer-Highscoreliste + QR-Code) |
 | `css/turnier.css` | Styling für Turniermodus (Beamer, Mobilgeräte, Podest) |
+| `css/offene-tuer.css` | Styling für Tag der offenen Tür (Setup & 16:9 Beamer) |
 | `css/style.css` | gesamtes Styling |
 | `js/` | App-Logik (siehe Frontend) |
 | `js/spiele/` | Minispiele + Register `spiele.js` |
@@ -40,7 +42,7 @@ Rechentrainer für die Volksschule als PWA. Kinder rechnen (tippen oder sprechen
 | Icons | `node tools/icon.js` |
 | Stimme neu | `python tools/stimme.py` (Azure mit `AZURE_SPEECH_KEY`/`_REGION`, sonst edge-tts) |
 
-`tools/test.js` prüft: Aufgaben-Generator je Übung (keine negativen Ergebnisse, keine Reste, eindeutige Lücken, Zehnerübergang wie angegeben), Rekord-Schlüssel und Umstellung alter Schlüssel (auch `Speicher.uebungenUmstellen`, dafür exportiert `speicher.js` für Node), Zahlwort-Parser, Jonas-Schnipsel vollständig, Level-Generatoren Schrauben/Unblock, Server-Helfer (`hilfe.js`: Benutzername, Mail, Klassen-CSV, Passwort-Hash), Turnier-Logik (`turnier.js`: Gruppen, K.-o.-Baum, Wertung, Zustandsautomat, Aufgabenfilter, Durchspielen). Kein Test für HTTP-Routen oder UI.
+`tools/test.js` prüft: Aufgaben-Generator je Übung (keine negativen Ergebnisse, keine Reste, eindeutige Lücken, Zehnerübergang wie angegeben), Rekord-Schlüssel und Umstellung alter Schlüssel (auch `Speicher.uebungenUmstellen`, dafür exportiert `speicher.js` für Node), Zahlwort-Parser, Jonas-Schnipsel vollständig, Level-Generatoren Schrauben/Unblock, Server-Helfer (`hilfe.js`: Benutzername, Mail, Klassen-CSV, Passwort-Hash), Turnier-Logik (`turnier.js`: Gruppen, K.-o.-Baum, Wertung, Zustandsautomat, Aufgabenfilter, Durchspielen), Tag-der-offenen-Tür-Logik (`tdot.js`: Stationen, Wertung, Bestwert, Pause/Löschen). Kein Test für HTTP-Routen oder UI.
 
 ## Frontend
 
@@ -49,6 +51,7 @@ Einstieg: `index.html` lädt der Reihe nach `speicher → online → aufgaben �
 | Datei | Zuständig für |
 |---|---|
 | `js/turnier.js` | Turniermodus UI (Lehrkraft & Kind), SSE-Live-Verbindung, Countdown, Live-Fortschritt |
+| `js/offene-tuer.js` | Tag der offenen Tür UI (Lehrkraft-Setup & Live-Beamer-Highscoreliste per SSE) |
 | `js/app.js` | gesamte UI in einer IIFE: Bildschirme, Rechenrunde, Auswertung/Sterne, Rekorde, Spiele-Auswahl, Eltern-Bereich + PIN, Online-UI, Anmelde-Bildschirm, Spielerwahl. Abschnitte mit `// ---------- … ----------` |
 | `js/speicher.js` | `Speicher`: localStorage je Spieler, Standardwerte (`standard()`), Migrationen alter Daten in `laden()` |
 | `js/online.js` | `Online`: Server-Anfragen, Verbinden (Code/Konto/SSO), Warteschlange für offline, `senden()` = `POST /api/sync` |
@@ -84,6 +87,8 @@ Einstieg `server/server.js` (ein `http.createServer`, Routing per `"${METHODE} $
 | `hilfe.js` | Validierung (Name, Emoji, Benutzername, Mail, Rekord-Key/-Wert), JSON-Antworten, Hashing, scrypt-Passwörter, Rate-Limit `erlaubt()`, `ip()` |
 | `turnier.js` | Spiellogik für Turniere (ohne HTTP): Zustand im RAM, Paarungen, K.-o.-Baum, Wertung |
 | `turnier-routen.js` | HTTP-Routen `/api/turnier/*` und SSE-Live-Verbindungen |
+| `tdot.js` | SQLite-Dienst für „Tag der offenen Tür“ (Stationen, Highscores, Bestwert-Logik) |
+| `tdot-routen.js` | HTTP-Routen `/api/tdot/*` und SSE-Live-Verbindungen für den Beamer |
 | `einstellungen.js` | `ANMELDUNG`, `DOMAIN`, MS-Daten, `ADRESSE` aus Env |
 | `sso.js` | Microsoft-Login (bgbb): start → rückruf → `/#sso=<Übergabe>` → einlösen |
 
@@ -117,6 +122,8 @@ Auth: `Authorization: Bearer <schluessel>`; gespeichert wird nur `sha256` in Tab
 | `sterne_buchungen` | `id`, UNIQUE (`spieler_id`, `client_id`) | `delta` ±, `grund` ∈ `runde`/`spiel`/`eltern`/`start`; Kontostand = Summe |
 | `erlaubte_adressen` | `email` | piazzi: freigegebene Adressen (mehrere Konten pro Adresse erlaubt) |
 | `klassen_zuordnung` | `benutzername` | bgbb: Klasse aus CSV-Import, gilt auch vor dem ersten Login |
+| `tdot_stationen` | `code` | Tag der offenen Tür: Stationen mit Titel, Status (`aktiv`), Einstellungen, `leitung_hash` |
+| `tdot_ergebnisse` | `id`, UNIQUE (`station_code`, `teilnehmer_key`) | Tag der offenen Tür: bestes Ergebnis je Name (`wert` = ms inkl. Strafzeit bzw. Punkte) |
 
 **Migrationen:** keine Versionsnummern. Neue Tabellen mit `CREATE TABLE IF NOT EXISTS`, neue Spalten über `spalte(tabelle, name, def)` in `db.js` (prüft `PRAGMA table_info`). Läuft bei jedem Start. Nur additiv ändern.
 
@@ -150,6 +157,10 @@ Auth: `Authorization: Bearer <schluessel>`; gespeichert wird nur `sha256` in Tab
   - Server-Timer: Automatischer Countdown (3 s) und Runden-Timeout (`dauerMs` + 2 s Kulanz). Bei Abbruch/vorzeitigem Beenden werden die Timer per `timerLoeschen()` aufgeräumt.
   - Inaktive Turniere (>3 h inaktiv oder >8 h alt) werden alle 10 min per `aufraeumenAlle()` entfernt und deren offene SSE-Verbindungen ordentlich per `res.end()` geschlossen.
   - Formate: Sprint (1 Runde, alle zusammen), K.-o. (1-gegen-1 mit Freilosen, Kampflos-Wertung bei Ausfall, Entscheidungsaufgabe bei Duell-Gleichstand, optional Spiel um Platz 3), Liga (Sprintrunden mit Punkten 10, 8, 6, 5...), Gruppenphase → K.-o. (feste Gruppen über Vorrunden, danach K.-o.-Baum der besten Aufsteiger).
+- **Tag der offenen Tür (`/offene-tuer`, Schüler über `/?tdot=CODE`)**:
+  - Stationen und Highscores liegen dauerhaft in SQLite (`tdot_stationen`, `tdot_ergebnisse`), geschützt für die Lehrkraft über `leitung_hash` (Bearer-Token im `localStorage`/`sessionStorage`).
+  - Schüler scannen den QR-Code (`/?tdot=CODE`), geben Spitznamen + Emoji ein und rechnen direkt im normalen Rechner (`index.html` `#runde`, ohne `Speicher`- oder `Online`-Nutzung).
+  - Je Person (`teilnehmer_key = name.toLowerCase()`) bleibt nur der beste Wert gespeichert; Beamer-Updates laufen über `/api/tdot/:code/ereignisse` (SSE `hallo`, `update`, `station`, `beendet`).
 
 ## Arbeitsweise
 

@@ -58,6 +58,30 @@
   </div>
 </section>
 
+<!-- ============ TAG DER OFFENEN TÜR (BEITRITT) ============ -->
+<section id="tdot-beitritt" class="screen">
+  <header class="kopf">
+    <button id="tdot-ton" class="rund klein" title="Ton aus" aria-label="Ton aus">🔊</button>
+    <h1 id="tdot-titel">Tag der offenen Tür</h1>
+    <div></div>
+  </header>
+  <div id="tdot-info" class="tdot-info-karte">⏳ Station wird geladen …</div>
+  <div id="tdot-formular" class="versteckt">
+    <div id="tdot-vorschau" class="avatar riesig"></div>
+    <input id="tdot-name" class="name-eingabe" type="text" maxlength="16" placeholder="Wie heißt du?" autocomplete="off">
+    <p id="tdot-fehler" class="sprach-hinweis"></p>
+    <h2 class="bild-titel">Such dir ein Bild aus:</h2>
+    <div id="tdot-bilder" class="bilder"></div>
+    <div class="aktionen">
+      <button id="tdot-los" class="knopf gross gruen">Los geht's! 🚀</button>
+    </div>
+  </div>
+  <div id="tdot-fehler-aktionen" class="aktionen versteckt">
+    <button id="tdot-neu-laden" class="knopf blau">🔄 Aktualisieren</button>
+    <a href="/" class="knopf grau" style="text-align:center;text-decoration:none">Zur normalen App</a>
+  </div>
+</section>
+
 <!-- ============ START ============ -->
 <section id="start" class="screen">
   <header class="kopf">
@@ -155,6 +179,7 @@
   <div id="erg-fehler" class="erg-fehler"></div>
   <div class="aktionen">
     <button id="nochmal-runde" class="knopf gross gruen">Nochmal 🔁</button>
+    <button id="tdot-anderer-spieler" class="knopf grau versteckt">👤 Anderer Spieler</button>
     <button id="erg-spiele" class="knopf lila">🎮 Spiele</button>
     <button id="erg-menue" class="knopf grau">🏠 Menü</button>
   </div>
@@ -241,6 +266,9 @@
 
     <h2>Turnier</h2>
     <div class="zeile"><a href="/turnier" class="knopf blau" style="text-decoration:none">🏆 Turnier veranstalten</a></div>
+
+    <h2>Tag der offenen Tür</h2>
+    <div class="zeile"><a href="/offene-tuer" class="knopf gruen" style="text-decoration:none">🏫 Tag der offenen Tür starten</a></div>
 
     <h2>Eltern-PIN</h2>
     <div class="zeile"><button id="pin-aendern" class="knopf klein">🔒 PIN ändern</button></div>

@@ -115,6 +115,8 @@ db.exec(`
   );
 `);
 
+require('./tdot').initSchema(db);
+
 // Schlüssel aus der Zeit vor den Geräte-Schlüsseln übernehmen (einmalig, danach ändert sich nichts mehr)
 db.exec(`INSERT OR IGNORE INTO schluessel (hash, spieler_id, erstellt)
   SELECT schluessel_hash, id, erstellt FROM spieler WHERE schluessel_hash NOT LIKE 'konto:%'`);
